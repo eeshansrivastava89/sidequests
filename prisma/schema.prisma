@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  pathHash    String   @unique
+  pathDisplay String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scan     Scan?
+  derived  Derived?
+  llm      Llm?
+  override Override?
+  metadata Metadata?
+  activity Activity[]
+}
+
+model Scan {
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rawJson   String   // Full scan output as JSON
+  scannedAt DateTime @default(now())
+}
+
+model Derived {
+  id              String  @id @default(cuid())
+  projectId       String  @unique
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  statusAuto      String  // active, in-progress, stale, archived
+  healthScoreAuto Int
+  derivedJson     String  // Full derived output as JSON (tags, etc.)
+}
+
+model Llm {
+  id                   String   @id @default(cuid())
+  projectId            String   @unique
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  purpose              String?
+  tagsJson             String?  // JSON array
+  notableFeaturesJson  String?  // JSON array
+  recommendationsJson  String?  // JSON array
+  takeawaysJson        String?  // JSON object
+  generatedAt          DateTime @default(now())
+}
+
+model Override {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  statusOverride  String?
+  purposeOverride String?
+  tagsOverride    String?  // JSON array
+  notesOverride   String?
+  manualJson      String?  // Arbitrary manual overrides as JSON
+  updatedAt       DateTime @updatedAt
+}
+
+model Metadata {
+  id             String  @id @default(cuid())
+  projectId      String  @unique
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  goal           String?
+  audience       String?
+  successMetrics String?
+  nextAction     String?
+  publishTarget  String?
+  evidenceJson   String? // JSON object for O-1 evidence
+  outcomesJson   String? // JSON object for O-1 outcomes
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        String   // e.g. "scan", "override", "llm", "metadata"
+  payloadJson String?
+  createdAt   DateTime @default(now())
+}
