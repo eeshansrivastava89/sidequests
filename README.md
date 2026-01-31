@@ -6,7 +6,6 @@ A local developer portfolio dashboard that scans `~/dev` projects, computes heal
 
 ```bash
 npm install
-cp config.example.json config.example.json  # reference only — config comes from env
 cp .env.local.example .env.local             # then edit values
 npx prisma migrate dev                       # create/migrate SQLite database
 npm run dev                                  # start Next.js dev server
