@@ -6,5 +6,6 @@ export async function GET() {
   return NextResponse.json({
     featureLlm: config.featureLlm,
     featureO1: config.featureO1,
+    sanitizePaths: config.sanitizePaths,
   });
 }

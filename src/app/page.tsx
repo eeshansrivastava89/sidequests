@@ -177,6 +177,7 @@ export default function DashboardPage() {
                 key={project.id}
                 project={project}
                 onClick={() => setSelectedId(project.id)}
+                sanitizePaths={config.sanitizePaths}
               />
             ))}
           </div>

@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 interface AppConfig {
   featureLlm: boolean;
   featureO1: boolean;
+  sanitizePaths: boolean;
 }
 
-const DEFAULT: AppConfig = { featureLlm: false, featureO1: false };
+const DEFAULT: AppConfig = { featureLlm: false, featureO1: false, sanitizePaths: true };
 
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT);

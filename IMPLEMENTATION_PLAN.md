@@ -12,6 +12,7 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 6: Completed
 - ✅ Phase 7: Completed
 - ✅ Phase 8: Completed
+- ⏳ Phase 9: Pending
 
 Notes:
 - ✅ README setup line fixed (no no-op copy).
@@ -103,6 +104,19 @@ Deliverables:
 - Refresh button shows live progress with per-project status
 - LLM failures are visible without checking server logs
 - UI updates incrementally (no “black box” refresh)
+
+## ⏳ Phase 9 - Quick Actions (Pending)
+- Add header buttons for quick actions:
+  - Open in VS Code (uses vscode://file/<path>)
+  - Copy "claude" command for project folder
+  - Copy "codex" command for project folder
+- Only show quick actions when SANITIZE_PATHS=false (avoid leaking paths in OSS mode)
+- Add tooltip text: VS Code button behavior depends on user VS Code window settings
+
+Deliverables:
+- One-click VS Code link for the selected project
+- Copy-to-clipboard buttons for Claude/Codex commands
+- Buttons are hidden/disabled when paths are sanitized
 
 ## Acceptance Criteria
 - Status auto-computed but editable; edits persist across refresh
