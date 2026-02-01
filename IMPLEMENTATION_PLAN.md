@@ -2,7 +2,7 @@
 
 This is the step-by-step plan for Claude to implement. Codex will review each phase.
 
-## Status (2026-01-31)
+## Status (2026-02-01)
 - ✅ Phase 0: Completed
 - ✅ Phase 1: Completed
 - ✅ Phase 2: Completed
@@ -12,7 +12,8 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 6: Completed
 - ✅ Phase 7: Completed
 - ✅ Phase 8: Completed
-- ⏳ Phase 9: Pending
+- ✅ Phase 9: Completed
+- ⏳ Phase 10: Pending
 
 Notes:
 - ✅ README setup line fixed (no no-op copy).
@@ -105,7 +106,7 @@ Deliverables:
 - LLM failures are visible without checking server logs
 - UI updates incrementally (no “black box” refresh)
 
-## ⏳ Phase 9 - Quick Actions (Pending)
+## ✅ Phase 9 - Quick Actions (Completed)
 - Add header buttons for quick actions:
   - Open in VS Code (uses vscode://file/<path>)
   - Copy "claude" command for project folder
@@ -117,6 +118,17 @@ Deliverables:
 - One-click VS Code link for the selected project
 - Copy-to-clipboard buttons for Claude/Codex commands
 - Buttons are hidden/disabled when paths are sanitized
+
+## ⏳ Phase 10 - Soft Prune Missing Projects (Pending)
+- On refresh, mark projects missing from the latest scan as pruned (soft delete)
+- Add `prunedAt` timestamp on Project (nullable) and hide pruned projects by default
+- If a pruned project reappears in a future scan, auto-restore (clear prunedAt)
+- Behavior should be safe and deterministic (only mark absent pathHash values after a successful scan)
+
+Deliverables:
+- Deleted/renamed/missing repos disappear from the UI after refresh
+- Manual overrides/metadata are preserved (no data loss on temporary removal)
+- Projects auto-restore when the pathHash returns
 
 ## Acceptance Criteria
 - Status auto-computed but editable; edits persist across refresh

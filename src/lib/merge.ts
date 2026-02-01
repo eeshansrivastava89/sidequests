@@ -88,6 +88,7 @@ export async function mergeProjectView(projectId: string): Promise<MergedProject
 
 export async function mergeAllProjects(): Promise<MergedProject[]> {
   const projects = await db.project.findMany({
+    where: { prunedAt: null },
     include: { scan: true, derived: true, llm: true, override: true, metadata: true },
     orderBy: { name: "asc" },
   });

@@ -17,7 +17,7 @@ export const codexCliProvider: LlmProvider = {
 
     const { stdout } = await execFileAsync(
       "codex",
-      ["--quiet", "--approval-mode", "full-auto", prompt],
+      ["exec", "--full-auto", prompt],
       { timeout: 120_000, maxBuffer: 1024 * 1024 }
     );
 

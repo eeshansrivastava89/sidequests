@@ -113,6 +113,17 @@ export async function runRefreshPipeline(
     deriveData.projects.map((d) => [d.pathHash, d])
   );
 
+  // Soft-prune missing projects and restore returning ones
+  const scannedHashes = new Set(scanData.projects.map((p) => p.pathHash));
+  await db.project.updateMany({
+    where: { pathHash: { notIn: [...scannedHashes] }, prunedAt: null },
+    data: { prunedAt: new Date() },
+  });
+  await db.project.updateMany({
+    where: { pathHash: { in: [...scannedHashes] }, prunedAt: { not: null } },
+    data: { prunedAt: null },
+  });
+
   const llmProvider = getLlmProvider();
   const total = scanData.projects.length;
 
