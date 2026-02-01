@@ -2,6 +2,8 @@
   "DEV_ROOT": "~/dev",
   "EXCLUDE_DIRS": "_projects_dashboard,node_modules,.venv,__pycache__,.git",
   "FEATURE_LLM": false,
+  "LLM_PROVIDER": "claude-cli",
+  "LLM_ALLOW_UNSAFE": false,
   "FEATURE_O1": false,
   "SANITIZE_PATHS": true
 }

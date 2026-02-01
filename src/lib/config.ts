@@ -28,7 +28,22 @@ export const config = {
   get featureO1(): boolean {
     return envBool("FEATURE_O1", false);
   },
+  get llmProvider(): string {
+    return process.env.LLM_PROVIDER || "claude-cli";
+  },
+  get llmAllowUnsafe(): boolean {
+    return envBool("LLM_ALLOW_UNSAFE", false);
+  },
   get sanitizePaths(): boolean {
     return envBool("SANITIZE_PATHS", true);
+  },
+  get claudeCliModel(): string | undefined {
+    return process.env.CLAUDE_CLI_MODEL || undefined;
+  },
+  get llmDebug(): boolean {
+    return envBool("LLM_DEBUG", false);
+  },
+  get llmOverwriteMetadata(): boolean {
+    return envBool("LLM_OVERWRITE_METADATA", false);
   },
 } as const;
