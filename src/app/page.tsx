@@ -6,7 +6,7 @@ import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
 import type { Project, WorkflowView } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
-import { ProjectCard } from "@/components/project-card";
+import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
 import { RefreshPanel } from "@/components/refresh-panel";
 import { Button } from "@/components/ui/button";
@@ -171,16 +171,12 @@ export default function DashboardPage() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onClick={() => setSelectedId(project.id)}
-                sanitizePaths={config.sanitizePaths}
-              />
-            ))}
-          </div>
+          <ProjectList
+            projects={filtered}
+            selectedId={selectedId}
+            onSelect={(p) => setSelectedId(p.id)}
+            sanitizePaths={config.sanitizePaths}
+          />
         )}
       </main>
 

@@ -1,0 +1,199 @@
+"use client";
+
+import type { Project } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface ProjectListProps {
+  projects: Project[];
+  selectedId: string | null;
+  onSelect: (project: Project) => void;
+  sanitizePaths: boolean;
+}
+
+const STATUS_DOT: Record<string, string> = {
+  active: "bg-emerald-500",
+  "in-progress": "bg-blue-500",
+  stale: "bg-amber-500",
+  archived: "bg-zinc-400",
+};
+
+function healthColor(score: number): string {
+  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 40) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function formatDaysInactive(days: number | null | undefined): string {
+  if (days == null) return "\u2014";
+  return `${days}d`;
+}
+
+function copyToClipboard(text: string, label: string) {
+  navigator.clipboard.writeText(text).then(
+    () => toast.success(`Copied ${label} command`),
+    () => toast.error("Failed to copy")
+  );
+}
+
+function VsCodeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.583 2.213l-4.52 4.275L7.95 2.213 2.4 4.831v14.338l5.55 2.618 5.113-4.275 4.52 4.275L23.6 19.17V4.831l-6.017-2.618zM7.95 15.6l-3.15-2.1V10.5l3.15 2.1v3zm5.113-3.6L7.95 8.4V5.4l5.113 3.6v3zm4.52 3.6l-3.15-2.1v-3l3.15 2.1v3z" />
+    </svg>
+  );
+}
+
+function ClaudeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3.5 5h7a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-7a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5zm1 3.5h5a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-5a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5z" />
+    </svg>
+  );
+}
+
+function CodexIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h6v2H8v-2z" />
+    </svg>
+  );
+}
+
+export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: ProjectListProps) {
+  const gridCols = sanitizePaths
+    ? "grid-cols-[auto_1fr_auto_auto_auto_1fr]"
+    : "grid-cols-[auto_1fr_auto_auto_auto_1fr_auto]";
+
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      {/* Header row */}
+      <div className={cn(
+        "grid items-center gap-x-3 px-3 h-8 bg-muted/50 border-b border-border text-[11px] font-medium text-muted-foreground uppercase tracking-wider select-none",
+        gridCols
+      )}>
+        <div className="w-2.5" />
+        <div>Name</div>
+        <div className="hidden sm:block">Lang</div>
+        <div className="hidden md:block text-right">Health</div>
+        <div className="hidden sm:block text-right">Inactive</div>
+        <div className="hidden md:block">Last Commit</div>
+        {!sanitizePaths && <div className="text-right">Actions</div>}
+      </div>
+
+      {/* Rows */}
+      {projects.map((project) => {
+        const isSelected = project.id === selectedId;
+        const rawPath = project.pathDisplay;
+
+        return (
+          <div
+            key={project.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelect(project)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(project);
+              }
+            }}
+            className={cn(
+              "grid items-center gap-x-3 px-3 h-10 border-b border-border last:border-b-0 cursor-pointer transition-colors",
+              gridCols,
+              isSelected
+                ? "bg-accent"
+                : "hover:bg-muted/50"
+            )}
+          >
+            {/* Status dot */}
+            <div
+              className={cn(
+                "w-2.5 h-2.5 rounded-full shrink-0",
+                STATUS_DOT[project.status] ?? STATUS_DOT.archived
+              )}
+              title={project.status}
+            />
+
+            {/* Name */}
+            <div
+              className="font-semibold text-sm truncate min-w-0"
+              title={rawPath}
+            >
+              {project.name}
+            </div>
+
+            {/* Language badge */}
+            <div className="hidden sm:block">
+              {project.scan?.languages?.primary ? (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                  {project.scan.languages.primary}
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground text-xs">{"\u2014"}</span>
+              )}
+            </div>
+
+            {/* Health score */}
+            <div className={cn(
+              "hidden md:block text-right font-mono text-sm font-semibold tabular-nums w-8",
+              healthColor(project.healthScore)
+            )}>
+              {project.healthScore}
+            </div>
+
+            {/* Days inactive */}
+            <div className="hidden sm:block text-right font-mono text-xs text-muted-foreground tabular-nums w-10">
+              {formatDaysInactive(project.scan?.daysInactive)}
+            </div>
+
+            {/* Last commit message */}
+            <div className="hidden md:block font-mono text-xs text-muted-foreground truncate min-w-0">
+              {project.scan?.lastCommitMessage ?? "\u2014"}
+            </div>
+
+            {/* Quick actions */}
+            {!sanitizePaths && (
+              <div
+                className="flex items-center gap-0.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#007ACC] hover:bg-[#007ACC]/10"
+                  title="Open in VS Code"
+                  asChild
+                >
+                  <a href={`vscode://file${encodeURI(rawPath)}`}>
+                    <VsCodeIcon className="size-3" />
+                  </a>
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#D97757] hover:bg-[#D97757]/10"
+                  title="Copy Claude command"
+                  onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
+                >
+                  <ClaudeIcon className="size-3" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Copy Codex command"
+                  onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
+                >
+                  <CodexIcon className="size-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

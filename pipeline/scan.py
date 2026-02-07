@@ -72,6 +72,15 @@ def get_git_info(path: str) -> dict:
             "remoteUrl": None,
             "commitCount": 0,
             "daysInactive": None,
+            "isDirty": False,
+            "untrackedCount": 0,
+            "modifiedCount": 0,
+            "stagedCount": 0,
+            "ahead": 0,
+            "behind": 0,
+            "recentCommits": [],
+            "branchCount": 0,
+            "stashCount": 0,
         }
 
     last_date = run_git(path, "log", "-1", "--format=%aI")
@@ -89,6 +98,60 @@ def get_git_info(path: str) -> dict:
         except ValueError:
             pass
 
+    # Working tree status
+    status_output = run_git(path, "status", "--porcelain")
+    is_dirty = False
+    untracked = 0
+    modified = 0
+    staged = 0
+    if status_output:
+        is_dirty = True
+        for line in status_output.splitlines():
+            if len(line) < 2:
+                continue
+            x, y = line[0], line[1]
+            if x == "?" and y == "?":
+                untracked += 1
+            if y == "M" or x == "M":
+                modified += 1
+            if x in ("A", "M", "R", "D") and y != "?":
+                staged += 1
+
+    # Ahead/behind remote
+    ahead_count = 0
+    behind_count = 0
+    if branch:
+        ab_output = run_git(path, "rev-list", "--count", "--left-right", f"@{{upstream}}...HEAD")
+        if ab_output:
+            parts = ab_output.split()
+            if len(parts) == 2:
+                try:
+                    behind_count = int(parts[0])
+                    ahead_count = int(parts[1])
+                except ValueError:
+                    pass
+
+    # Recent commits
+    recent_commits: list[dict] = []
+    log_output = run_git(path, "log", "-10", "--format=%H|%aI|%s")
+    if log_output:
+        for line in log_output.splitlines():
+            parts = line.split("|", 2)
+            if len(parts) == 3:
+                recent_commits.append({
+                    "hash": parts[0],
+                    "date": parts[1],
+                    "message": parts[2],
+                })
+
+    # Branch count
+    branch_output = run_git(path, "branch", "--list")
+    branch_count = len(branch_output.splitlines()) if branch_output else 0
+
+    # Stash count
+    stash_output = run_git(path, "stash", "list")
+    stash_count = len(stash_output.splitlines()) if stash_output else 0
+
     return {
         "isRepo": True,
         "lastCommitDate": last_date,
@@ -97,6 +160,15 @@ def get_git_info(path: str) -> dict:
         "remoteUrl": remote,
         "commitCount": commit_count,
         "daysInactive": days_inactive,
+        "isDirty": is_dirty,
+        "untrackedCount": untracked,
+        "modifiedCount": modified,
+        "stagedCount": staged,
+        "ahead": ahead_count,
+        "behind": behind_count,
+        "recentCommits": recent_commits,
+        "branchCount": branch_count,
+        "stashCount": stash_count,
     }
 
 
@@ -162,9 +234,11 @@ def check_deployment(path: str) -> dict:
     }
 
 
-def count_todos(path: str) -> tuple[int, int]:
+def count_todos(path: str) -> tuple[int, int, int]:
+    """Walk source files, counting TODOs, FIXMEs, and total lines of code."""
     todo_count = 0
     fixme_count = 0
+    loc_count = 0
 
     for root, dirs, files in os.walk(path):
         dirs[:] = [d for d in dirs if d not in SKIP_WALK_DIRS]
@@ -175,6 +249,7 @@ def count_todos(path: str) -> tuple[int, int]:
             try:
                 with open(fpath, "r", errors="ignore") as f:
                     for line in f:
+                        loc_count += 1
                         if "TODO" in line:
                             todo_count += 1
                         if "FIXME" in line:
@@ -182,7 +257,7 @@ def count_todos(path: str) -> tuple[int, int]:
             except (PermissionError, OSError):
                 continue
 
-    return todo_count, fixme_count
+    return todo_count, fixme_count, loc_count
 
 
 def get_description(path: str) -> str | None:
@@ -211,6 +286,188 @@ def get_description(path: str) -> str | None:
     return None
 
 
+FRAMEWORK_MAP_JS: dict[str, str] = {
+    "next": "nextjs",
+    "react": "react",
+    "vue": "vue",
+    "@angular/core": "angular",
+    "express": "express",
+    "fastify": "fastify",
+    "svelte": "svelte",
+    "nuxt": "nuxt",
+    "@remix-run/react": "remix",
+    "gatsby": "gatsby",
+}
+
+FRAMEWORK_MAP_RUST: dict[str, str] = {
+    "axum": "axum",
+    "actix-web": "actix",
+    "rocket": "rocket",
+    "warp": "warp",
+}
+
+FRAMEWORK_MAP_PYTHON: list[tuple[str, str]] = [
+    ("fastapi", "fastapi"),
+    ("django", "django"),
+    ("flask", "flask"),
+    ("starlette", "starlette"),
+]
+
+SERVICE_DEPS: dict[str, str] = {
+    "@supabase/supabase-js": "supabase",
+    "posthog-js": "posthog",
+    "posthog-node": "posthog",
+    "stripe": "stripe",
+    "firebase": "firebase",
+    "firebase-admin": "firebase",
+    "@aws-sdk": "aws",
+    "@prisma/client": "prisma",
+    "mongoose": "mongodb",
+    "@sentry": "sentry",
+}
+
+ENV_KEY_PREFIXES: list[tuple[str, str]] = [
+    ("SUPABASE_", "supabase"),
+    ("POSTHOG_", "posthog"),
+    ("NEXT_PUBLIC_POSTHOG", "posthog"),
+    ("STRIPE_", "stripe"),
+    ("FIREBASE_", "firebase"),
+    ("AWS_", "aws"),
+    ("DATABASE_URL", "database"),
+    ("SENTRY_", "sentry"),
+    ("OPENAI_", "openai"),
+    ("ANTHROPIC_", "anthropic"),
+]
+
+LOCKFILE_MAP: list[tuple[str, str]] = [
+    ("pnpm-lock.yaml", "pnpm"),
+    ("package-lock.json", "npm"),
+    ("yarn.lock", "yarn"),
+    ("bun.lockb", "bun"),
+    ("Cargo.lock", "cargo"),
+    ("uv.lock", "uv"),
+    ("poetry.lock", "poetry"),
+    ("Pipfile.lock", "pipenv"),
+]
+
+
+def _read_json(path: str) -> dict | None:
+    """Read a JSON file, returning None on any error."""
+    try:
+        return json.loads(Path(path).read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def detect_framework(path: str) -> str | None:
+    """Detect the primary framework from dependency files."""
+    p = Path(path)
+
+    # Check package.json
+    pkg = _read_json(str(p / "package.json"))
+    if pkg:
+        all_deps: dict = {}
+        all_deps.update(pkg.get("dependencies", {}) or {})
+        all_deps.update(pkg.get("devDependencies", {}) or {})
+        for dep_name, framework in FRAMEWORK_MAP_JS.items():
+            if dep_name in all_deps:
+                return framework
+
+    # Check Cargo.toml
+    cargo = p / "Cargo.toml"
+    if cargo.exists():
+        try:
+            text = cargo.read_text()
+            for dep_name, framework in FRAMEWORK_MAP_RUST.items():
+                # Match both [dependencies] table entries and inline
+                if dep_name in text:
+                    return framework
+        except OSError:
+            pass
+
+    # Check pyproject.toml and requirements.txt
+    pyproject = p / "pyproject.toml"
+    requirements = p / "requirements.txt"
+    py_text = ""
+    if pyproject.exists():
+        try:
+            py_text += pyproject.read_text()
+        except OSError:
+            pass
+    if requirements.exists():
+        try:
+            py_text += requirements.read_text()
+        except OSError:
+            pass
+    if py_text:
+        for dep_name, framework in FRAMEWORK_MAP_PYTHON:
+            if dep_name in py_text:
+                return framework
+
+    return None
+
+
+def detect_scripts(path: str) -> list[str]:
+    """Extract script names from package.json."""
+    pkg = _read_json(str(Path(path) / "package.json"))
+    if pkg:
+        scripts = pkg.get("scripts")
+        if isinstance(scripts, dict):
+            return list(scripts.keys())
+    return []
+
+
+def detect_services(path: str) -> list[str]:
+    """Detect external services from deps and .env key prefixes."""
+    p = Path(path)
+    services: set[str] = set()
+
+    # Check package.json dependencies
+    pkg = _read_json(str(p / "package.json"))
+    if pkg:
+        all_deps: dict = {}
+        all_deps.update(pkg.get("dependencies", {}) or {})
+        all_deps.update(pkg.get("devDependencies", {}) or {})
+        for dep_name in all_deps:
+            for pattern, service in SERVICE_DEPS.items():
+                if dep_name == pattern or dep_name.startswith(pattern + "/"):
+                    services.add(service)
+
+    # Check .env key prefixes (KEYS ONLY, never values)
+    for env_file in [".env", ".env.local", ".env.development"]:
+        env_path = p / env_file
+        if env_path.exists():
+            try:
+                with open(str(env_path), "r", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        key = line.split("=", 1)[0].strip()
+                        for prefix, service in ENV_KEY_PREFIXES:
+                            if key.startswith(prefix):
+                                services.add(service)
+            except (PermissionError, OSError):
+                continue
+
+    return sorted(services)
+
+
+def detect_package_manager(path: str) -> str | None:
+    """Detect package manager from lockfiles."""
+    p = Path(path)
+    for filename, manager in LOCKFILE_MAP:
+        if (p / filename).exists():
+            return manager
+    return None
+
+
+def detect_license(path: str) -> bool:
+    """Check for LICENSE or LICENSE.md."""
+    p = Path(path)
+    return (p / "LICENSE").exists() or (p / "LICENSE.md").exists()
+
+
 def has_language_indicators(path: str) -> bool:
     """Check if a directory contains any language indicator files."""
     return any((Path(path) / f).exists() for f in LANGUAGE_INDICATORS)
@@ -223,8 +480,13 @@ def scan_project(abs_path: str) -> dict:
     files = check_files(abs_path)
     cicd = check_cicd(abs_path)
     deployment = check_deployment(abs_path)
-    todo_count, fixme_count = count_todos(abs_path)
+    todo_count, fixme_count, loc_estimate = count_todos(abs_path)
     description = get_description(abs_path)
+    framework = detect_framework(abs_path)
+    scripts = detect_scripts(abs_path)
+    services = detect_services(abs_path)
+    package_manager = detect_package_manager(abs_path)
+    license_found = detect_license(abs_path)
 
     return {
         "name": name,
@@ -238,6 +500,12 @@ def scan_project(abs_path: str) -> dict:
         "todoCount": todo_count,
         "fixmeCount": fixme_count,
         "description": description,
+        "framework": framework,
+        "scripts": scripts,
+        "services": services,
+        "locEstimate": loc_estimate,
+        "packageManager": package_manager,
+        "license": license_found,
     }
 
 
