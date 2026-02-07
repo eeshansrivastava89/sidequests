@@ -7,7 +7,6 @@ export const SYSTEM_PROMPT = `You are a developer portfolio analyst. Given a pro
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
 - "notableFeatures": An array of 2-5 notable aspects of this project.
 - "recommendations": An array of 2-4 actionable next steps to improve the project.
-- "takeaways": An object with keys "strength" and "gap", each a short sentence.
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
@@ -45,8 +44,7 @@ export function buildPrompt(input: LlmInput): string {
   "purpose": "1-2 sentence description",
   "tags": ["3-8 descriptive tags"],
   "notableFeatures": ["2-5 notable aspects"],
-  "recommendations": ["2-4 actionable next steps"],
-  "takeaways": { "strength": "short sentence", "gap": "short sentence" }${metadataFields}
+  "recommendations": ["2-4 actionable next steps"]${metadataFields}
 }
 
 Project data:
@@ -91,7 +89,6 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
     tags: Array.isArray(obj?.tags) ? obj.tags : [],
     notableFeatures: Array.isArray(obj?.notableFeatures) ? obj.notableFeatures : [],
     recommendations: Array.isArray(obj?.recommendations) ? obj.recommendations : [],
-    takeaways: (obj?.takeaways && typeof obj.takeaways === "object") ? obj.takeaways as Record<string, string> : {},
   };
 
   // Extract optional metadata fields

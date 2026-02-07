@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-
-const VALID_STATUSES = ["active", "in-progress", "stale", "archived"] as const;
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -17,16 +14,83 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
-interface ProjectDrawerProps {
-  project: Project | null;
-  open: boolean;
-  onClose: () => void;
-  onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
-  onUpdateMetadata: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
-  featureO1?: boolean;
-  onExport?: (projectId: string) => void;
+/* ── Constants ─────────────────────────────────────────── */
+
+const VALID_STATUSES = ["active", "paused", "stale", "archived"] as const;
+
+/* ── Icons ─────────────────────────────────────────────── */
+
+function VsCodeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.583 2.213l-4.52 4.275L7.95 2.213 2.4 4.831v14.338l5.55 2.618 5.113-4.275 4.52 4.275L23.6 19.17V4.831l-6.017-2.618zM7.95 15.6l-3.15-2.1V10.5l3.15 2.1v3zm5.113-3.6L7.95 8.4V5.4l5.113 3.6v3zm4.52 3.6l-3.15-2.1v-3l3.15 2.1v3z" />
+    </svg>
+  );
 }
+
+function ClaudeIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3.5 5h7a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-7a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5zm1 3.5h5a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-5a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5z" />
+    </svg>
+  );
+}
+
+function CodexIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h6v2H8v-2z" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={cn("size-4 transition-transform", open && "rotate-90", className)}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/* ── Helpers ────────────────────────────────────────────── */
+
+function copyToClipboard(text: string, label: string) {
+  navigator.clipboard.writeText(text).then(
+    () => toast.success(`Copied ${label} command`),
+    () => toast.error("Failed to copy")
+  );
+}
+
+function healthColor(score: number): string {
+  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 40) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/* ── Editable Components ───────────────────────────────── */
 
 function StatusSelect({
   value,
@@ -36,18 +100,15 @@ function StatusSelect({
   onSave: (v: string) => void;
 }) {
   return (
-    <div>
-      <div className="text-xs font-medium text-muted-foreground mb-1">Status</div>
-      <select
-        value={value}
-        onChange={(e) => onSave(e.target.value)}
-        className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-      >
-        {VALID_STATUSES.map((s) => (
-          <option key={s} value={s}>{s}</option>
-        ))}
-      </select>
-    </div>
+    <select
+      value={value}
+      onChange={(e) => onSave(e.target.value)}
+      className="h-7 rounded-md border border-input bg-background px-2 text-xs font-medium ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+    >
+      {VALID_STATUSES.map((s) => (
+        <option key={s} value={s}>{s}</option>
+      ))}
+    </select>
   );
 }
 
@@ -68,7 +129,7 @@ function EditableField({
   if (!editing) {
     return (
       <div className="group">
-        <div className="text-xs font-medium text-muted-foreground mb-1">{label}</div>
+        <div className="text-xs font-medium text-muted-foreground mb-0.5">{label}</div>
         <div
           className="text-sm cursor-pointer rounded px-2 py-1 -mx-2 hover:bg-muted transition-colors whitespace-pre-wrap"
           onClick={() => {
@@ -89,13 +150,13 @@ function EditableField({
 
   return (
     <div>
-      <div className="text-xs font-medium text-muted-foreground mb-1">{label}</div>
-      <div className="flex flex-col gap-1.5">
+      <div className="text-xs font-medium text-muted-foreground mb-0.5">{label}</div>
+      <div className="flex flex-col gap-1">
         {multiline ? (
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="min-h-[4rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-y"
+            className="min-h-[3rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 resize-y"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Escape") setEditing(false);
@@ -105,7 +166,7 @@ function EditableField({
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="h-8 text-sm"
+            className="h-7 text-sm"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter") save();
@@ -113,11 +174,11 @@ function EditableField({
             }}
           />
         )}
-        <div className="flex gap-1.5">
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={save}>
+        <div className="flex gap-1">
+          <Button size="xs" variant="ghost" onClick={save}>
             Save
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setEditing(false)}>
+          <Button size="xs" variant="ghost" onClick={() => setEditing(false)}>
             Cancel
           </Button>
         </div>
@@ -126,94 +187,39 @@ function EditableField({
   );
 }
 
-function ScanDetails({ project }: { project: Project }) {
-  const scan = project.scan;
-  if (!scan) return <p className="text-sm text-muted-foreground">No scan data available.</p>;
+/* ── Collapsible Section ───────────────────────────────── */
+
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="space-y-3 text-sm">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-        <div>
-          <span className="text-muted-foreground">Branch</span>
-          <p className="font-mono text-xs">{scan.branch ?? "n/a"}</p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Commits</span>
-          <p>{scan.commitCount}</p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Days Inactive</span>
-          <p>{scan.daysInactive ?? "n/a"}</p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">TODOs / FIXMEs</span>
-          <p>{scan.todoCount} / {scan.fixmeCount}</p>
-        </div>
-      </div>
-
-      {scan.lastCommitMessage && (
-        <div>
-          <span className="text-muted-foreground">Last Commit</span>
-          <p className="font-mono text-xs truncate">{scan.lastCommitMessage}</p>
-        </div>
-      )}
-
-      <div>
-        <span className="text-muted-foreground">Languages</span>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {scan.languages.detected.map((lang) => (
-            <Badge key={lang} variant="secondary" className="text-[10px]">
-              {lang}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <span className="text-muted-foreground text-xs">Files</span>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(scan.files)
-              .filter(([, v]) => v)
-              .map(([k]) => (
-                <Badge key={k} variant="outline" className="text-[10px]">
-                  {k}
-                </Badge>
-              ))}
-          </div>
-        </div>
-        <div>
-          <span className="text-muted-foreground text-xs">CI/CD</span>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(scan.cicd)
-              .filter(([, v]) => v)
-              .map(([k]) => (
-                <Badge key={k} variant="outline" className="text-[10px]">
-                  {k}
-                </Badge>
-              ))}
-          </div>
-        </div>
-        <div>
-          <span className="text-muted-foreground text-xs">Deploy</span>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(scan.deployment)
-              .filter(([, v]) => v)
-              .map(([k]) => (
-                <Badge key={k} variant="outline" className="text-[10px]">
-                  {k}
-                </Badge>
-              ))}
-          </div>
-        </div>
-      </div>
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-1.5 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronIcon open={open} />
+        {title}
+      </button>
+      {open && <div className="pb-2">{children}</div>}
     </div>
   );
 }
 
+/* ── Structured Data (for evidence/outcomes) ───────────── */
+
 function StructuredData({ data }: { data: Record<string, unknown> }) {
   return (
-    <dl className="space-y-2">
+    <dl className="space-y-1.5">
       {Object.entries(data).map(([key, value]) => (
         <div key={key}>
           <dt className="text-xs font-medium text-muted-foreground capitalize">
@@ -240,46 +246,19 @@ function StructuredData({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function EvidenceTab({ project, onExport }: { project: Project; onExport?: (id: string) => void }) {
-  const hasEvidence = project.evidence && Object.keys(project.evidence).length > 0;
-  const hasOutcomes = project.outcomes && Object.keys(project.outcomes).length > 0;
+/* ── Drawer Props ──────────────────────────────────────── */
 
-  return (
-    <div className="space-y-4">
-      {onExport && (
-        <Button size="sm" variant="outline" onClick={() => onExport(project.id)}>
-          Export Evidence
-        </Button>
-      )}
-
-      <div>
-        <h4 className="text-xs font-medium text-muted-foreground mb-1">Evidence</h4>
-        {hasEvidence ? (
-          <div className="rounded-md bg-muted p-3">
-            <StructuredData data={project.evidence as Record<string, unknown>} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground italic">
-            No evidence data. Use PATCH /api/projects/:id/metadata to add evidenceJson.
-          </p>
-        )}
-      </div>
-
-      <div>
-        <h4 className="text-xs font-medium text-muted-foreground mb-1">Outcomes</h4>
-        {hasOutcomes ? (
-          <div className="rounded-md bg-muted p-3">
-            <StructuredData data={project.outcomes as Record<string, unknown>} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground italic">
-            No outcomes data. Use PATCH /api/projects/:id/metadata to add outcomesJson.
-          </p>
-        )}
-      </div>
-    </div>
-  );
+interface ProjectDrawerProps {
+  project: Project | null;
+  open: boolean;
+  onClose: () => void;
+  onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
+  onUpdateMetadata: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
+  featureO1?: boolean;
+  onExport?: (projectId: string) => void;
 }
+
+/* ── Main Drawer ───────────────────────────────────────── */
 
 export function ProjectDrawer({
   project,
@@ -292,63 +271,345 @@ export function ProjectDrawer({
 }: ProjectDrawerProps) {
   if (!project) return null;
 
+  const scan = project.scan;
   const statusClass = STATUS_COLORS[project.status] ?? STATUS_COLORS.archived;
+  const rawPath = project.pathDisplay;
+
+  const recentCommits = project.recentCommits.length > 0 ? project.recentCommits : null;
+  const scripts = Object.keys(project.scripts).length > 0 ? project.scripts : null;
+  const services = project.services.length > 0 ? project.services : null;
+  const framework = project.framework ?? scan?.languages?.primary ?? null;
+  const branchName = project.branchName ?? scan?.branch ?? null;
+  const isDirty = project.isDirty;
+  const ahead = project.ahead;
+  const behind = project.behind;
+  const loc = project.locEstimate || null;
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg p-0">
-        <SheetHeader className="px-6 pt-6 pb-4">
-          <SheetTitle className="text-lg">{project.name}</SheetTitle>
-          <p className="text-xs text-muted-foreground font-mono">{project.pathDisplay}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusClass}`}>
-              {project.status}
-            </span>
-            <span className="text-sm font-semibold tabular-nums">
-              {project.healthScore}/100
-            </span>
-          </div>
+        <SheetHeader className="px-6 pt-6 pb-3">
+          <SheetTitle className="text-lg leading-tight">{project.name}</SheetTitle>
+          <p className="text-xs text-muted-foreground font-mono truncate">{rawPath}</p>
         </SheetHeader>
 
-        <ScrollArea className="h-[calc(100vh-10rem)]">
-          <div className="px-6 pb-6">
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="w-full">
-                <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
-                <TabsTrigger value="edit" className="flex-1">Edit</TabsTrigger>
-                <TabsTrigger value="scan" className="flex-1">Scan</TabsTrigger>
-                {featureO1 && (
-                  <TabsTrigger value="evidence" className="flex-1">Evidence</TabsTrigger>
-                )}
-              </TabsList>
+        <ScrollArea className="h-[calc(100vh-7rem)]">
+          <div className="px-6 pb-6 space-y-1">
 
-              <TabsContent value="overview" className="mt-4 space-y-4">
-                {project.purpose && (
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Purpose</h4>
-                    <p className="text-sm">{project.purpose}</p>
+            {/* ── Section 1: At a Glance (always visible) ── */}
+            <div className="space-y-3">
+
+              {/* Status + Health + Branch row */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <StatusSelect
+                  value={project.status}
+                  onSave={(v) => onUpdateOverride(project.id, { statusOverride: v })}
+                />
+                <span className={cn("text-xl font-bold tabular-nums", healthColor(project.healthScore))}>
+                  {project.healthScore}
+                </span>
+                <span className="text-xs text-muted-foreground">/100</span>
+                {branchName && (
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {branchName}
+                  </Badge>
+                )}
+                {isDirty && (
+                  <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                    dirty
+                  </Badge>
+                )}
+                {ahead != null && ahead > 0 && (
+                  <Badge variant="outline" className="text-[10px]">
+                    ↑{ahead}
+                  </Badge>
+                )}
+                {behind != null && behind > 0 && (
+                  <Badge variant="outline" className="text-[10px]">
+                    ↓{behind}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Temporal row */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                {scan?.daysInactive != null && (
+                  <span>{scan.daysInactive}d inactive</span>
+                )}
+                <span>Last commit {formatDate(scan?.lastCommitDate)}</span>
+                <span className={statusClass + " rounded-full px-2 py-0.5 text-[10px] font-medium"}>
+                  {project.status}
+                </span>
+              </div>
+
+              {/* Last commit message */}
+              {scan?.lastCommitMessage && (
+                <div className="font-mono text-xs bg-muted/50 rounded px-2.5 py-1.5 text-foreground/80 truncate">
+                  {scan.lastCommitMessage}
+                </div>
+              )}
+
+              {/* Next Action (highlighted) */}
+              {project.nextAction && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40 px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-0.5">
+                    Next Action
+                  </div>
+                  <div
+                    className="text-sm cursor-pointer hover:opacity-70 transition-opacity"
+                    onClick={() => {
+                      const v = prompt("Next Action:", project.nextAction ?? "");
+                      if (v !== null) onUpdateMetadata(project.id, { nextAction: v || null });
+                    }}
+                  >
+                    {project.nextAction}
+                  </div>
+                </div>
+              )}
+              {!project.nextAction && (
+                <div
+                  className="rounded-md border border-dashed border-muted-foreground/30 px-3 py-2 text-xs text-muted-foreground italic cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => {
+                    const v = prompt("Set Next Action:");
+                    if (v) onUpdateMetadata(project.id, { nextAction: v });
+                  }}
+                >
+                  + Set next action
+                </div>
+              )}
+
+              {/* Notes (inline editable) */}
+              <EditableField
+                label="Notes"
+                value={project.notes ?? ""}
+                onSave={(v) => onUpdateOverride(project.id, { notesOverride: v || null })}
+                multiline
+              />
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#007ACC] hover:bg-[#007ACC]/10"
+                  title="Open in VS Code"
+                  asChild
+                >
+                  <a href={`vscode://file${encodeURI(rawPath)}`}>
+                    <VsCodeIcon className="size-4" />
+                  </a>
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#D97757] hover:bg-[#D97757]/10"
+                  title="Copy Claude command"
+                  onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
+                >
+                  <ClaudeIcon className="size-4" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Copy Codex command"
+                  onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
+                >
+                  <CodexIcon className="size-4" />
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="ml-1 text-muted-foreground"
+                  title="Copy path"
+                  onClick={() => copyToClipboard(rawPath, "path")}
+                >
+                  Copy path
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* ── Section 2: Recent Activity (collapsible, default open) ── */}
+            <Section title="Recent Activity" defaultOpen>
+              <div className="space-y-1">
+                {recentCommits && recentCommits.length > 0 ? (
+                  recentCommits.slice(0, 10).map((commit, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs py-0.5">
+                      <span className="text-muted-foreground shrink-0 tabular-nums w-16">
+                        {formatDate(commit.date)}
+                      </span>
+                      <span className="font-mono text-foreground/80 truncate">
+                        {commit.message}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground py-1">
+                    {scan?.lastCommitMessage ? (
+                      <div className="space-y-1">
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground shrink-0 tabular-nums w-16">
+                            {formatDate(scan.lastCommitDate)}
+                          </span>
+                          <span className="font-mono truncate">{scan.lastCommitMessage}</span>
+                        </div>
+                        <p className="italic text-muted-foreground/60">
+                          Full commit history available after next scan update.
+                        </p>
+                      </div>
+                    ) : (
+                      "No commit history available."
+                    )}
                   </div>
                 )}
+              </div>
+            </Section>
 
-                {project.tags.length > 0 && (
+            <Separator />
+
+            {/* ── Section 3: Details (collapsible, default collapsed) ── */}
+            <Section title="Details">
+              <div className="space-y-3">
+                {/* Purpose + Tags (editable) */}
+                <EditableField
+                  label="Purpose"
+                  value={project.purpose ?? ""}
+                  onSave={(v) => onUpdateOverride(project.id, { purposeOverride: v || null })}
+                  multiline
+                />
+
+                <EditableField
+                  label="Tags"
+                  value={project.tags.join(", ")}
+                  onSave={(v) =>
+                    onUpdateOverride(project.id, {
+                      tagsOverride: v
+                        ? JSON.stringify(v.split(",").map((t) => t.trim()).filter(Boolean))
+                        : null,
+                    })
+                  }
+                />
+
+                {/* Framework + Languages */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {framework && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Framework</span>
+                      <p className="font-mono text-xs">{framework}</p>
+                    </div>
+                  )}
+                  {scan?.languages?.detected && scan.languages.detected.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Languages</span>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {scan.languages.detected.map((lang) => (
+                          <Badge key={lang} variant="secondary" className="text-[10px]">
+                            {lang}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Scripts */}
+                {scripts && Object.keys(scripts).length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Tags</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {project.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
+                    <span className="text-xs text-muted-foreground">Scripts</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {Object.keys(scripts).map((name) => (
+                        <Badge key={name} variant="outline" className="text-[10px] font-mono">
+                          {name}
                         </Badge>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {/* External Services */}
+                {services && services.length > 0 && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Services</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {services.map((svc) => (
+                        <Badge key={svc} variant="secondary" className="text-[10px]">
+                          {svc}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Files / CI-CD / Deploy badges */}
+                <div className="grid grid-cols-3 gap-2">
+                  {scan?.files && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Files</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(scan.files)
+                          .filter(([, v]) => v)
+                          .map(([k]) => (
+                            <Badge key={k} variant="outline" className="text-[10px]">
+                              {k}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  {scan?.cicd && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">CI/CD</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(scan.cicd)
+                          .filter(([, v]) => v)
+                          .map(([k]) => (
+                            <Badge key={k} variant="outline" className="text-[10px]">
+                              {k}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  {scan?.deployment && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Deploy</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(scan.deployment)
+                          .filter(([, v]) => v)
+                          .map(([k]) => (
+                            <Badge key={k} variant="outline" className="text-[10px]">
+                              {k}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* LOC */}
+                {loc != null && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Lines of Code</span>
+                    <p className="text-sm font-mono tabular-nums">{loc.toLocaleString()}</p>
+                  </div>
+                )}
+
+                {/* TODOs / FIXMEs */}
+                {scan && (scan.todoCount > 0 || scan.fixmeCount > 0) && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">Code markers</span>
+                    <p className="text-sm">
+                      {scan.todoCount} TODOs / {scan.fixmeCount} FIXMEs
+                    </p>
+                  </div>
+                )}
+
+                {/* Notable Features */}
                 {project.notableFeatures.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                      Notable Features
-                    </h4>
-                    <ul className="list-disc list-inside text-sm space-y-0.5">
+                    <span className="text-xs text-muted-foreground">Notable Features</span>
+                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
                       {project.notableFeatures.map((f, i) => (
                         <li key={i}>{f}</li>
                       ))}
@@ -356,12 +617,11 @@ export function ProjectDrawer({
                   </div>
                 )}
 
+                {/* Recommendations */}
                 {project.recommendations.length > 0 && (
                   <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-1">
-                      Recommendations
-                    </h4>
-                    <ul className="list-disc list-inside text-sm space-y-0.5">
+                    <span className="text-xs text-muted-foreground">Recommendations</span>
+                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
                       {project.recommendations.map((r, i) => (
                         <li key={i}>{r}</li>
                       ))}
@@ -369,73 +629,19 @@ export function ProjectDrawer({
                   </div>
                 )}
 
-                {project.notes && (
-                  <div>
-                    <h4 className="text-xs font-medium text-muted-foreground mb-1">Notes</h4>
-                    <p className="text-sm">{project.notes}</p>
-                  </div>
-                )}
-
-                <Separator />
-
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  {project.goal && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Goal</span>
-                      <p>{project.goal}</p>
-                    </div>
-                  )}
-                  {project.audience && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Audience</span>
-                      <p>{project.audience}</p>
-                    </div>
-                  )}
-                  {project.nextAction && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Next Action</span>
-                      <p>{project.nextAction}</p>
-                    </div>
-                  )}
-                  {project.publishTarget && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Publish Target</span>
-                      <p>{project.publishTarget}</p>
-                    </div>
-                  )}
+                {/* Last scanned */}
+                <div className="text-[10px] text-muted-foreground pt-1">
+                  Scanned {formatDate(project.lastScanned)}
+                  {scan?.commitCount != null && ` · ${scan.commitCount} commits`}
                 </div>
+              </div>
+            </Section>
 
-                <div className="text-xs text-muted-foreground pt-2">
-                  Last scanned: {project.lastScanned ? new Date(project.lastScanned).toLocaleString() : "never"}
-                </div>
-              </TabsContent>
+            <Separator />
 
-              <TabsContent value="edit" className="mt-4 space-y-4">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Overrides
-                </h4>
-                <StatusSelect
-                  value={project.status}
-                  onSave={(v) => onUpdateOverride(project.id, { statusOverride: v })}
-                />
-                <EditableField
-                  label="Purpose"
-                  value={project.purpose ?? ""}
-                  onSave={(v) => onUpdateOverride(project.id, { purposeOverride: v || null })}
-                  multiline
-                />
-                <EditableField
-                  label="Notes"
-                  value={project.notes ?? ""}
-                  onSave={(v) => onUpdateOverride(project.id, { notesOverride: v || null })}
-                  multiline
-                />
-
-                <Separator />
-
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Metadata
-                </h4>
+            {/* ── Section 4: Workflow (collapsible, default collapsed) ── */}
+            <Section title="Workflow">
+              <div className="space-y-3">
                 <EditableField
                   label="Goal"
                   value={project.goal ?? ""}
@@ -450,6 +656,7 @@ export function ProjectDrawer({
                   label="Success Metrics"
                   value={project.successMetrics ?? ""}
                   onSave={(v) => onUpdateMetadata(project.id, { successMetrics: v || null })}
+                  multiline
                 />
                 <EditableField
                   label="Next Action"
@@ -461,18 +668,48 @@ export function ProjectDrawer({
                   value={project.publishTarget ?? ""}
                   onSave={(v) => onUpdateMetadata(project.id, { publishTarget: v || null })}
                 />
-              </TabsContent>
 
-              <TabsContent value="scan" className="mt-4">
-                <ScanDetails project={project} />
-              </TabsContent>
+                {/* Evidence + Outcomes (O1 feature) */}
+                {featureO1 && (
+                  <>
+                    <Separator />
 
-              {featureO1 && (
-                <TabsContent value="evidence" className="mt-4">
-                  <EvidenceTab project={project} onExport={onExport} />
-                </TabsContent>
-              )}
-            </Tabs>
+                    {onExport && (
+                      <Button size="sm" variant="outline" onClick={() => onExport(project.id)}>
+                        Export Evidence
+                      </Button>
+                    )}
+
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Evidence</span>
+                      {project.evidence && Object.keys(project.evidence).length > 0 ? (
+                        <div className="rounded-md bg-muted p-2.5 mt-1">
+                          <StructuredData data={project.evidence} />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic mt-0.5">
+                          No evidence data.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Outcomes</span>
+                      {project.outcomes && Object.keys(project.outcomes).length > 0 ? (
+                        <div className="rounded-md bg-muted p-2.5 mt-1">
+                          <StructuredData data={project.outcomes} />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic mt-0.5">
+                          No outcomes data.
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Section>
+
           </div>
         </ScrollArea>
       </SheetContent>

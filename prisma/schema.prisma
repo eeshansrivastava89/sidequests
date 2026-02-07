@@ -8,13 +8,15 @@ datasource db {
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  name        String
-  pathHash    String   @unique
-  pathDisplay String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  prunedAt    DateTime?
+  id            String    @id @default(cuid())
+  name          String
+  pathHash      String    @unique
+  pathDisplay   String
+  pinned        Boolean   @default(false)
+  lastTouchedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  prunedAt      DateTime?
 
   scan     Scan?
   derived  Derived?
@@ -33,12 +35,19 @@ model Scan {
 }
 
 model Derived {
-  id              String  @id @default(cuid())
-  projectId       String  @unique
-  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  statusAuto      String  // active, in-progress, stale, archived
+  id              String    @id @default(cuid())
+  projectId       String    @unique
+  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  statusAuto      String    // active, paused, stale, archived
   healthScoreAuto Int
-  derivedJson     String  // Full derived output as JSON (tags, etc.)
+  derivedJson     String    // Full derived output as JSON (tags, etc.)
+  isDirty         Boolean   @default(false)
+  ahead           Int       @default(0)
+  behind          Int       @default(0)
+  framework       String?
+  branchName      String?
+  lastCommitDate  DateTime?
+  locEstimate     Int       @default(0)
 }
 
 model Llm {
@@ -49,7 +58,6 @@ model Llm {
   tagsJson             String?  // JSON array
   notableFeaturesJson  String?  // JSON array
   recommendationsJson  String?  // JSON array
-  takeawaysJson        String?  // JSON object
   generatedAt          DateTime @default(now())
 }
 
@@ -61,7 +69,6 @@ model Override {
   purposeOverride String?
   tagsOverride    String?  // JSON array
   notesOverride   String?
-  manualJson      String?  // Arbitrary manual overrides as JSON
   updatedAt       DateTime @updatedAt
 }
 
@@ -85,4 +92,6 @@ model Activity {
   type        String   // e.g. "scan", "override", "llm", "metadata"
   payloadJson String?
   createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
 }

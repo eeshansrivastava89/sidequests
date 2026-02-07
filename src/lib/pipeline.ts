@@ -143,10 +143,12 @@ export async function runRefreshPipeline(
         name: scanned.name,
         pathHash: scanned.pathHash,
         pathDisplay: scanned.path,
+        lastTouchedAt: new Date(),
       },
       update: {
         name: scanned.name,
         pathDisplay: scanned.path,
+        lastTouchedAt: new Date(),
       },
     });
 
@@ -166,6 +168,18 @@ export async function runRefreshPipeline(
 
     if (derived) {
       const derivedJson = JSON.stringify({ tags: derived.tags });
+
+      // Extract promoted columns from raw scan data
+      const scanGit = scanned as Record<string, unknown>;
+      const isDirty = (scanGit.isDirty as boolean) ?? false;
+      const ahead = (scanGit.ahead as number) ?? 0;
+      const behind = (scanGit.behind as number) ?? 0;
+      const framework = (scanGit.framework as string) ?? null;
+      const branchName = (scanGit.branch as string) ?? null;
+      const lastCommitDateStr = scanGit.lastCommitDate as string | null;
+      const lastCommitDate = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
+      const locEstimate = (scanGit.locEstimate as number) ?? 0;
+
       await db.derived.upsert({
         where: { projectId: project.id },
         create: {
@@ -173,11 +187,25 @@ export async function runRefreshPipeline(
           statusAuto: derived.statusAuto,
           healthScoreAuto: derived.healthScoreAuto,
           derivedJson,
+          isDirty,
+          ahead,
+          behind,
+          framework,
+          branchName,
+          lastCommitDate,
+          locEstimate,
         },
         update: {
           statusAuto: derived.statusAuto,
           healthScoreAuto: derived.healthScoreAuto,
           derivedJson,
+          isDirty,
+          ahead,
+          behind,
+          framework,
+          branchName,
+          lastCommitDate,
+          locEstimate,
         },
       });
     }
@@ -214,14 +242,12 @@ export async function runRefreshPipeline(
             tagsJson: JSON.stringify(enrichment.tags),
             notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
             recommendationsJson: JSON.stringify(enrichment.recommendations),
-            takeawaysJson: JSON.stringify(enrichment.takeaways),
           },
           update: {
             purpose: enrichment.purpose,
             tagsJson: JSON.stringify(enrichment.tags),
             notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
             recommendationsJson: JSON.stringify(enrichment.recommendations),
-            takeawaysJson: JSON.stringify(enrichment.takeaways),
             generatedAt: new Date(),
           },
         });

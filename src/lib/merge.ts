@@ -20,8 +20,30 @@ export interface MergedProject {
   recommendations: string[];
   notes: string | null;
 
+  // Promoted derived columns
+  isDirty: boolean;
+  ahead: number;
+  behind: number;
+  framework: string | null;
+  branchName: string | null;
+  lastCommitDate: string | null;
+  locEstimate: number;
+
   // Raw scan data
   scan: RawScan | null;
+
+  // Scan-derived fields surfaced at top level
+  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
+  scripts: Record<string, string>;
+  services: string[];
+  packageManager: string | null;
+  branchCount: number;
+  stashCount: number;
+  license: string | null;
+
+  // Project-level fields
+  pinned: boolean;
+  lastTouchedAt: string | null;
 
   // Metadata (workflow fields)
   goal: string | null;
@@ -47,6 +69,7 @@ export interface RawScan {
   remoteUrl: string | null;
   commitCount: number;
   daysInactive: number | null;
+  isDirty: boolean;
   languages: { primary: string | null; detected: string[] };
   files: Record<string, boolean>;
   cicd: Record<string, boolean>;
@@ -54,6 +77,17 @@ export interface RawScan {
   todoCount: number;
   fixmeCount: number;
   description: string | null;
+  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
+  scripts: Record<string, string>;
+  services: string[];
+  packageManager: string | null;
+  branchCount: number;
+  stashCount: number;
+  locEstimate: number;
+  license: string | null;
+  ahead: number;
+  behind: number;
+  framework: string | null;
 }
 
 function parseJson<T>(json: string | null | undefined, fallback: T): T {
@@ -98,7 +132,18 @@ export async function mergeAllProjects(): Promise<MergedProject[]> {
 
 type ProjectWithRelations = Project & {
   scan: { rawJson: string; scannedAt: Date } | null;
-  derived: { statusAuto: string; healthScoreAuto: number; derivedJson: string } | null;
+  derived: {
+    statusAuto: string;
+    healthScoreAuto: number;
+    derivedJson: string;
+    isDirty: boolean;
+    ahead: number;
+    behind: number;
+    framework: string | null;
+    branchName: string | null;
+    lastCommitDate: Date | null;
+    locEstimate: number;
+  } | null;
   llm: {
     purpose: string | null;
     tagsJson: string | null;
@@ -110,7 +155,6 @@ type ProjectWithRelations = Project & {
     purposeOverride: string | null;
     tagsOverride: string | null;
     notesOverride: string | null;
-    manualJson: string | null;
   } | null;
   metadata: {
     goal: string | null;
@@ -165,7 +209,29 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
     recommendations,
     notes,
 
+    // Promoted derived columns
+    isDirty: derived?.isDirty ?? rawScan?.isDirty ?? false,
+    ahead: derived?.ahead ?? rawScan?.ahead ?? 0,
+    behind: derived?.behind ?? rawScan?.behind ?? 0,
+    framework: derived?.framework ?? rawScan?.framework ?? null,
+    branchName: derived?.branchName ?? rawScan?.branch ?? null,
+    lastCommitDate: derived?.lastCommitDate?.toISOString() ?? rawScan?.lastCommitDate ?? null,
+    locEstimate: derived?.locEstimate ?? rawScan?.locEstimate ?? 0,
+
     scan: rawScan,
+
+    // Scan-derived fields surfaced at top level
+    recentCommits: rawScan?.recentCommits ?? [],
+    scripts: rawScan?.scripts ?? {},
+    services: rawScan?.services ?? [],
+    packageManager: rawScan?.packageManager ?? null,
+    branchCount: rawScan?.branchCount ?? 0,
+    stashCount: rawScan?.stashCount ?? 0,
+    license: rawScan?.license ?? null,
+
+    // Project-level fields
+    pinned: project.pinned,
+    lastTouchedAt: project.lastTouchedAt?.toISOString() ?? null,
 
     goal: metadata?.goal ?? null,
     audience: metadata?.audience ?? null,

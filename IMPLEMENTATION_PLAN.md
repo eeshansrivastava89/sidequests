@@ -14,12 +14,12 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 8: Completed
 - ✅ Phase 9: Completed
 - ✅ Phase 10: Completed
-- ⬜ Phase 11: Enhanced Scan Pipeline
-- ⬜ Phase 12: Schema Evolution & Derive v2
-- ⬜ Phase 13: Compact List View
-- ⬜ Phase 14: Sort, Filter & Recently Active
-- ⬜ Phase 15: Drawer Redesign
-- ⬜ Phase 16: API & Merge Updates
+- ✅ Phase 11: Enhanced Scan Pipeline
+- ✅ Phase 12: Schema Evolution & Derive v2
+- ✅ Phase 13: Compact List View
+- ✅ Phase 14: Sort, Filter & Recently Active
+- 🔄 Phase 15: Drawer Redesign
+- 🔄 Phase 16: API & Merge Updates
 - ⬜ Phase 17: Enhanced Quick Actions
 - ⬜ Phase 18: Project Pinning & Favorites
 - ⬜ Phase 19: Pipeline Optimizations

@@ -9,7 +9,7 @@ interface StatsBarProps {
 export function StatsBar({ projects }: StatsBarProps) {
   const total = projects.length;
   const active = projects.filter((p) => p.status === "active").length;
-  const inProgress = projects.filter((p) => p.status === "in-progress").length;
+  const paused = projects.filter((p) => p.status === "paused").length;
   const stale = projects.filter((p) => p.status === "stale").length;
   const avgHealth =
     total > 0 ? Math.round(projects.reduce((s, p) => s + p.healthScore, 0) / total) : 0;
@@ -17,7 +17,7 @@ export function StatsBar({ projects }: StatsBarProps) {
   const stats = [
     { label: "Total", value: total },
     { label: "Active", value: active },
-    { label: "In Progress", value: inProgress },
+    { label: "Paused", value: paused },
     { label: "Stale", value: stale },
     { label: "Avg Health", value: `${avgHealth}%` },
   ];

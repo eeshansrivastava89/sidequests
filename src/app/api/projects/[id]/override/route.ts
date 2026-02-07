@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 /** Fields stored as JSON strings — accept objects/arrays and stringify. */
-const JSON_FIELDS = new Set(["tagsOverride", "manualJson"]);
+const JSON_FIELDS = new Set(["tagsOverride"]);
 /** Fields stored as plain strings. */
 const STRING_FIELDS = new Set(["statusOverride", "purposeOverride", "notesOverride"]);
 const ALLOWED_FIELDS = [...STRING_FIELDS, ...JSON_FIELDS];

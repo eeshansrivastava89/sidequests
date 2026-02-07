@@ -16,7 +16,7 @@ interface ProjectListProps {
 
 const STATUS_DOT: Record<string, string> = {
   active: "bg-emerald-500",
-  "in-progress": "bg-blue-500",
+  paused: "bg-blue-500",
   stale: "bg-amber-500",
   archived: "bg-zinc-400",
 };
@@ -65,8 +65,8 @@ function CodexIcon({ className }: { className?: string }) {
 
 export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[auto_1fr_auto_auto_auto_1fr]"
-    : "grid-cols-[auto_1fr_auto_auto_auto_1fr_auto]";
+    ? "grid-cols-[auto_1fr_auto_3rem_3rem_1fr]"
+    : "grid-cols-[auto_1fr_auto_3rem_3rem_1fr_auto]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -139,14 +139,14 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
 
             {/* Health score */}
             <div className={cn(
-              "hidden md:block text-right font-mono text-sm font-semibold tabular-nums w-8",
+              "hidden md:block text-right font-mono text-sm font-semibold tabular-nums",
               healthColor(project.healthScore)
             )}>
               {project.healthScore}
             </div>
 
             {/* Days inactive */}
-            <div className="hidden sm:block text-right font-mono text-xs text-muted-foreground tabular-nums w-10">
+            <div className="hidden sm:block text-right font-mono text-xs text-muted-foreground tabular-nums">
               {formatDaysInactive(project.scan?.daysInactive)}
             </div>
 
@@ -158,7 +158,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
             {/* Quick actions */}
             {!sanitizePaths && (
               <div
-                className="flex items-center gap-0.5"
+                className="flex items-center gap-1"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Button
@@ -169,7 +169,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                   asChild
                 >
                   <a href={`vscode://file${encodeURI(rawPath)}`}>
-                    <VsCodeIcon className="size-3" />
+                    <VsCodeIcon className="size-4" />
                   </a>
                 </Button>
                 <Button
@@ -179,7 +179,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                   title="Copy Claude command"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
                 >
-                  <ClaudeIcon className="size-3" />
+                  <ClaudeIcon className="size-4" />
                 </Button>
                 <Button
                   size="icon-xs"
@@ -187,7 +187,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                   title="Copy Codex command"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
                 >
-                  <CodexIcon className="size-3" />
+                  <CodexIcon className="size-4" />
                 </Button>
               </div>
             )}

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
-import type { Project, WorkflowView } from "@/lib/types";
+import type { Project, WorkflowView, SortKey } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
@@ -13,14 +13,69 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+/* ── Sort ───────────────────────────────────────────────── */
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "lastCommit", label: "Last Commit" },
+  { key: "name", label: "Name" },
+  { key: "health", label: "Health" },
+  { key: "status", label: "Status" },
+  { key: "daysInactive", label: "Days Inactive" },
+];
+
+function sortProjects(projects: Project[], sortKey: SortKey): Project[] {
+  const sorted = [...projects];
+  switch (sortKey) {
+    case "lastCommit":
+      return sorted.sort((a, b) => {
+        const da = a.scan?.lastCommitDate ?? "";
+        const db = b.scan?.lastCommitDate ?? "";
+        return db.localeCompare(da); // desc
+      });
+    case "name":
+      return sorted.sort((a, b) => a.name.localeCompare(b.name)); // asc
+    case "health":
+      return sorted.sort((a, b) => a.healthScore - b.healthScore); // asc (worst first)
+    case "status": {
+      const order: Record<string, number> = { active: 0, paused: 1, stale: 2, archived: 3 };
+      return sorted.sort(
+        (a, b) => (order[a.status] ?? 99) - (order[b.status] ?? 99)
+      );
+    }
+    case "daysInactive":
+      return sorted.sort((a, b) => {
+        const da = a.scan?.daysInactive ?? Infinity;
+        const db = b.scan?.daysInactive ?? Infinity;
+        return da - db; // asc (least inactive first)
+      });
+    default:
+      return sorted;
+  }
+}
+
+/* ── Filter ─────────────────────────────────────────────── */
+
+function needsAttention(p: Project): boolean {
+  const di = p.scan?.daysInactive ?? 0;
+  return (
+    p.healthScore < 40 ||
+    (di > 30 && !p.nextAction) ||
+    (p.isDirty && di > 7)
+  );
+}
+
 function filterByView(projects: Project[], view: WorkflowView): Project[] {
   switch (view) {
-    case "next-actions":
-      return projects.filter((p) => p.nextAction);
-    case "publish-queue":
-      return projects.filter((p) => p.publishTarget);
-    case "stalled":
-      return projects.filter((p) => p.status === "stale" || p.status === "archived");
+    case "active":
+      return projects.filter(
+        (p) => p.status === "active" || p.status === "paused"
+      );
+    case "needs-attention":
+      return projects.filter(needsAttention);
+    case "stale":
+      return projects.filter((p) => p.status === "stale");
+    case "archived":
+      return projects.filter((p) => p.status === "archived");
     default:
       return projects;
   }
@@ -39,6 +94,42 @@ function filterBySearch(projects: Project[], query: string): Project[] {
   );
 }
 
+/* ── LocalStorage helpers ───────────────────────────────── */
+
+function loadSortKey(): SortKey {
+  if (typeof window === "undefined") return "lastCommit";
+  return (localStorage.getItem("dashboard-sort") as SortKey) ?? "lastCommit";
+}
+
+function saveSortKey(key: SortKey) {
+  localStorage.setItem("dashboard-sort", key);
+}
+
+/* ── Last Refreshed ─────────────────────────────────────── */
+
+function getLastRefreshed(projects: Project[]): string | null {
+  let latest: string | null = null;
+  for (const p of projects) {
+    if (p.lastScanned && (!latest || p.lastScanned > latest)) {
+      latest = p.lastScanned;
+    }
+  }
+  return latest;
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+/* ── Page ───────────────────────────────────────────────── */
+
 export default function DashboardPage() {
   const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata } =
     useProjects();
@@ -46,8 +137,19 @@ export default function DashboardPage() {
   const refreshHook = useRefresh(fetchProjects);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("lastCommit");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+
+  // Hydrate sort key from localStorage after mount
+  useEffect(() => {
+    setSortKey(loadSortKey());
+  }, []);
+
+  const handleSortChange = useCallback((key: SortKey) => {
+    setSortKey(key);
+    saveSortKey(key);
+  }, []);
 
   const handleExport = useCallback(async (projectId?: string) => {
     setExporting(true);
@@ -73,9 +175,11 @@ export default function DashboardPage() {
   }, []);
 
   const filtered = useMemo(
-    () => filterBySearch(filterByView(projects, view), search),
-    [projects, view, search]
+    () => sortProjects(filterBySearch(filterByView(projects, view), search), sortKey),
+    [projects, view, search, sortKey]
   );
+
+  const lastRefreshed = useMemo(() => getLastRefreshed(projects), [projects]);
 
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
@@ -104,7 +208,14 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
-            <h1 className="text-lg font-semibold tracking-tight">Projects</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold tracking-tight">Projects</h1>
+              {lastRefreshed && (
+                <span className="text-xs text-muted-foreground">
+                  Last refreshed {formatRelativeTime(lastRefreshed)}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {config.featureO1 && (
                 <Button
@@ -143,6 +254,7 @@ export default function DashboardPage() {
 
         <StatsBar projects={projects} />
 
+        {/* Filter tabs + Sort + Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Tabs
             value={view}
@@ -150,18 +262,33 @@ export default function DashboardPage() {
           >
             <TabsList>
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="next-actions">Next Actions</TabsTrigger>
-              <TabsTrigger value="publish-queue">Publish Queue</TabsTrigger>
-              <TabsTrigger value="stalled">Stalled</TabsTrigger>
+              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="needs-attention">Needs Attention</TabsTrigger>
+              <TabsTrigger value="stale">Stale</TabsTrigger>
+              <TabsTrigger value="archived">Archived</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <Input
-            placeholder="Search projects..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-full sm:w-64"
-          />
+          <div className="flex items-center gap-2">
+            <select
+              value={sortKey}
+              onChange={(e) => handleSortChange(e.target.value as SortKey)}
+              className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+
+            <Input
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 w-full sm:w-64"
+            />
+          </div>
         </div>
 
         {filtered.length === 0 ? (
