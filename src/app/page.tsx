@@ -259,28 +259,28 @@ export default function DashboardPage() {
           break;
         }
         case "v": {
-          if (selectedProject?.pathDisplay) {
+          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
             window.open(`vscode://file${encodeURI(selectedProject.pathDisplay)}`);
             touchProject(selectedProject.id, "vscode");
           }
           break;
         }
         case "c": {
-          if (selectedProject?.pathDisplay) {
+          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`);
             touchProject(selectedProject.id, "claude");
           }
           break;
         }
         case "x": {
-          if (selectedProject?.pathDisplay) {
+          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`);
             touchProject(selectedProject.id, "codex");
           }
           break;
         }
         case "t": {
-          if (selectedProject?.pathDisplay) {
+          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`);
             touchProject(selectedProject.id, "terminal");
           }
@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin, touchProject]);
+  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin, touchProject, config.sanitizePaths]);
 
   if (loading) {
     return (

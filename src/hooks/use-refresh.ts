@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface RefreshEvent {
   type: string;
@@ -162,6 +162,13 @@ export function useRefresh(onComplete: () => void) {
       setState((s) => ({ ...s, active: false, phase: "Cancelled" }));
     });
   }, [state.active, onComplete]);
+
+  // Cleanup on unmount — close any open EventSource
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();

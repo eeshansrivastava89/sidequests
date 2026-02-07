@@ -4,66 +4,63 @@
 
 ## Project Anchor
 
-**Project:** Projects Dashboard v2 — local web app scanning ~/dev to provide bird's-eye view of all projects
-**Current Phase:** Wave A of Phases 11-21 complete (Phase 11 + Phase 13). Transforming from "portfolio tracker" to "daily starting point" tool.
+**Project:** Projects Dashboard v2 — local web app scanning ~/dev as a "daily starting point" for developers
+**Current Phase:** All 21 phases complete. Awaiting Codex code review feedback.
 
 ## Git State
 
 **Branch:** main
-**Last Commit:** 7ae61d1 phase 10: soft-prune missing projects on refresh
-**Uncommitted Changes:**
-- `IMPLEMENTATION_PLAN.md` — Added Phases 11-21 with agent team strategy (11 new phases)
-- `pipeline/scan.py` — Phase 11: 15 new fields (git dirty, ahead/behind, recent commits, framework, services, LOC, scripts, package manager, license)
-- `src/app/page.tsx` — Phase 13: Replaced card grid with `<ProjectList>` compact list view
-- `src/components/project-list.tsx` — NEW: Compact list component (~40px rows, CSS grid, responsive)
+**Last Commit:** c1fbb87 docs: mark all 21 phases complete, rewrite PITCH.md, add rawJsonHash migration
+**Uncommitted Changes:** None (clean working tree)
 
-## What We Were Doing
+## Recent Commits (this session)
 
-### Task
-Major UX + backend overhaul to transform the dashboard from a portfolio tracker into a "daily starting point" tool. Planned and executing 11 new phases (11-21) using agent teams for parallel development.
+| Commit | Content |
+|--------|---------|
+| `4e5b11e` | phase 11+13: enhanced scan pipeline and compact list view (prior session) |
+| `5ca809b` | phases 12-16: schema evolution, derive v2, sort/filter, drawer redesign, API merge updates |
+| `e60aa57` | phases 17-19: enhanced quick actions, project pinning, pipeline optimizations |
+| `adb6556` | phases 20-21: session memory, activity timeline, docs update |
+| `c1fbb87` | docs: mark all 21 phases complete, rewrite PITCH.md, add rawJsonHash migration |
 
-### Progress
-- [x] Research phase: Spun up 3-agent research team (frontend, backend, product) for deep analysis
-- [x] Implementation plan: Added Phases 11-21 to IMPLEMENTATION_PLAN.md with agent team wave strategy
-- [x] **Phase 11 (Wave A):** Enhanced scan.py — 15 new fields per project (git status, ahead/behind, recent commits, framework detection, services, LOC, scripts, package manager, license)
-- [x] **Phase 13 (Wave A):** Compact list view — replaced card grid with dense ~40px rows, CSS grid layout, responsive, build passes
-- [ ] **Phase 12:** Schema Evolution & Derive v2 (Wave B — next)
-- [ ] **Phase 14:** Sort, Filter & Recently Active (Wave B — next)
-- [ ] **Phase 15:** Drawer Redesign (Wave C)
-- [ ] **Phase 16:** API & Merge Updates (Wave C)
-- [ ] **Phase 17:** Enhanced Quick Actions (Wave D)
-- [ ] **Phase 18:** Project Pinning & Favorites (Wave D)
-- [ ] **Phase 19:** Pipeline Optimizations (Wave D)
-- [ ] **Phase 20:** Session Memory & Activity Timeline (Wave E)
-- [ ] **Phase 21:** Docs & Architecture Update (Wave F)
+## What We Did
 
-### Where We Stopped
-Wave A complete (Phase 11 + 13). All changes are uncommitted. Build passes. User was about to either view the app in browser or kick off Wave B.
+### All 21 Phases Complete
+Phases 11-21 implemented using agent teams (parallel Tmux agents). Waves:
+- **Wave A** (prior session): Phase 11 (scan.py 15 new fields) + Phase 13 (compact list view)
+- **Wave B+C** (this session): Phases 12-16 (schema evolution, derive v2, sort/filter, drawer redesign, API merge)
+- **Wave D** (this session): Phases 17-19 (quick actions, pinning, pipeline optimizations)
+- **Wave E+F** (this session): Phases 20-21 (session memory, activity timeline, docs)
+
+### Issues Resolved This Session
+1. **Memory leak crash** — Prior session crashed at 97% RAM. Root cause: orphaned Claude agent processes from Tmux teams not getting cleaned up on force-kill. Killed orphan PID 82263, cleaned stale team/task dirs.
+2. **Orphan Next.js dev server** — Found running from 12:28 AM eating 750MB. Killed PIDs 38454/38477/38478/39731.
+3. **Missing migration** — Phase 19 added `rawJsonHash` to Prisma schema but no migration was run. Dashboard crashed with `no such column: main.Scan.rawJsonHash`. Fixed with `prisma migrate dev --name add_raw_json_hash`.
 
 ## Decisions Made
 
-| Decision | Rationale | Files |
-|----------|-----------|-------|
-| Replace cards with compact list | Cards too dense, ~6-9 visible vs 25+ with list rows | project-list.tsx, page.tsx |
-| 15 new scan fields in scan.py | Git dirty/ahead-behind, framework, services are the most-wanted missing data | scan.py |
-| "in-progress" → "paused" (Phase 12) | 15-60 days inactive isn't "in progress" — planned for derive v2 | derive.py (not yet) |
-| Agent team waves A-F | Backend + frontend can parallelize; clear dependency graph | IMPLEMENTATION_PLAN.md |
-| Keep project-card.tsx | May bring back as toggle view option later | — |
-| Don't deprioritize anything | User explicitly said include all recommendations | IMPLEMENTATION_PLAN.md |
+| Decision | Rationale |
+|----------|-----------|
+| Use Opus for agents, not Sonnet | User's preference — their money, their session. Memory issue was orphan processes, not model size. |
+| Clean up defensive scanAny casts | Phase 15 agent coded defensively against Phase 16; once both landed, switched to top-level Project fields |
+| PITCH.md full rewrite | Repositioned from "bird's-eye view" to "daily starting point" to match the Phase 11-21 transformation |
+
+## Working Model
+
+- **Claude (me):** Implementer — writes code, runs agent teams
+- **Codex:** Architect and code reviewer — reviews work, provides feedback
+- User mediates between the two
 
 ## Next Actions
 
-1. **Commit Wave A changes** (if user approves)
-2. **Kick off Wave B:** Phase 12 (schema evolution + derive v2) + Phase 14 (sort/filter/recently active)
-3. Or: Start dev server to visually verify the new list view first
+1. **Receive Codex code review feedback** — user will bring it next session
+2. **Address review findings** — implement whatever Codex flags
+3. **Visual QA** — user was about to test the dashboard when session ended
 
 ## Conversation Essence
 
-- User discovered the auto-memory feature (v2.1.32) — keeping both auto-memory and /context-save for now, as they serve different purposes
-- Used agent teams (new feature) for both research and implementation — user explicitly requested this workflow
-- Research team found the core problem: dashboard answers "what do I have?" but not "what was I doing?"
-- Key missing signals: git dirty status (#1), recent commits, sort-by-recency, framework detection
-- Dead fields discovered: Override.manualJson, Llm.takeawaysJson — never read in merge.ts
-- Activity model exists but is never surfaced in UI — Phase 20 will fix this
-- User's framework for projects: every project has PITCH.md + IMPLEMENTATION_PLAN.md + ARCHITECTURE.md
-- ARCHITECTURE.md and PITCH.md updates deferred to after implementation (Phase 21)
+- Session started with crash recovery and orphan cleanup
+- Agent teams work well but need graceful shutdown — orphan processes are the real memory risk, not model size
+- User explicitly wants Opus for agents, not Sonnet — don't downgrade without asking
+- All docs updated: IMPLEMENTATION_PLAN (all ✅), ARCHITECTURE.md (comprehensive), PITCH.md (rewritten), README.md (updated)
+- .env.local.example updated with LLM_CONCURRENCY=3

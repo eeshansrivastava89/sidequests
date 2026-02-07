@@ -31,6 +31,52 @@ interface DeriveOutput {
   }>;
 }
 
+/** Validate scan.py output at the Python→TS boundary. */
+function validateScanOutput(data: unknown): ScanOutput {
+  if (!data || typeof data !== "object") {
+    throw new Error("scan.py: output is not an object");
+  }
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.scannedAt !== "string") {
+    throw new Error("scan.py: missing or invalid 'scannedAt' (expected string)");
+  }
+  if (typeof obj.projectCount !== "number") {
+    throw new Error("scan.py: missing or invalid 'projectCount' (expected number)");
+  }
+  if (!Array.isArray(obj.projects)) {
+    throw new Error("scan.py: missing or invalid 'projects' (expected array)");
+  }
+  for (let i = 0; i < obj.projects.length; i++) {
+    const p = obj.projects[i] as Record<string, unknown>;
+    if (typeof p.name !== "string") throw new Error(`scan.py: projects[${i}] missing 'name'`);
+    if (typeof p.path !== "string") throw new Error(`scan.py: projects[${i}] missing 'path'`);
+    if (typeof p.pathHash !== "string") throw new Error(`scan.py: projects[${i}] missing 'pathHash'`);
+  }
+  return data as ScanOutput;
+}
+
+/** Validate derive.py output at the Python→TS boundary. */
+function validateDeriveOutput(data: unknown): DeriveOutput {
+  if (!data || typeof data !== "object") {
+    throw new Error("derive.py: output is not an object");
+  }
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.derivedAt !== "string") {
+    throw new Error("derive.py: missing or invalid 'derivedAt' (expected string)");
+  }
+  if (!Array.isArray(obj.projects)) {
+    throw new Error("derive.py: missing or invalid 'projects' (expected array)");
+  }
+  for (let i = 0; i < obj.projects.length; i++) {
+    const p = obj.projects[i] as Record<string, unknown>;
+    if (typeof p.pathHash !== "string") throw new Error(`derive.py: projects[${i}] missing 'pathHash'`);
+    if (typeof p.statusAuto !== "string") throw new Error(`derive.py: projects[${i}] missing 'statusAuto'`);
+    if (typeof p.healthScoreAuto !== "number") throw new Error(`derive.py: projects[${i}] missing 'healthScoreAuto'`);
+    if (!Array.isArray(p.tags)) throw new Error(`derive.py: projects[${i}] missing 'tags'`);
+  }
+  return data as DeriveOutput;
+}
+
 /** Events emitted during the refresh pipeline. */
 export type PipelineEvent =
   | { type: "scan_start" }
@@ -116,13 +162,13 @@ export async function runRefreshPipeline(
     "scan.py",
     [config.devRoot, config.excludeDirs.join(",")]
   );
-  const scanData: ScanOutput = JSON.parse(scanJson);
+  const scanData = validateScanOutput(JSON.parse(scanJson));
   emit({ type: "scan_complete", projectCount: scanData.projectCount });
 
   // 2. Derive
   emit({ type: "derive_start" });
   const deriveJson = await runPython("derive.py", [], scanJson);
-  const deriveData: DeriveOutput = JSON.parse(deriveJson);
+  const deriveData = validateDeriveOutput(JSON.parse(deriveJson));
   emit({ type: "derive_complete" });
 
   const derivedByHash = new Map(
