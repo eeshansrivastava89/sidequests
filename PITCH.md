@@ -1,100 +1,113 @@
 # Projects Dashboard
 
-**A bird's-eye view of everything you're building.**
+**Your daily starting point as a developer.**
 
 ---
 
 ## The Problem
 
-If you're a developer with more than a handful of projects in `~/dev`, you already know the feeling: you can't remember what half of them do, which ones need attention, and which ones you quietly abandoned six months ago.
+If you're a developer with more than a handful of projects in `~/dev`, you already know the feeling: you sit down to work and can't remember what you were doing yesterday, which projects have uncommitted changes, and which ones you quietly abandoned six months ago.
 
-The only way to get a picture of your work is to open each folder, check git logs, scan for a README, and try to remember the context. That takes time you don't have, so you don't do it, and projects silently rot.
+The only way to get a picture is to open each folder, check git logs, scan for a README, and try to reconstruct context. That takes time you don't have, so you don't do it, and projects silently rot.
 
-There's no tool that gives you a single view of all your local projects — their status, their health, what needs doing next. GitHub shows you repositories, but it doesn't know about your local experiments, your half-finished prototypes, or the project you've been meaning to add tests to for three months.
+GitHub shows you repositories, but it doesn't know about your local experiments, your dirty working trees, or the project you've been meaning to push for three weeks. There's no tool that answers the two questions you actually have when you sit down to code:
+
+1. **What was I working on?**
+2. **What needs my attention?**
 
 ## What This Is
 
-Projects Dashboard is a local web app that scans your development directory and shows you everything at a glance.
+Projects Dashboard is a local web app that scans your development directory and becomes the first thing you open every morning.
 
-It runs on your machine. It reads your filesystem. No cloud, no accounts, no syncing. You open it in a browser and see the state of all your work in one place.
+It runs on your machine. No cloud, no accounts, no syncing. Open it in a browser and within seconds you know the state of everything you're building.
 
 ### What it does on every scan
 
-1. **Discovers projects** in `~/dev` — anything with a git repo or language indicator files
-2. **Collects facts** — last commit, languages, README, tests, CI/CD, TODOs, deployment config
-3. **Computes status** — active, in-progress, stale, or archived, based on how recently you committed
-4. **Computes a health score** — 0 to 100, based on whether a project has the basics: README, tests, CI, a remote, low TODO count
-5. **Optionally asks an LLM** to generate a one-line purpose, tags, and recommendations
-6. **Shows you a dashboard** — stats, cards, filters, search, and a detail drawer with editable fields
+1. **Discovers projects** in `~/dev` — anything with a git repo or language indicators
+2. **Collects real-time facts** — git dirty state, ahead/behind remote, recent commits, branch, framework, external services, LOC, scripts, package manager
+3. **Computes status** — active, paused, stale, or archived, based on commit recency
+4. **Computes a health score** — 0 to 100, using gradient scoring across 11 signals (README, tests, CI, recency, remote, TODOs, deployment, linter, license, lockfile)
+5. **Optionally asks an LLM** to generate purpose, tags, and recommendations — with hash-based skip so unchanged projects don't waste API calls
+6. **Shows a compact dashboard** — sorted by last commit, filterable, keyboard-navigable, with pinned projects at the top and one-click launch into VS Code, Claude, Codex, or Terminal
 
 ### What makes it different from "just checking GitHub"
 
 - It works with **local projects that aren't on GitHub** yet
-- It catches **projects you forgot about** — the Stalled view surfaces anything you haven't touched in 61+ days
-- It gives you **a health score**, which is a gentle nudge toward better project hygiene
-- It lets you **set next actions and goals** per project, turning the dashboard into a lightweight project backlog
-- **Manual overrides** let you curate — mark something as "in-progress" even if git says it's stale, add notes, set a publish target
-- Everything is **local and private** — path sanitization means you can share screenshots or export data without leaking your filesystem layout
+- It shows **git dirty state** — you instantly see which projects have uncommitted work
+- It answers **"what was I working on?"** — default sort by last commit, pinned projects, "Recently Active" view
+- It catches **projects that need attention** — the Needs Attention filter surfaces low-health, stale, or dirty-and-abandoned projects
+- It gives you **a health score** with gradient scoring — a gentle nudge toward better project hygiene
+- It lets you **pin focus projects** to the top of the dashboard so you always see what matters
+- **Keyboard shortcuts** let you navigate, launch tools, and pin projects without touching the mouse
+- **Manual overrides** persist across every scan — your edits are never overwritten
+- Everything is **local and private** — path sanitization means you can share screenshots without leaking your filesystem
 
 ## How It Improves Your Life
 
-### Weekly review in 30 seconds
+### Morning startup in 10 seconds
 
-Open the dashboard, hit Refresh. You immediately see how many projects are active, how many are stale, and what your average health score is. No more opening 15 terminal tabs.
+Open the dashboard. Your pinned projects are at the top. Everything else is sorted by last commit. You immediately see what you were working on, which projects have dirty working trees, and what needs doing. No terminal tabs, no `git status` in five different folders.
 
-### The "Stalled" view catches things you forgot
+### Keyboard-driven workflow
 
-Filter to stalled projects. These are things you haven't committed to in months. For each one, make a decision: set a next action, archive it intentionally, or delete it. This stops the slow accumulation of dead projects that clutter your workspace and your mental model.
+Press `j`/`k` to navigate, `v` to open in VS Code, `c` to copy a Claude command, `p` to pin. The dashboard becomes a launcher — see everything, pick a project, start working.
 
-### Health scores push you toward consistency
+### "Needs Attention" catches things before they rot
 
-A project with no README, no tests, and no remote scores poorly. That number is a small, persistent reminder to spend 10 minutes bringing it up to baseline. Over time, your projects become more consistent and more presentable.
+The filter surfaces projects with low health, no next action set, or uncommitted changes left too long. One glance tells you what's slipping.
 
-### "Next Actions" becomes your project backlog
+### Pin what matters
 
-In the detail drawer, set a Next Action for any project — "write tests," "deploy to production," "add auth." The Next Actions workflow view then becomes your personal kanban across all projects. Monday morning, open it, pick what to work on.
+Pin your active focus projects. They stay at the top across refreshes. Everything else falls into the sorted list below. No manual reordering — just pin and forget.
 
-### Manual overrides let you be the authority
+### One-click launch
 
-The scanner computes status and health automatically, but you know your projects better than an algorithm. Override the status, add notes, set goals. Your edits persist across every scan — they're never overwritten.
+Every project row has quick actions: VS Code, Claude CLI, Codex CLI, Terminal. Click or use keyboard shortcuts. The dashboard tracks what you open, so "last opened" becomes another signal for recency.
+
+### Activity timeline
+
+Open any project's drawer and see a full history: recent commits, when it was last scanned, when you last opened it, when overrides were changed. Context you'd otherwise lose.
+
+### Health scores push consistency
+
+A project with no README, no tests, and no remote scores poorly. The gradient scoring rewards incremental improvement — adding a linter config or a license nudges the score up.
 
 ### LLM enrichment fills in the gaps
 
-If you turn on LLM support, the dashboard will generate a one-line purpose, suggested tags, and actionable recommendations for each project. This is especially useful when you have 20+ projects and can't remember what half of them do.
+Turn on LLM support and the dashboard generates purpose descriptions, suggested tags, and actionable recommendations. Unchanged projects are automatically skipped (hash-based detection), and LLM calls run in parallel for speed.
 
 ## The Workflow That Gets the Most Value
 
 ```
-Monday morning:
-  1. Open dashboard, hit Refresh
-  2. Check Stalled — anything here you care about?
-     → Yes: set a next action
-     → No: override status to "archived"
-  3. Check Next Actions — pick what to work on today
-  4. Work on your projects
+Every morning:
+  1. Open dashboard — pinned projects at top, sorted by last commit
+  2. Scan pinned projects — anything dirty? Any commits to push?
+  3. Check "Needs Attention" — anything slipping?
+  4. Press 'v' on a project → VS Code opens → start working
 
-After shipping something:
-  5. Update metadata (goal, audience, publish target)
-     so you remember the context next time
+Weekly review (2 minutes):
+  5. Hit Refresh
+  6. Check Stale tab — archive or set next actions
+  7. Glance at health scores — anything worth 10 minutes of cleanup?
 ```
 
-That's it. Five minutes a week for a clear picture of everything you're building.
+### Who This Is For
 
-## Who This Is For
-
-- **Prolific side-project developers** who start more things than they finish and need a system to keep track
-- **Portfolio builders** who want to know which projects are presentable and which need work
-- **Developers doing a career review** who want to assess their body of work systematically
-- **Open-source maintainers** juggling multiple repos who need a local overview that isn't tied to a single hosting platform
+- **Active developers** juggling 3-5 projects who need a launch point every morning
+- **Prolific side-project builders** who start more things than they finish
+- **Portfolio builders** assessing which projects are presentable
+- **Open-source maintainers** who need a local overview across multiple repos
 
 ## Technical Details
 
-- **Stack**: Next.js, TypeScript, Tailwind CSS, shadcn/ui, Prisma, SQLite, Python
+- **Stack**: Next.js 16, React 19, TypeScript 5, Tailwind v4, shadcn/ui, Prisma 7, SQLite, Python 3
 - **Runs locally**: no external server, no database service, just `npm run dev`
-- **Scan pipeline**: Python scripts for filesystem scanning and deterministic derivation
-- **LLM support**: pluggable providers — Claude CLI, OpenRouter, Ollama, MLX, Codex CLI (agentic providers are gated)
-- **Feature flags**: LLM enrichment and O-1 evidence export are off by default
-- **OSS-ready**: path sanitization on by default, sample data included, no private information in the repo
+- **Scan pipeline**: Python scripts for filesystem scanning (15+ fields per project) and deterministic derivation
+- **LLM support**: 5 pluggable providers — Claude CLI, OpenRouter, Ollama, MLX, Codex CLI
+- **Pipeline optimizations**: hash-based LLM skip, parallel LLM calls (configurable concurrency), 90-day activity cleanup
+- **Feature flags**: LLM enrichment, O-1 evidence export, path sanitization — all configurable
+- **11 API routes** covering projects, overrides, metadata, pinning, activity, touch tracking, refresh (streaming + non-streaming), config, and evidence export
+- **Keyboard shortcuts**: full navigation and action shortcuts (j/k/v/c/x/t/p/Enter/Esc)
 
 ## What "O-1 Evidence" Means
 
@@ -102,4 +115,4 @@ If you're building a portfolio for a visa application, performance review, or jo
 
 ## Status
 
-All seven implementation phases are complete. The dashboard scans projects, computes health, supports LLM enrichment, has a full API, an interactive UI with workflow views, gated O-1 export, and documentation for open-source release.
+All 21 implementation phases are complete. The dashboard has evolved from a portfolio tracker into a daily starting point — scanning projects, computing health with gradient scoring, tracking git dirty state and remote sync, supporting keyboard-driven navigation, project pinning, activity timelines, one-click tool launch, parallel LLM enrichment with change detection, and full documentation.

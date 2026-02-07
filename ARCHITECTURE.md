@@ -197,8 +197,8 @@ Orchestrates the full refresh:
 | `/api/projects/[id]/override` | PATCH | Set manual overrides (status, purpose, tags, notes) |
 | `/api/projects/[id]/metadata` | PATCH | Set workflow metadata (goal, audience, nextAction, etc.) |
 | `/api/projects/[id]/pin` | PATCH | Toggle pinned state |
-| `/api/projects/[id]/activity` | GET | Last 20 activity records for a project (Phase 20) |
-| `/api/projects/[id]/touch` | POST | Record quick action usage, update lastTouchedAt (Phase 20) |
+| `/api/projects/[id]/activity` | GET | Last 20 activity records for a project |
+| `/api/projects/[id]/touch` | POST | Record quick action usage, update lastTouchedAt |
 | `/api/refresh` | POST | Run full pipeline (non-streaming) |
 | `/api/refresh/stream` | GET | Run full pipeline with SSE progress events |
 | `/api/config` | GET | Client-safe feature flags (featureLlm, featureO1, sanitizePaths) |
@@ -247,7 +247,7 @@ Orchestrates the dashboard:
 ### Hooks
 | Hook | Purpose |
 |------|---------|
-| `use-projects.ts` | Fetch, cache, and mutate projects. Includes `togglePin`. |
+| `use-projects.ts` | Fetch, cache, and mutate projects. Includes `togglePin`, `touchProject`. |
 | `use-refresh.ts` | SSE streaming for refresh progress. Start, cancel, state. |
 | `use-config.ts` | Fetch client-safe feature flags. |
 
@@ -305,6 +305,8 @@ src/
       projects/[id]/override/    -- PATCH overrides
       projects/[id]/metadata/    -- PATCH metadata
       projects/[id]/pin/         -- PATCH toggle pin
+      projects/[id]/activity/    -- GET activity timeline
+      projects/[id]/touch/       -- POST quick action tracking
       refresh/route.ts           -- POST non-streaming refresh
       refresh/stream/route.ts    -- GET SSE streaming refresh
       config/route.ts            -- GET feature flags

@@ -23,8 +23,8 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 17: Enhanced Quick Actions
 - ✅ Phase 18: Project Pinning & Favorites
 - ✅ Phase 19: Pipeline Optimizations
-- 🔄 Phase 20: Session Memory & Activity Timeline
-- 🔄 Phase 21: Docs & Architecture Update
+- ✅ Phase 20: Session Memory & Activity Timeline
+- ✅ Phase 21: Docs & Architecture Update
 
 Notes:
 - ✅ README setup line fixed (no no-op copy).
