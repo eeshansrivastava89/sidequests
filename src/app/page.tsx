@@ -131,7 +131,7 @@ function formatRelativeTime(iso: string): string {
 /* ── Page ───────────────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin } =
+  const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject } =
     useProjects();
   const config = useConfig();
   const refreshHook = useRefresh(fetchProjects);
@@ -179,6 +179,13 @@ export default function DashboardPage() {
       togglePin(id);
     },
     [togglePin]
+  );
+
+  const handleTouch = useCallback(
+    (id: string, tool: string) => {
+      touchProject(id, tool);
+    },
+    [touchProject]
   );
 
   const filtered = useMemo(
@@ -254,24 +261,28 @@ export default function DashboardPage() {
         case "v": {
           if (selectedProject?.pathDisplay) {
             window.open(`vscode://file${encodeURI(selectedProject.pathDisplay)}`);
+            touchProject(selectedProject.id, "vscode");
           }
           break;
         }
         case "c": {
           if (selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`);
+            touchProject(selectedProject.id, "claude");
           }
           break;
         }
         case "x": {
           if (selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`);
+            touchProject(selectedProject.id, "codex");
           }
           break;
         }
         case "t": {
           if (selectedProject?.pathDisplay) {
             navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`);
+            touchProject(selectedProject.id, "terminal");
           }
           break;
         }
@@ -286,7 +297,7 @@ export default function DashboardPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin]);
+  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin, touchProject]);
 
   if (loading) {
     return (
@@ -411,6 +422,7 @@ export default function DashboardPage() {
                   selectedId={selectedId}
                   onSelect={(p) => setSelectedId(p.id)}
                   onTogglePin={handleTogglePin}
+                  onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
                 />
               </div>
@@ -427,6 +439,7 @@ export default function DashboardPage() {
                   selectedId={selectedId}
                   onSelect={(p) => setSelectedId(p.id)}
                   onTogglePin={handleTogglePin}
+                  onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
                 />
               </div>
@@ -442,6 +455,7 @@ export default function DashboardPage() {
         onUpdateOverride={updateOverride}
         onUpdateMetadata={updateMetadata}
         onTogglePin={handleTogglePin}
+        onTouch={handleTouch}
         featureO1={config.featureO1}
         onExport={handleExport}
       />

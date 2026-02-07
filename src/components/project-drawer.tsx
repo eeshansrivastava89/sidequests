@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Project } from "@/lib/types";
 import { STATUS_COLORS } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -273,6 +273,54 @@ function StructuredData({ data }: { data: Record<string, unknown> }) {
 
 /* ── Drawer Props ──────────────────────────────────────── */
 
+interface ActivityEntry {
+  id: string;
+  type: string;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  scan: "Scanned",
+  llm: "LLM enriched",
+  override: "Override updated",
+  metadata: "Metadata updated",
+  pin: "Pinned/Unpinned",
+  opened: "Opened",
+};
+
+function activityLabel(entry: ActivityEntry): string {
+  if (entry.type === "opened" && entry.payload?.tool) {
+    const toolNames: Record<string, string> = {
+      vscode: "VS Code",
+      claude: "Claude",
+      codex: "Codex",
+      terminal: "Terminal",
+    };
+    return `Opened in ${toolNames[entry.payload.tool as string] ?? entry.payload.tool}`;
+  }
+  if (entry.type === "pin" && entry.payload) {
+    return entry.payload.pinned ? "Pinned" : "Unpinned";
+  }
+  return ACTIVITY_LABELS[entry.type] ?? entry.type;
+}
+
+function activityIcon(entry: ActivityEntry): string {
+  if (entry.type === "opened") {
+    const tool = entry.payload?.tool as string | undefined;
+    if (tool === "vscode") return "\u25B6";
+    if (tool === "claude") return "\u2728";
+    if (tool === "codex") return "\u2318";
+    if (tool === "terminal") return ">";
+  }
+  if (entry.type === "scan") return "\u21BB";
+  if (entry.type === "llm") return "\u2606";
+  if (entry.type === "pin") return "\u2302";
+  if (entry.type === "override") return "\u270E";
+  if (entry.type === "metadata") return "\u2630";
+  return "\u2022";
+}
+
 interface ProjectDrawerProps {
   project: Project | null;
   open: boolean;
@@ -280,6 +328,7 @@ interface ProjectDrawerProps {
   onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onUpdateMetadata: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onTogglePin: (id: string) => void;
+  onTouch: (id: string, tool: string) => void;
   featureO1?: boolean;
   onExport?: (projectId: string) => void;
 }
@@ -293,9 +342,27 @@ export function ProjectDrawer({
   onUpdateOverride,
   onUpdateMetadata,
   onTogglePin,
+  onTouch,
   featureO1,
   onExport,
 }: ProjectDrawerProps) {
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    if (!project?.id || !open) {
+      setActivities([]);
+      return;
+    }
+    fetch(`/api/projects/${project.id}/activity`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) setActivities(data.activities);
+      })
+      .catch(() => {
+        // Silently ignore activity fetch failures
+      });
+  }, [project?.id, open]);
+
   if (!project) return null;
 
   const scan = project.scan;
@@ -437,7 +504,7 @@ export function ProjectDrawer({
                   title="Open in VS Code (v)"
                   asChild
                 >
-                  <a href={`vscode://file${encodeURI(rawPath)}`}>
+                  <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
                     <VsCodeIcon className="size-4" />
                   </a>
                 </Button>
@@ -446,7 +513,7 @@ export function ProjectDrawer({
                   variant="ghost"
                   className="text-[#D97757] hover:bg-[#D97757]/10"
                   title="Copy Claude command (c)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
                 >
                   <ClaudeIcon className="size-4" />
                 </Button>
@@ -454,7 +521,7 @@ export function ProjectDrawer({
                   size="icon-xs"
                   variant="ghost"
                   title="Copy Codex command (x)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
                 >
                   <CodexIcon className="size-4" />
                 </Button>
@@ -462,7 +529,7 @@ export function ProjectDrawer({
                   size="icon-xs"
                   variant="ghost"
                   title="Copy terminal cd command (t)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}"`, "Terminal")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
                 >
                   <TerminalIcon className="size-4" />
                 </Button>
@@ -511,6 +578,28 @@ export function ProjectDrawer({
                     ) : (
                       "No commit history available."
                     )}
+                  </div>
+                )}
+
+                {/* Activity Timeline */}
+                {activities.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-border/50">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Activity Log
+                    </div>
+                    {activities.map((entry) => (
+                      <div key={entry.id} className="flex items-center gap-2 text-xs py-0.5">
+                        <span className="w-4 text-center text-muted-foreground shrink-0">
+                          {activityIcon(entry)}
+                        </span>
+                        <span className="text-foreground/80 truncate">
+                          {activityLabel(entry)}
+                        </span>
+                        <span className="text-muted-foreground shrink-0 ml-auto tabular-nums">
+                          {formatDate(entry.createdAt)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

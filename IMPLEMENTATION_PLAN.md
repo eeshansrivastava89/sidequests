@@ -18,13 +18,13 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 12: Schema Evolution & Derive v2
 - ✅ Phase 13: Compact List View
 - ✅ Phase 14: Sort, Filter & Recently Active
-- 🔄 Phase 15: Drawer Redesign
-- 🔄 Phase 16: API & Merge Updates
-- ⬜ Phase 17: Enhanced Quick Actions
-- ⬜ Phase 18: Project Pinning & Favorites
-- ⬜ Phase 19: Pipeline Optimizations
-- ⬜ Phase 20: Session Memory & Activity Timeline
-- ⬜ Phase 21: Docs & Architecture Update
+- ✅ Phase 15: Drawer Redesign
+- ✅ Phase 16: API & Merge Updates
+- ✅ Phase 17: Enhanced Quick Actions
+- ✅ Phase 18: Project Pinning & Favorites
+- ✅ Phase 19: Pipeline Optimizations
+- 🔄 Phase 20: Session Memory & Activity Timeline
+- 🔄 Phase 21: Docs & Architecture Update
 
 Notes:
 - ✅ README setup line fixed (no no-op copy).

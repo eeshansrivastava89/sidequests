@@ -12,6 +12,7 @@ interface ProjectListProps {
   selectedId: string | null;
   onSelect: (project: Project) => void;
   onTogglePin: (id: string) => void;
+  onTouch: (id: string, tool: string) => void;
   sanitizePaths: boolean;
 }
 
@@ -31,6 +32,18 @@ function healthColor(score: number): string {
 function formatDaysInactive(days: number | null | undefined): string {
   if (days == null) return "\u2014";
   return `${days}d`;
+}
+
+function formatLastTouched(iso: string | null): string | null {
+  if (!iso) return null;
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Opened just now";
+  if (mins < 60) return `Opened ${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Opened ${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `Opened ${days}d ago`;
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -89,10 +102,10 @@ function PinIcon({ filled, className }: { filled?: boolean; className?: string }
   );
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanitizePaths }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[auto_auto_1fr_auto_3rem_3rem_1fr]"
-    : "grid-cols-[auto_auto_1fr_auto_3rem_3rem_1fr_auto]";
+    ? "grid-cols-[auto_auto_1fr_auto_3rem_3rem_auto_1fr]"
+    : "grid-cols-[auto_auto_1fr_auto_3rem_3rem_auto_1fr_auto]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -107,6 +120,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
         <div className="hidden sm:block">Lang</div>
         <div className="hidden md:block text-right">Health</div>
         <div className="hidden sm:block text-right">Inactive</div>
+        <div className="hidden lg:block text-right">Opened</div>
         <div className="hidden md:block">Last Commit</div>
         {!sanitizePaths && <div className="text-right">Actions</div>}
       </div>
@@ -195,6 +209,11 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
               {formatDaysInactive(project.scan?.daysInactive)}
             </div>
 
+            {/* Last opened */}
+            <div className="hidden lg:block text-right text-[11px] text-muted-foreground truncate">
+              {formatLastTouched(project.lastTouchedAt) ?? "\u2014"}
+            </div>
+
             {/* Last commit message */}
             <div className="hidden md:block font-mono text-xs text-muted-foreground truncate min-w-0">
               {project.scan?.lastCommitMessage ?? "\u2014"}
@@ -213,7 +232,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
                   title="Open in VS Code (v)"
                   asChild
                 >
-                  <a href={`vscode://file${encodeURI(rawPath)}`}>
+                  <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
                     <VsCodeIcon className="size-4" />
                   </a>
                 </Button>
@@ -222,7 +241,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
                   variant="ghost"
                   className="text-[#D97757] hover:bg-[#D97757]/10"
                   title="Copy Claude command (c)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
                 >
                   <ClaudeIcon className="size-4" />
                 </Button>
@@ -230,7 +249,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
                   size="icon-xs"
                   variant="ghost"
                   title="Copy Codex command (x)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
                 >
                   <CodexIcon className="size-4" />
                 </Button>
@@ -238,7 +257,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanit
                   size="icon-xs"
                   variant="ghost"
                   title="Copy terminal cd command (t)"
-                  onClick={() => copyToClipboard(`cd "${rawPath}"`, "Terminal")}
+                  onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
                 >
                   <TerminalIcon className="size-4" />
                 </Button>

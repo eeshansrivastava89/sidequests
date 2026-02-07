@@ -54,6 +54,17 @@ export function useProjects() {
     [fetchProjects]
   );
 
+  const touchProject = useCallback((id: string, tool: string) => {
+    // Fire-and-forget: no await, no refetch
+    fetch(`/api/projects/${id}/touch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool }),
+    }).catch(() => {
+      // Silently ignore touch failures
+    });
+  }, []);
+
   const togglePin = useCallback(
     async (id: string) => {
       const res = await fetch(`/api/projects/${id}/pin`, {
@@ -70,5 +81,5 @@ export function useProjects() {
     fetchProjects();
   }, [fetchProjects]);
 
-  return { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin };
+  return { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject };
 }
