@@ -54,9 +54,21 @@ export function useProjects() {
     [fetchProjects]
   );
 
+  const togglePin = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/api/projects/${id}/pin`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (data.ok) await fetchProjects();
+      return data;
+    },
+    [fetchProjects]
+  );
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
 
-  return { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata };
+  return { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin };
 }

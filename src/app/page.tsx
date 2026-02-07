@@ -131,7 +131,7 @@ function formatRelativeTime(iso: string): string {
 /* ── Page ───────────────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata } =
+  const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin } =
     useProjects();
   const config = useConfig();
   const refreshHook = useRefresh(fetchProjects);
@@ -174,9 +174,26 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handleTogglePin = useCallback(
+    (id: string) => {
+      togglePin(id);
+    },
+    [togglePin]
+  );
+
   const filtered = useMemo(
     () => sortProjects(filterBySearch(filterByView(projects, view), search), sortKey),
     [projects, view, search, sortKey]
+  );
+
+  const pinnedProjects = useMemo(
+    () => filtered.filter((p) => p.pinned),
+    [filtered]
+  );
+
+  const unpinnedProjects = useMemo(
+    () => filtered.filter((p) => !p.pinned),
+    [filtered]
   );
 
   const lastRefreshed = useMemo(() => getLastRefreshed(projects), [projects]);
@@ -185,6 +202,91 @@ export default function DashboardPage() {
     () => projects.find((p) => p.id === selectedId) ?? null,
     [projects, selectedId]
   );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+      const allVisible = [...pinnedProjects, ...unpinnedProjects];
+
+      switch (e.key) {
+        case "Escape":
+          if (selectedId) {
+            setSelectedId(null);
+          }
+          break;
+        case "Enter": {
+          if (!selectedId && allVisible.length > 0) {
+            setSelectedId(allVisible[0].id);
+          }
+          break;
+        }
+        case "j":
+        case "ArrowDown": {
+          e.preventDefault();
+          if (allVisible.length === 0) break;
+          if (!selectedId) {
+            setSelectedId(allVisible[0].id);
+          } else {
+            const idx = allVisible.findIndex((p) => p.id === selectedId);
+            if (idx < allVisible.length - 1) {
+              setSelectedId(allVisible[idx + 1].id);
+            }
+          }
+          break;
+        }
+        case "k":
+        case "ArrowUp": {
+          e.preventDefault();
+          if (allVisible.length === 0) break;
+          if (!selectedId) {
+            setSelectedId(allVisible[allVisible.length - 1].id);
+          } else {
+            const idx = allVisible.findIndex((p) => p.id === selectedId);
+            if (idx > 0) {
+              setSelectedId(allVisible[idx - 1].id);
+            }
+          }
+          break;
+        }
+        case "v": {
+          if (selectedProject?.pathDisplay) {
+            window.open(`vscode://file${encodeURI(selectedProject.pathDisplay)}`);
+          }
+          break;
+        }
+        case "c": {
+          if (selectedProject?.pathDisplay) {
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`);
+          }
+          break;
+        }
+        case "x": {
+          if (selectedProject?.pathDisplay) {
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`);
+          }
+          break;
+        }
+        case "t": {
+          if (selectedProject?.pathDisplay) {
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`);
+          }
+          break;
+        }
+        case "p": {
+          if (selectedProject) {
+            handleTogglePin(selectedProject.id);
+          }
+          break;
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin]);
 
   if (loading) {
     return (
@@ -298,12 +400,38 @@ export default function DashboardPage() {
             </p>
           </div>
         ) : (
-          <ProjectList
-            projects={filtered}
-            selectedId={selectedId}
-            onSelect={(p) => setSelectedId(p.id)}
-            sanitizePaths={config.sanitizePaths}
-          />
+          <div className="space-y-4">
+            {pinnedProjects.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Pinned
+                </h2>
+                <ProjectList
+                  projects={pinnedProjects}
+                  selectedId={selectedId}
+                  onSelect={(p) => setSelectedId(p.id)}
+                  onTogglePin={handleTogglePin}
+                  sanitizePaths={config.sanitizePaths}
+                />
+              </div>
+            )}
+            {unpinnedProjects.length > 0 && (
+              <div>
+                {pinnedProjects.length > 0 && (
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    Projects
+                  </h2>
+                )}
+                <ProjectList
+                  projects={unpinnedProjects}
+                  selectedId={selectedId}
+                  onSelect={(p) => setSelectedId(p.id)}
+                  onTogglePin={handleTogglePin}
+                  sanitizePaths={config.sanitizePaths}
+                />
+              </div>
+            )}
+          </div>
         )}
       </main>
 
@@ -313,6 +441,7 @@ export default function DashboardPage() {
         onClose={() => setSelectedId(null)}
         onUpdateOverride={updateOverride}
         onUpdateMetadata={updateMetadata}
+        onTogglePin={handleTogglePin}
         featureO1={config.featureO1}
         onExport={handleExport}
       />

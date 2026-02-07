@@ -47,6 +47,31 @@ function CodexIcon({ className }: { className?: string }) {
   );
 }
 
+function TerminalIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}
+
+function PinIcon({ filled, className }: { filled?: boolean; className?: string }) {
+  if (filled) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 2L14.5 3.5L18.5 7.5L20 6L16 2ZM12.5 5.5L8 10L9 14L2 21H3L10 14L14 15L18.5 10.5L12.5 5.5Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
+    </svg>
+  );
+}
+
 function ChevronIcon({ open, className }: { open: boolean; className?: string }) {
   return (
     <svg
@@ -254,6 +279,7 @@ interface ProjectDrawerProps {
   onClose: () => void;
   onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onUpdateMetadata: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
+  onTogglePin: (id: string) => void;
   featureO1?: boolean;
   onExport?: (projectId: string) => void;
 }
@@ -266,6 +292,7 @@ export function ProjectDrawer({
   onClose,
   onUpdateOverride,
   onUpdateMetadata,
+  onTogglePin,
   featureO1,
   onExport,
 }: ProjectDrawerProps) {
@@ -289,7 +316,22 @@ export function ProjectDrawer({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="w-full sm:max-w-lg p-0">
         <SheetHeader className="px-6 pt-6 pb-3">
-          <SheetTitle className="text-lg leading-tight">{project.name}</SheetTitle>
+          <div className="flex items-center gap-2">
+            <SheetTitle className="text-lg leading-tight">{project.name}</SheetTitle>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center justify-center w-6 h-6 rounded transition-colors shrink-0",
+                project.pinned
+                  ? "text-amber-500 hover:text-amber-600"
+                  : "text-muted-foreground/40 hover:text-muted-foreground/70"
+              )}
+              title={project.pinned ? "Unpin project" : "Pin project"}
+              onClick={() => onTogglePin(project.id)}
+            >
+              <PinIcon filled={project.pinned} className="size-4" />
+            </button>
+          </div>
           <p className="text-xs text-muted-foreground font-mono truncate">{rawPath}</p>
         </SheetHeader>
 
@@ -392,7 +434,7 @@ export function ProjectDrawer({
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#007ACC] hover:bg-[#007ACC]/10"
-                  title="Open in VS Code"
+                  title="Open in VS Code (v)"
                   asChild
                 >
                   <a href={`vscode://file${encodeURI(rawPath)}`}>
@@ -403,7 +445,7 @@ export function ProjectDrawer({
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#D97757] hover:bg-[#D97757]/10"
-                  title="Copy Claude command"
+                  title="Copy Claude command (c)"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
                 >
                   <ClaudeIcon className="size-4" />
@@ -411,10 +453,18 @@ export function ProjectDrawer({
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  title="Copy Codex command"
+                  title="Copy Codex command (x)"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
                 >
                   <CodexIcon className="size-4" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Copy terminal cd command (t)"
+                  onClick={() => copyToClipboard(`cd "${rawPath}"`, "Terminal")}
+                >
+                  <TerminalIcon className="size-4" />
                 </Button>
                 <Button
                   size="xs"

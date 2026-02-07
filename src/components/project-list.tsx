@@ -11,6 +11,7 @@ interface ProjectListProps {
   projects: Project[];
   selectedId: string | null;
   onSelect: (project: Project) => void;
+  onTogglePin: (id: string) => void;
   sanitizePaths: boolean;
 }
 
@@ -63,10 +64,35 @@ function CodexIcon({ className }: { className?: string }) {
   );
 }
 
-export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: ProjectListProps) {
+function TerminalIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}
+
+function PinIcon({ filled, className }: { filled?: boolean; className?: string }) {
+  if (filled) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 2L14.5 3.5L18.5 7.5L20 6L16 2ZM12.5 5.5L8 10L9 14L2 21H3L10 14L14 15L18.5 10.5L12.5 5.5Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
+    </svg>
+  );
+}
+
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, sanitizePaths }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[auto_1fr_auto_3rem_3rem_1fr]"
-    : "grid-cols-[auto_1fr_auto_3rem_3rem_1fr_auto]";
+    ? "grid-cols-[auto_auto_1fr_auto_3rem_3rem_1fr]"
+    : "grid-cols-[auto_auto_1fr_auto_3rem_3rem_1fr_auto]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -76,6 +102,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
         gridCols
       )}>
         <div className="w-2.5" />
+        <div className="w-5" />
         <div>Name</div>
         <div className="hidden sm:block">Lang</div>
         <div className="hidden md:block text-right">Health</div>
@@ -117,6 +144,24 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
               )}
               title={project.status}
             />
+
+            {/* Pin toggle */}
+            <button
+              type="button"
+              className={cn(
+                "flex items-center justify-center w-5 h-5 rounded transition-colors",
+                project.pinned
+                  ? "text-amber-500 hover:text-amber-600"
+                  : "text-muted-foreground/30 hover:text-muted-foreground/60"
+              )}
+              title={project.pinned ? "Unpin project" : "Pin project"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePin(project.id);
+              }}
+            >
+              <PinIcon filled={project.pinned} className="size-3.5" />
+            </button>
 
             {/* Name */}
             <div
@@ -165,7 +210,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#007ACC] hover:bg-[#007ACC]/10"
-                  title="Open in VS Code"
+                  title="Open in VS Code (v)"
                   asChild
                 >
                   <a href={`vscode://file${encodeURI(rawPath)}`}>
@@ -176,7 +221,7 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#D97757] hover:bg-[#D97757]/10"
-                  title="Copy Claude command"
+                  title="Copy Claude command (c)"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && claude`, "Claude")}
                 >
                   <ClaudeIcon className="size-4" />
@@ -184,10 +229,18 @@ export function ProjectList({ projects, selectedId, onSelect, sanitizePaths }: P
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  title="Copy Codex command"
+                  title="Copy Codex command (x)"
                   onClick={() => copyToClipboard(`cd "${rawPath}" && codex`, "Codex")}
                 >
                   <CodexIcon className="size-4" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Copy terminal cd command (t)"
+                  onClick={() => copyToClipboard(`cd "${rawPath}"`, "Terminal")}
+                >
+                  <TerminalIcon className="size-4" />
                 </Button>
               </div>
             )}

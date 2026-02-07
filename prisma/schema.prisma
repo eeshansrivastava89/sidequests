@@ -27,11 +27,12 @@ model Project {
 }
 
 model Scan {
-  id        String   @id @default(cuid())
-  projectId String   @unique
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  rawJson   String   // Full scan output as JSON
-  scannedAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  projectId   String   @unique
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rawJson     String   // Full scan output as JSON
+  rawJsonHash String?  // SHA-256 hash of rawJson for change detection
+  scannedAt   DateTime @default(now())
 }
 
 model Derived {
