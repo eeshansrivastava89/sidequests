@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
@@ -140,6 +140,7 @@ export default function DashboardPage() {
   const [sortKey, setSortKey] = useState<SortKey>("lastCommit");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Hydrate sort key from localStorage after mount
   useEffect(() => {
@@ -205,6 +206,15 @@ export default function DashboardPage() {
 
   const lastRefreshed = useMemo(() => getLastRefreshed(projects), [projects]);
 
+  // Tab counts for filter labels
+  const tabCounts = useMemo(() => ({
+    all: projects.length,
+    active: filterByView(projects, "active").length,
+    "needs-attention": filterByView(projects, "needs-attention").length,
+    stale: filterByView(projects, "stale").length,
+    archived: filterByView(projects, "archived").length,
+  }), [projects]);
+
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
     [projects, selectedId]
@@ -219,9 +229,16 @@ export default function DashboardPage() {
       const allVisible = [...pinnedProjects, ...unpinnedProjects];
 
       switch (e.key) {
+        case "/": {
+          e.preventDefault();
+          searchRef.current?.focus();
+          break;
+        }
         case "Escape":
           if (selectedId) {
             setSelectedId(null);
+          } else if (document.activeElement === searchRef.current) {
+            searchRef.current?.blur();
           }
           break;
         case "Enter": {
@@ -299,6 +316,14 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin, touchProject, config.sanitizePaths]);
 
+  // Scroll selected project into view on keyboard navigation
+  useEffect(() => {
+    if (selectedId) {
+      const el = document.querySelector(`[data-project-id="${selectedId}"]`);
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedId]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -374,11 +399,11 @@ export default function DashboardPage() {
             onValueChange={(v) => setView(v as WorkflowView)}
           >
             <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="needs-attention">Needs Attention</TabsTrigger>
-              <TabsTrigger value="stale">Stale</TabsTrigger>
-              <TabsTrigger value="archived">Archived</TabsTrigger>
+              <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
+              <TabsTrigger value="active">Active ({tabCounts.active})</TabsTrigger>
+              <TabsTrigger value="needs-attention">Needs Attention ({tabCounts["needs-attention"]})</TabsTrigger>
+              <TabsTrigger value="stale">Stale ({tabCounts.stale})</TabsTrigger>
+              <TabsTrigger value="archived">Archived ({tabCounts.archived})</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -396,7 +421,8 @@ export default function DashboardPage() {
             </select>
 
             <Input
-              placeholder="Search projects..."
+              ref={searchRef}
+              placeholder="Search projects... (/)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 w-full sm:w-64"

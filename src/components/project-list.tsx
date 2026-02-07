@@ -133,6 +133,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         return (
           <div
             key={project.id}
+            data-project-id={project.id}
             role="button"
             tabIndex={0}
             onClick={() => onSelect(project)}
@@ -177,12 +178,17 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               <PinIcon filled={project.pinned} className="size-3.5" />
             </button>
 
-            {/* Name */}
-            <div
-              className="font-semibold text-sm truncate min-w-0"
-              title={rawPath}
-            >
-              {project.name}
+            {/* Name + git indicators */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-semibold text-sm truncate" title={rawPath}>
+                {project.name}
+              </span>
+              {project.isDirty && (
+                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" title="Uncommitted changes" />
+              )}
+              {project.ahead > 0 && (
+                <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>
+              )}
             </div>
 
             {/* Language badge */}
