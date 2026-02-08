@@ -14,7 +14,7 @@ import { SettingsModal } from "@/components/settings-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ChevronDown } from "lucide-react";
+import { Settings, ChevronDown, X } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 
@@ -317,7 +317,7 @@ export default function DashboardPage() {
           projectDeltas={deltaHook.deltas?.projects}
         />
 
-        <StatsBar projects={projects} filteredCount={filtered.length} deltas={deltaHook.deltas} />
+        <StatsBar projects={projects} deltas={deltaHook.deltas} />
 
         {/* Filter tabs + Sort + Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -359,6 +359,48 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Active filter chips */}
+        {(view !== "all" || search) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {view !== "all" && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
+                {view === "needs-attention" ? "Needs Attention" : view.charAt(0).toUpperCase() + view.slice(1)}
+                <button
+                  type="button"
+                  className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setView("all")}
+                  aria-label="Clear tab filter"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+            {search && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
+                &ldquo;{search}&rdquo;
+                <button
+                  type="button"
+                  className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              onClick={() => { setView("all"); setSearch(""); handleSortChange("lastCommit"); }}
+            >
+              Clear all
+            </button>
+            <span className="text-xs text-muted-foreground">
+              Showing {filtered.length} of {projects.length}
+            </span>
+          </div>
+        )}
+
         {filtered.length === 0 ? (
           <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
             <p className="text-muted-foreground">
@@ -380,6 +422,7 @@ export default function DashboardPage() {
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
                   deltas={deltaHook.deltas}
+                  view={view}
                 />
               </div>
             )}
@@ -398,6 +441,7 @@ export default function DashboardPage() {
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
                   deltas={deltaHook.deltas}
+                  view={view}
                 />
               </div>
             )}

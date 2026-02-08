@@ -19,6 +19,7 @@ export type DeltaCause =
   | "unchanged";
 
 export interface ProjectDelta {
+  projectName: string;
   healthScore: number;
   hygieneScore: number;
   momentumScore: number;
@@ -28,12 +29,18 @@ export interface ProjectDelta {
   fieldsChanged: string[];
   deltaCause: DeltaCause[];
   semanticChanged: boolean;
+  prevHygieneScore: number;
+  prevMomentumScore: number;
+  curHygieneScore: number;
+  curMomentumScore: number;
 }
 
 export interface DeltaSummary {
   scoresChanged: number;
   enriched: number;
   unchanged: number;
+  changedNames: string[];
+  enrichedNames: string[];
 }
 
 export interface DashboardDeltas {
@@ -177,6 +184,8 @@ export function useRefreshDeltas(projects: Project[]) {
     let scoresChanged = 0;
     let enriched = 0;
     let unchanged = 0;
+    const changedNames: string[] = [];
+    const enrichedNames: string[] = [];
 
     for (const p of projects) {
       const old = snap.get(p.id);
@@ -185,6 +194,7 @@ export function useRefreshDeltas(projects: Project[]) {
       if (!old) {
         // New project since snapshot
         projectDeltas.set(p.id, {
+          projectName: p.name,
           healthScore: 0,
           hygieneScore: 0,
           momentumScore: 0,
@@ -194,8 +204,13 @@ export function useRefreshDeltas(projects: Project[]) {
           fieldsChanged: [],
           deltaCause: ["scan_changed"],
           semanticChanged: false,
+          prevHygieneScore: 0,
+          prevMomentumScore: 0,
+          curHygieneScore: curSnap.hygieneScore,
+          curMomentumScore: curSnap.momentumScore,
         });
         scoresChanged++;
+        changedNames.push(p.name);
         continue;
       }
 
@@ -221,6 +236,7 @@ export function useRefreshDeltas(projects: Project[]) {
 
       // Always track the project delta (including unchanged)
       projectDeltas.set(p.id, {
+        projectName: p.name,
         healthScore: p.healthScore - old.healthScore,
         hygieneScore: curSnap.hygieneScore - old.hygieneScore,
         momentumScore: curSnap.momentumScore - old.momentumScore,
@@ -230,6 +246,10 @@ export function useRefreshDeltas(projects: Project[]) {
         fieldsChanged: changed,
         deltaCause: causes,
         semanticChanged,
+        prevHygieneScore: old.hygieneScore,
+        prevMomentumScore: old.momentumScore,
+        curHygieneScore: curSnap.hygieneScore,
+        curMomentumScore: curSnap.momentumScore,
       });
 
       // Aggregate cause summary
@@ -238,8 +258,10 @@ export function useRefreshDeltas(projects: Project[]) {
         unchanged++;
       } else if (newlyEnriched) {
         enriched++;
+        enrichedNames.push(p.name);
       } else {
         scoresChanged++;
+        changedNames.push(p.name);
       }
     }
 
@@ -250,7 +272,7 @@ export function useRefreshDeltas(projects: Project[]) {
       needsAttention: curAttention - snapAttention,
       avgHealth: curAvgHealth - snapAvgHealth,
       projects: projectDeltas,
-      causeSummary: { scoresChanged, enriched, unchanged },
+      causeSummary: { scoresChanged, enriched, unchanged, changedNames, enrichedNames },
     };
   }, [projects, version]);
 

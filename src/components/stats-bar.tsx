@@ -6,13 +6,11 @@ import { evaluateAttention } from "@/lib/attention";
 
 interface StatsBarProps {
   projects: Project[];
-  filteredCount?: number;
   deltas?: DashboardDeltas | null;
 }
 
-export function StatsBar({ projects, filteredCount, deltas }: StatsBarProps) {
+export function StatsBar({ projects, deltas }: StatsBarProps) {
   const total = projects.length;
-  const isFiltered = filteredCount != null && filteredCount !== total;
   const dirty = projects.filter((p) => p.isDirty).length;
   const unpushed = projects.filter((p) => p.ahead > 0).length;
   const needsAttention = projects.filter((p) => evaluateAttention(p).needsAttention).length;
@@ -21,7 +19,7 @@ export function StatsBar({ projects, filteredCount, deltas }: StatsBarProps) {
 
   // increaseGood: true = increase is good (green ↑), false = bad (red ↑), null = neutral
   const stats: Array<{ label: string; value: string | number; accent?: boolean; delta?: number; increaseGood: boolean | null }> = [
-    { label: "Total", value: isFiltered ? `${filteredCount} / ${total}` : total, delta: deltas?.totalCount, increaseGood: null },
+    { label: "Total", value: total, delta: deltas?.totalCount, increaseGood: null },
     { label: "Dirty", value: dirty, accent: dirty > 0, delta: deltas?.dirtyCount, increaseGood: false },
     { label: "Unpushed", value: unpushed, accent: unpushed > 0, delta: deltas?.unpushedCount, increaseGood: false },
     { label: "Needs Attention", value: needsAttention, accent: needsAttention > 0, delta: deltas?.needsAttention, increaseGood: false },

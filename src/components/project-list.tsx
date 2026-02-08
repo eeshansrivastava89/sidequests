@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
 import { healthColor, copyToClipboard } from "@/lib/project-helpers";
+import { evaluateAttention } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 
 interface ProjectListProps {
@@ -16,6 +17,7 @@ interface ProjectListProps {
   onTouch: (id: string, tool: string) => void;
   sanitizePaths: boolean;
   deltas?: DashboardDeltas | null;
+  view?: string;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -53,10 +55,10 @@ function formatDaysInactive(days: number | null | undefined): string {
   return `${days}d`;
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas, view }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_3.5rem_1fr]"
-    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_3.5rem_1fr_7rem]";
+    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr]"
+    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr_7rem]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -131,16 +133,39 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
             </button>
 
             {/* Name + git indicators */}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="font-semibold text-sm truncate" title={rawPath}>
-                {project.name}
-              </span>
-              {project.isDirty && (
-                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" title="Uncommitted changes" />
-              )}
-              {project.ahead > 0 && (
-                <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>
-              )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-sm truncate" title={rawPath}>
+                  {project.name}
+                </span>
+                {project.isDirty && (
+                  <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" title="Uncommitted changes" />
+                )}
+                {project.ahead > 0 && (
+                  <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>
+                )}
+              </div>
+              {view === "needs-attention" && (() => {
+                const attention = evaluateAttention(project);
+                if (!attention.needsAttention) return null;
+                return (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    {attention.reasons.slice(0, 2).map(r => (
+                      <span key={r.code} className={cn(
+                        "text-[9px] rounded px-1 py-0",
+                        r.severity === "high" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                        r.severity === "med" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                      )}>
+                        {r.label}
+                      </span>
+                    ))}
+                    {attention.reasons.length > 2 && (
+                      <span className="text-[9px] text-muted-foreground">+{attention.reasons.length - 2}</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Language badge */}

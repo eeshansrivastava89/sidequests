@@ -5,87 +5,67 @@
 ## Project Anchor
 
 **Project:** Projects Dashboard — local web app scanning ~/dev for a bird's-eye view of all projects
-**Current Phase:** Phases 32-33 complete (not yet committed)
+**Current Phase:** Phases 32-33 complete + visual QA fixes. Project closed out for now.
 
 ## Git State
 
 **Branch:** main
-**Last Commit:** 3f2e93a phases 24-29: codex simplification, drawer UX overhaul, split scan/enrich
-**Uncommitted Changes:** 37 files (25 modified, 12 new)
+**Last Commit:** 6d85790 phases 32-33: settings UI, score re-architecture, visual QA fixes
+**Uncommitted Changes:** None (clean working tree)
 
 ## What We Did This Session
 
-### Phase 32: Settings Modal + Split Enrich Button
-All dashboard config moved from `.env.local`-only to a Settings UI:
-- **Settings persistence:** `src/lib/settings.ts` — file-backed JSON cache, `settings.json > env > defaults` priority chain
-- **Config refactor:** Every getter in `config.ts` now checks settings.json first
-- **LLM provider refactor:** openrouter/ollama/mlx use config getters instead of process.env
-- **Settings API:** `GET /api/settings` (merged config, masks API key as "***") + `PUT` (validates, writes, clears cache)
-- **Settings Modal:** `src/components/settings-modal.tsx` — 3 sections (General, AI Enrichment, Provider Settings), Claude CLI model as dropdown (Sonnet 4.5/Opus 4.6/Haiku 4.5)
-- **Header UI:** Gear icon opens settings modal, split enrich button with dropdown "Force re-enrich all" (replaces shift+click hack)
-- **useConfig hook:** Returns `{ config, refetch }`, fetches from `/api/settings`
-- **shadcn components:** Switch + Label added
+### Visual QA with Playwright
+Ran comprehensive headed Playwright tests across all dashboard flows:
+- Dashboard overview, stats bar, filter tabs, search
+- Project drawer (3 projects), drawer scroll through all sections
+- Settings modal, refresh/enrich buttons, split enrich dropdown
+- Keyboard navigation, pin functionality
+- Responsive views (tablet, mobile)
+- Score column close-up
 
-### Phase 33: Scoring + Delta Re-Architecture
-Driven by Codex Review doc (`.claude/codex-review.md`) — single healthScore was low-signal for daily decisions.
+### Fixes Implemented from QA Findings
 
-**Score Split (Task 1 — foundation):**
-- `derive.py` split into `hygieneScoreAuto` (structural: README/tests/CI/linter/license/lockfile/deploy/remote/TODO) + `momentumScoreAuto` (operational: commit recency/dirty/ahead/stale branches) + `scoreBreakdownJson`
-- `healthScoreAuto = round(0.65 * hygiene + 0.35 * momentum)` for backward compat
-- Prisma migration `add_score_dimensions`
-- pipeline.ts stores new fields, merge.ts + types.ts expose them
+| # | Issue | Fix |
+|---|---|---|
+| 1 | Needs Attention 11/13 too aggressive | Tightened: hygiene <30, momentum <25, TODOs >=20, unpushed >7d → now 7/13 |
+| 2 | Score column no legend | Split into separate **Hygiene** + **Momentum** columns with full names + tooltips |
+| 3 | Blue status dot unclear | Added title tooltip on status dot column header with color legend |
+| 4 | No Paused tab | Added Paused tab; Active no longer includes paused projects |
+| 5 | Stats don't update when filtered | Stats bar shows "X / Y" format when tab/search active |
+| 6 | Settings Save button hidden below fold | Moved Save button outside scroll area, sticky with border-top |
+| 7 | Enrich dropdown accessibility | Added aria-haspopup, aria-expanded, role="menu", role="menuitem" |
+| 8 | Keyboard shortcuts | **Removed entirely** per user decision (nobody will use them) |
+| 9 | Actions column misaligned | Left-aligned header, fixed 7rem column width |
+| 10 | __pycache__ in git | Added to .gitignore |
 
-**Attention Rule Engine (Task 4):**
-- `src/lib/attention.ts` — 6 reason codes: LOW_HYGIENE, STALE_MOMENTUM, DIRTY_AGE_GT_7, NO_NEXT_ACTION_GT_30, UNPUSHED_CHANGES, HIGH_TODO_COUNT
-- Shared evaluator used by page.tsx filters + stats-bar.tsx
-
-**Delta Provenance (Task 2):**
-- `use-refresh-deltas.ts` — DeltaCause[] with 11 cause values, DeltaSummary, semanticChanged
-- `refresh-panel.tsx` — shows "X scores changed, Y enriched, Z unchanged" + per-project cause badges
-
-**AI Structured Insight (Task 3):**
-- LLM prompt requests `aiInsight: { score, confidence, reasons[], risks[], nextBestAction }`
-- Runtime validation in `parseEnrichment()`, malformed → null
-- Prisma migration `add_ai_insight`, stored in pipeline.ts
-- Ungated (not behind featureO1)
-
-**UI Wiring:**
-- Project list: "Health" column → "Score" column showing `hygiene / momentum` split
-- Drawer header: shows `hyg / mom` scores with color coding
-- Drawer sections reordered: (1) Pitch, (2) Details (compressed 4-col grid: Framework | Languages | Services | LOC), (3) Timeline, (4) AI Insights + Recommendations merged, (5) O-1 Evidence
-- RefreshPanel wired with deltaSummary + projectDeltas props
-
-**Execution:** Used team of 4 parallel agents (score-split, attention-engine, delta-provenance, ai-insight), then integrated as team lead.
+### Committed
+Single commit `6d85790` — 36 files, +3,563 / -817 lines. Covers phases 32-33 (settings UI, score re-architecture, delta provenance, AI insights, attention engine) plus all visual QA fixes.
 
 ## Decisions Made
 
 | Decision | Rationale | Files |
 |----------|-----------|-------|
-| settings.json > env > defaults | User-friendly, no .env editing needed | config.ts, settings.ts |
-| API key masking "***" passthrough | Prevents accidental key deletion | api/settings/route.ts |
-| healthScore = 0.65*hygiene + 0.35*momentum | Backward compat weighted combo | derive.py |
-| AI insights ungated | User requested standard access | merge.ts, drawer |
-| O-1 Evidence still gated | Different concern, user didn't ungate | drawer |
-| Claude CLI model as dropdown | Only 3 options, better UX | settings-modal.tsx |
-| Drawer: Pitch → Details → Timeline → AI → O-1 | User-specified priority order | drawer |
-| Details compressed to 4-col grid | User wanted compact layout | drawer |
-| Split enrich button replaces shift+click | Discoverable UX | page.tsx |
+| Remove all keyboard shortcuts | User: "nobody will use it" | page.tsx |
+| Separate Hygiene + Momentum columns | "hyg/mom" was unclear, full names better | project-list.tsx |
+| Actions header left-aligned, 7rem fixed | Align with VS Code icon start | project-list.tsx |
+| Attention thresholds: hyg<30, mom<25 | 11/13 needing attention was meaningless signal | attention.ts |
+| Skip mobile fixes | User: "desktop only app" | — |
+| Paused tab only shows if count > 0 | Avoid empty tab clutter | page.tsx |
 
 ## Next Actions
 
-1. **Visual QA** — Run dev server, check table scores, drawer layout, settings modal, split button
-2. **Run Scan + Enrich** — Populate hygiene/momentum/aiInsight data for all projects
-3. **Commit** — Massive changeset (~37 files, phases 32-33)
-4. **Phase 34** — Calibration/backfill tooling (codex review Task 5)
+1. **Phase 34** — Calibration/backfill tooling (codex review Task 5 in `.claude/codex-review.md`)
+2. **Run Scan + Enrich** — Populate hygiene/momentum/aiInsight data for all projects with new scoring
+3. **Consider further tightening** — Needs Attention at 7/13 is still over half; may want to revisit thresholds after seeing real data
 
 ## Conversation Essence
 
 - Codex Review doc at `.claude/codex-review.md` has full research (DORA, SPACE, OpenSSF) and 5-task breakdown
 - Phase 33 plan at `.claude/phase-33-plan.md` has scoring formulas and file ownership map
-- User discovered "nothing changed" after enrichment because healthScore was purely structural → led to entire re-architecture
-- scan.py counts LOC via filesystem walk (not git ls-files) — files counted immediately after write
+- User is closing this project for now — all work committed, clean tree
 - Old `/api/config` route still exists but is dead code (superseded by `/api/settings`)
-- `pipeline/__pycache__/` should be added to `.gitignore`
-- User prefers Opus for agents, honest code review, brainstorming before implementing
 - Color scheme: orange/gold, NOT purple
 - Working model: Claude implements, Codex reviews/architects, user mediates
+- User prefers Opus for agents, honest code review, brainstorming before implementing
+- Playwright is installed in project node_modules (not global) — scripts must run from project dir

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
 import { healthColor, copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
+import { evaluateAttention } from "@/lib/attention";
 import { cn } from "@/lib/utils";
 import type { ProjectDelta } from "@/hooks/use-refresh-deltas";
 
@@ -63,6 +64,48 @@ function SectionBox({
         )}
       </div>
       {children}
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  source,
+  highlight,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  source?: { type: "scan" | "llm"; timestamp: string | null };
+  highlight?: boolean;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={cn("border border-border rounded-lg", highlight && "border-l-2 border-l-amber-400")}>
+      <button
+        type="button"
+        className="flex items-center justify-between w-full px-4 py-3 text-left"
+        onClick={() => setOpen(!open)}
+      >
+        <div className="flex items-center gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+          {source && (
+            <span className="text-[10px] text-muted-foreground">
+              {source.type} · {source.timestamp ? formatRelativeDate(source.timestamp) : "\u2014"}
+            </span>
+          )}
+        </div>
+        <svg
+          width="12" height="12" viewBox="0 0 12 12"
+          className={cn("text-muted-foreground transition-transform", open && "rotate-180")}
+          fill="none" stroke="currentColor" strokeWidth="1.5"
+        >
+          <path d="M3 4.5l3 3 3-3" />
+        </svg>
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
@@ -365,6 +408,27 @@ export function ProjectDrawer({
             )}
           </div>
 
+          {/* Attention banner */}
+          {(() => {
+            const attention = evaluateAttention(project);
+            if (!attention.needsAttention) return null;
+            return (
+              <div className={cn(
+                "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+                attention.severity === "high" ? "bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-900" :
+                attention.severity === "med" ? "bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900" :
+                "bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800"
+              )}>
+                <span className="text-xs font-medium">Needs Attention</span>
+                <span className="text-xs text-muted-foreground">&mdash;</span>
+                <span className="text-xs">{attention.reasons[0].label}</span>
+                {attention.reasons.length > 1 && (
+                  <span className="text-[10px] text-muted-foreground">+{attention.reasons.length - 1} more</span>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Line 4: Last commit message */}
           {scan?.lastCommitMessage && (
             <div className="font-mono text-sm bg-muted/50 rounded px-2.5 py-1.5 text-foreground/80">
@@ -549,10 +613,11 @@ export function ProjectDrawer({
           </SectionBox>
 
           {/* ── Section 4: AI Insights + Recommendations (merged) ── */}
-          <SectionBox
+          <CollapsibleSection
             title="AI Insights"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
             highlight={delta?.newlyEnriched}
+            defaultOpen={true}
           >
             {project.aiInsight ? (
               <div className="space-y-3">
@@ -625,11 +690,11 @@ export function ProjectDrawer({
                 </ul>
               </div>
             )}
-          </SectionBox>
+          </CollapsibleSection>
 
           {/* ── Section 5: O-1 Evidence ── */}
           {featureO1 && (
-            <SectionBox title="O-1 Evidence" source={{ type: "llm", timestamp: project.llmGeneratedAt }} highlight={delta?.newlyEnriched}>
+            <CollapsibleSection title="O-1 Evidence" source={{ type: "llm", timestamp: project.llmGeneratedAt }} highlight={delta?.newlyEnriched} defaultOpen={false}>
               <div className="space-y-3">
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">Evidence</span>
@@ -657,7 +722,7 @@ export function ProjectDrawer({
                   )}
                 </div>
               </div>
-            </SectionBox>
+            </CollapsibleSection>
           )}
 
         </div>

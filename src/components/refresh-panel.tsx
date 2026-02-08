@@ -30,28 +30,61 @@ function statusColor(status: string): string {
   }
 }
 
-/** Short human-readable label for the primary delta cause. */
-function causeBadge(delta: ProjectDelta): { label: string; className: string } | null {
+/** Render score transition badges for a project delta. */
+function scoreTransitions(delta: ProjectDelta): Array<{ label: string; className: string }> {
+  const badges: Array<{ label: string; className: string }> = [];
   const causes = delta.deltaCause;
+
+  // Hygiene score transition
+  if (causes.includes("hygiene_up")) {
+    badges.push({
+      label: `hyg ${delta.prevHygieneScore}\u2192${delta.curHygieneScore}`,
+      className: "text-emerald-600 dark:text-emerald-400",
+    });
+  } else if (causes.includes("hygiene_down")) {
+    badges.push({
+      label: `hyg ${delta.prevHygieneScore}\u2192${delta.curHygieneScore}`,
+      className: "text-amber-600 dark:text-amber-400",
+    });
+  }
+
+  // Momentum score transition
+  if (causes.includes("momentum_up")) {
+    badges.push({
+      label: `mom ${delta.prevMomentumScore}\u2192${delta.curMomentumScore}`,
+      className: "text-emerald-600 dark:text-emerald-400",
+    });
+  } else if (causes.includes("momentum_down")) {
+    badges.push({
+      label: `mom ${delta.prevMomentumScore}\u2192${delta.curMomentumScore}`,
+      className: "text-amber-600 dark:text-amber-400",
+    });
+  }
+
+  // Enriched badge
   if (causes.includes("newly_enriched")) {
-    return { label: "enriched", className: "text-violet-600 dark:text-violet-400" };
+    badges.push({
+      label: "enriched",
+      className: "text-violet-600 dark:text-violet-400",
+    });
   }
-  if (causes.includes("health_up") || causes.includes("hygiene_up") || causes.includes("momentum_up")) {
-    return { label: "score +", className: "text-emerald-600 dark:text-emerald-400" };
-  }
-  if (causes.includes("health_down") || causes.includes("hygiene_down") || causes.includes("momentum_down")) {
-    return { label: "score -", className: "text-amber-600 dark:text-amber-400" };
-  }
+
+  // Status changed badge
   if (causes.includes("status_changed")) {
-    return { label: "status", className: "text-blue-600 dark:text-blue-400" };
+    badges.push({
+      label: "status",
+      className: "text-blue-600 dark:text-blue-400",
+    });
   }
-  if (causes.includes("scan_changed")) {
-    return { label: "scan", className: "text-muted-foreground" };
-  }
-  if (causes.includes("unchanged")) {
-    return null; // No badge for unchanged
-  }
-  return null;
+
+  return badges;
+}
+
+/** Format a list of project names for inline display (max 3 shown). */
+function formatNameList(names: string[], max = 3): string {
+  if (names.length === 0) return "";
+  if (names.length <= max) return names.join(", ");
+  return `${names.slice(0, max - 1).join(", ")}, +${names.length - (max - 1)} more`;
 }
 
 function ProjectRow({
@@ -63,7 +96,7 @@ function ProjectRow({
   showLlm: boolean;
   delta?: ProjectDelta;
 }) {
-  const badge = delta ? causeBadge(delta) : null;
+  const badges = delta ? scoreTransitions(delta) : [];
 
   return (
     <div className="flex items-center gap-3 py-1 text-xs font-mono">
@@ -76,17 +109,17 @@ function ProjectRow({
           {statusIcon(project.llmStatus)} llm
         </span>
       )}
-      {badge && (
-        <span className={`w-16 ${badge.className}`}>
-          {badge.label}
+      {badges.map((b) => (
+        <span key={b.label} className={b.className}>
+          {b.label}
         </span>
-      )}
+      ))}
       {project.llmError && (
         <span className="text-red-500 truncate flex-1" title={project.llmError}>
           {project.llmError}
         </span>
       )}
-      {typeof project.detail?.purpose === "string" && !project.llmError && (
+      {typeof project.detail?.purpose === "string" && !project.llmError && badges.length === 0 && (
         <span className="text-muted-foreground truncate flex-1">
           {project.detail.purpose.slice(0, 60)}
         </span>
@@ -109,11 +142,10 @@ export function RefreshPanel({ state, onDismiss, deltaSummary, projectDeltas }: 
   const showLlm = state.mode === "enrich";
   const isDone = !state.active;
 
-  // Build a name-keyed lookup for project deltas (delta map is id-keyed,
-  // but project progress only has names; lead can provide a name-keyed map
-  // or we can skip if not available)
+  // Build a name-keyed lookup from the id-keyed delta map.
+  // Project progress rows only have names, so we re-key by projectName.
   const deltaByName = projectDeltas
-    ? new Map(Array.from(projectDeltas.entries()))
+    ? new Map(Array.from(projectDeltas.values()).map((d) => [d.projectName, d]))
     : null;
 
   return (
@@ -176,15 +208,25 @@ export function RefreshPanel({ state, onDismiss, deltaSummary, projectDeltas }: 
 
       {/* Delta cause summary (shown after completion when delta data is available) */}
       {isDone && deltaSummary && (deltaSummary.scoresChanged > 0 || deltaSummary.enriched > 0) && (
-        <div className="flex gap-4 px-4 py-1.5 text-xs border-b border-border bg-muted/20">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-1.5 text-xs border-b border-border bg-muted/20">
           {deltaSummary.scoresChanged > 0 && (
             <span className="text-amber-600 dark:text-amber-400">
               {deltaSummary.scoresChanged} scores changed
+              {deltaSummary.changedNames.length > 0 && (
+                <span className="text-muted-foreground font-normal">
+                  {": "}{formatNameList(deltaSummary.changedNames)}
+                </span>
+              )}
             </span>
           )}
           {deltaSummary.enriched > 0 && (
             <span className="text-violet-600 dark:text-violet-400">
               {deltaSummary.enriched} newly enriched
+              {deltaSummary.enrichedNames.length > 0 && (
+                <span className="text-muted-foreground font-normal">
+                  {": "}{formatNameList(deltaSummary.enrichedNames)}
+                </span>
+              )}
             </span>
           )}
           {deltaSummary.unchanged > 0 && (
