@@ -124,16 +124,11 @@ export default function DashboardPage() {
   const deltaHook = useRefreshDeltas(projects);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("lastCommit");
+  const [sortKey, setSortKey] = useState<SortKey>(() => loadSortKey());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [enrichDropdownOpen, setEnrichDropdownOpen] = useState(false);
   const enrichDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Hydrate sort key from localStorage after mount
-  useEffect(() => {
-    setSortKey(loadSortKey());
-  }, []);
 
   // Close enrich dropdown on outside click
   useEffect(() => {
@@ -401,7 +396,41 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {filtered.length === 0 ? (
+        {filtered.length === 0 && projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 px-6">
+            <h2 className="text-lg font-semibold mb-1">Welcome to Projects Dashboard</h2>
+            <p className="text-sm text-muted-foreground mb-6">Get started in 3 steps:</p>
+            <ol className="space-y-4 w-full max-w-sm">
+              <li className="flex items-start gap-3">
+                <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">1</span>
+                <div>
+                  <p className="text-sm font-medium">Open Settings</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">Configure your dev root directory</p>
+                  <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                    <Settings className="size-3.5 mr-1.5" /> Settings
+                  </Button>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">2</span>
+                <div>
+                  <p className="text-sm font-medium">Set your Dev Root</p>
+                  <p className="text-xs text-muted-foreground">The directory containing your projects (e.g. <code className="bg-muted px-1 rounded">~/dev</code>)</p>
+                </div>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">3</span>
+                <div>
+                  <p className="text-sm font-medium">Run a Scan</p>
+                  <p className="text-xs text-muted-foreground mb-1.5">Discover all git projects in your dev root</p>
+                  <Button size="sm" onClick={() => handleRefresh("scan")}>
+                    Scan Now
+                  </Button>
+                </div>
+              </li>
+            </ol>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
             <p className="text-muted-foreground">
               {search ? "No projects match your search." : "No projects in this view."}

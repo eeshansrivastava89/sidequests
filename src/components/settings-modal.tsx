@@ -25,14 +25,33 @@ interface Props {
   onSaved: () => void;
 }
 
+interface PreflightCheck {
+  name: string;
+  ok: boolean;
+  message: string;
+}
+
 export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
   const [draft, setDraft] = useState<AppConfig>(config);
   const [saving, setSaving] = useState(false);
+  const [preflight, setPreflight] = useState<PreflightCheck[] | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
 
   // Sync draft when config changes or modal opens
   useEffect(() => {
     if (open) setDraft(config);
   }, [open, config]);
+
+  // Fetch preflight checks when modal opens
+  useEffect(() => {
+    if (!open) return;
+    setPreflightLoading(true);
+    fetch("/api/preflight")
+      .then((res) => res.json())
+      .then((data) => setPreflight(data.checks))
+      .catch(() => setPreflight(null))
+      .finally(() => setPreflightLoading(false));
+  }, [open]);
 
   const set = useCallback(<K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -162,7 +181,7 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
                 <SwitchRow
                   label="Allow Unsafe"
-                  description="Enable agentic providers (claude-cli, codex-cli)"
+                  description="Enable agentic providers (codex-cli)"
                   checked={draft.llmAllowUnsafe}
                   onCheckedChange={(v) => set("llmAllowUnsafe", v)}
                 />
@@ -255,6 +274,30 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
               )}
             </section>
           )}
+
+          {/* ── System Status ── */}
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              System Status
+            </h3>
+            {preflightLoading ? (
+              <p className="text-sm text-muted-foreground">Checking...</p>
+            ) : preflight ? (
+              <div className="space-y-1.5">
+                {preflight.map((check) => (
+                  <div key={check.name} className="flex items-center gap-2">
+                    <span className={check.ok ? "text-emerald-500" : "text-red-500"}>
+                      {check.ok ? "\u2713" : "\u2717"}
+                    </span>
+                    <span className="text-sm font-medium">{check.name}</span>
+                    <span className="text-xs text-muted-foreground truncate">{check.message}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Unable to check system status.</p>
+            )}
+          </section>
 
         </div>
 

@@ -32,8 +32,16 @@ This is the step-by-step plan for Claude to implement. Codex will review each ph
 - ✅ Phase 26: Drawer IA Refactor (Single-Column, Action-First)
 - ✅ Phase 27: Functional Polish & Interaction Consistency
 - ✅ Phase 28: Modal Layout Refinement
-- ⬜ Phase 29: Drawer UX Overhaul (Full-Stack) — in progress
-- ⬜ Phase 30: Scan Deltas & Change Indicators
+- ✅ Phase 29: Drawer UX Overhaul (Full-Stack)
+- ✅ Phase 30: Scan Deltas & Change Indicators
+- ✅ Phase 32-33: Settings UI, Score Re-Architecture, Visual QA
+- ✅ Phase 34: LOC Column Fix, Score Traceability, Codex Review UX Fixes
+- ✅ Phase 35: Lint + Copy Consistency (OSS Readiness)
+- ✅ Phase 36: Docs + Governance Baseline (OSS Readiness)
+- ✅ Phase 37: 1-Command Bootstrap (OSS Readiness)
+- ✅ Phase 38: First-Run Onboarding UX (OSS Readiness)
+- ✅ Phase 39: Preflight Diagnostics (OSS Readiness)
+- ✅ Phase 40: Offline-Friendly Fonts (OSS Readiness)
 
 Notes:
 - ✅ README setup line fixed (no no-op copy).
@@ -41,8 +49,8 @@ Notes:
 - Phases 0-10 built the foundation (portfolio tracker). Phases 11-21 transform it into a "daily starting point" tool.
 - Phase 22 addressed Codex code review findings. Phase 23 addressed PM agent review findings.
 - Phases 24-27 are Codex-planned functional UI polish, shipped as 4 independently verifiable chunks. See `.claude/codex-review.md` for original plan.
-- Agent teams will be used for implementation. Backend and frontend phases can run in parallel where noted.
 - Phase 29 is a philosophy shift: dashboard becomes read-only (except status). Two parallel agents: data-layer (backend) + drawer-rewrite (frontend).
+- Phases 35-40 address OSS readiness findings from Codex audit (2026-02-08). See `.claude/codex-review.md` for original audit.
 
 ## Agent Team Strategy
 Phases 11-21 are designed for parallel execution using Claude Code agent teams:
@@ -683,7 +691,7 @@ Polish the project modal for scannability and visual rhythm.
 
 ---
 
-## ⬜ Phase 29 - Drawer UX Overhaul (Full-Stack)
+## ✅ Phase 29 - Drawer UX Overhaul (Full-Stack)
 
 Major restructure of the project modal: remove human-input fields, add LLM intelligence tracing, consolidate sections, and add new data fields. Philosophy shift: the dashboard requires no human text input except status selection — it's either deterministic Python scan or LLM-generated intelligence.
 
@@ -883,7 +891,7 @@ Full rewrite of `src/components/project-drawer.tsx`. Target ~350-400 LOC (down f
 
 ---
 
-## ⬜ Phase 30 - Scan Deltas & Change Indicators (Frontend)
+## ✅ Phase 30 - Scan Deltas & Change Indicators (Frontend)
 
 Show what changed after each scan/enrich — deltas on stats, highlights on enriched fields. Entirely client-side, no backend changes.
 
@@ -971,6 +979,91 @@ interface ProjectDelta {
 
 ---
 
+## Phases 35-40: OSS Readiness (Codex Audit)
+
+Source: `.claude/codex-review.md` (2026-02-08 audit). Claude validated all findings against the live codebase and re-ordered execution (lint first, not last).
+
+### ✅ Phase 35 - Lint + Copy Consistency
+
+**Problem:** 11 lint errors on clean checkout across 3 files. Settings UI says `codex-cli` and `claude-cli` are unsafe, but only `codex-cli` is in `unsafeProviders`.
+
+**Changes:**
+- `src/hooks/use-refresh-deltas.ts`: Replaced `useRef` + `useMemo` pattern with `useState` for the snapshot map (fixed 8 `react-hooks/refs` errors)
+- `src/app/page.tsx`: Replaced `useEffect` + `setSortKey` with `useState(() => loadSortKey())` lazy initializer (fixed 1 `set-state-in-effect` error)
+- `src/components/project-drawer.tsx`: Moved state resets out of effects using render-time project ID tracking (fixed 2 `set-state-in-effect` errors)
+- `src/components/settings-modal.tsx`: Fixed unsafe provider description to `"(codex-cli)"` to match `src/lib/llm/index.ts:19`
+
+**Deliverables:** `npm run lint` passes with 0 errors. Unsafe messaging matches code behavior.
+
+---
+
+### ✅ Phase 36 - Docs + Governance Baseline
+
+**Problem:** README documents removed keyboard shortcuts, dead `/api/config`, nonexistent `/api/o1/export`, wrong Node version (18+), single-score health model. Zero governance files.
+
+**Changes:**
+- Rewrote `README.md` — corrected Node version (>=20.9.0), removed dead endpoints/features, documented split Hygiene/Momentum scoring, Settings-first config, added `/api/settings` and `/api/preflight`
+- Created `LICENSE` (MIT), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
+- Expanded `settings.example.json` to cover all config fields
+
+**Deliverables:** README factually correct. 4 governance files present. Settings example covers all fields.
+
+---
+
+### ✅ Phase 37 - 1-Command Bootstrap
+
+**Problem:** Setup requires manually creating config, knowing to run prisma migrate, no `engines` field.
+
+**Changes:**
+- Created `scripts/setup.mjs` — checks Node/python3/git, copies `settings.example.json` → `settings.json`, runs Prisma generate + migrate
+- Added `"setup": "node scripts/setup.mjs"` to `package.json`
+- Added `"engines": { "node": ">=20.9.0" }` to `package.json`
+
+**Deliverables:** Fresh user path: `npm install` → `npm run setup` → `npm run dev`. Script is idempotent.
+
+---
+
+### ✅ Phase 38 - First-Run Onboarding UX
+
+**Problem:** Generic empty state ("No projects in this view") gives no guidance.
+
+**Changes:**
+- `src/app/page.tsx`: Added welcome card with 3-step checklist (Settings → Dev Root → Scan) when `projects.length === 0`
+- Kept existing "No projects match your search" for filtered-empty states
+- Auto-dismisses after first successful scan
+
+**Deliverables:** First-time user can discover setup path from UI alone.
+
+---
+
+### ✅ Phase 39 - Preflight Diagnostics
+
+**Problem:** Missing python3, git, or LLM providers only discovered after refresh fails with opaque errors.
+
+**Changes:**
+- Created `GET /api/preflight` — checks python3, git on PATH; provider-specific readiness (claude/codex binary, openrouter API key, ollama/mlx URL reachability)
+- Added System Status section to Settings modal with green/red indicators per check
+- Fetches preflight on modal open
+
+**Deliverables:** User sees readiness status before running enrich. Failures have specific remediation text.
+
+**Files:** `src/app/api/preflight/route.ts` (new), `src/components/settings-modal.tsx`
+
+---
+
+### ✅ Phase 40 - Offline-Friendly Fonts
+
+**Problem:** `layout.tsx` imports Geist + Geist_Mono from `next/font/google`. Builds fail in restricted networks.
+
+**Changes:**
+- Copied Geist woff2 files to `public/fonts/`
+- Switched `src/app/layout.tsx` from `next/font/google` to `next/font/local`
+- Same CSS variables preserved (`--font-geist-sans`, `--font-geist-mono`)
+
+**Deliverables:** `npm run build` succeeds with no network access.
+
+---
+
 ## Acceptance Criteria (Current)
 
 **Core invariants:**
@@ -1011,6 +1104,17 @@ interface ProjectDelta {
 - No TypeScript errors, no console errors
 - All new fields backward-compatible with existing data
 
+**OSS readiness (Phases 35-40):**
+- `npm run lint` passes with 0 errors
+- Unsafe messaging matches code behavior (only `codex-cli`)
+- README factually correct for current codebase
+- Governance files (LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY) exist
+- Fresh user path succeeds: `npm install` → `npm run setup` → `npm run dev`
+- First-run empty state guides user to Settings → Scan
+- Preflight diagnostics visible in Settings modal
+- `settings.example.json` covers all config fields
+- `npm run build` works offline (local fonts)
+
 ## Checkpoint Reviews
 - After Phase 1: data model and merge logic review
 - After Phase 2: deterministic pipeline review
@@ -1027,3 +1131,4 @@ interface ProjectDelta {
 - After Phase 26 + 27: drawer IA refactor + functional polish review
 - After Phase 29: drawer UX overhaul + data layer review
 - After Phase 30: scan deltas + change indicators review
+- After Phase 35-40: OSS readiness audit resolution (Codex audit)

@@ -2,5 +2,11 @@
   "devRoot": "~/dev",
   "excludeDirs": "node_modules,.venv,__pycache__,.git",
   "featureLlm": false,
-  "llmProvider": "claude-cli"
+  "llmProvider": "claude-cli",
+  "llmAllowUnsafe": false,
+  "llmConcurrency": 3,
+  "llmOverwriteMetadata": false,
+  "llmDebug": false,
+  "featureO1": false,
+  "sanitizePaths": true
 }

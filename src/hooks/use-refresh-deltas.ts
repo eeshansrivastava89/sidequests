@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Project } from "@/lib/types";
 
 /* ── Types ─────────────────────────────────────────────── */
@@ -135,29 +135,23 @@ function computeCauses(old: ProjectSnapshot, cur: ProjectSnapshot, newlyEnriched
 /* ── Hook ──────────────────────────────────────────────── */
 
 export function useRefreshDeltas(projects: Project[]) {
-  const snapshotRef = useRef<Map<string, ProjectSnapshot> | null>(null);
-  const [version, setVersion] = useState(0);
+  const [snapState, setSnapState] = useState<Map<string, ProjectSnapshot> | null>(null);
 
   const snapshot = useCallback(() => {
     const map = new Map<string, ProjectSnapshot>();
     for (const p of projects) {
       map.set(p.id, snapProject(p));
     }
-    snapshotRef.current = map;
-    setVersion((v) => v + 1);
+    setSnapState(map);
   }, [projects]);
 
   const clear = useCallback(() => {
-    snapshotRef.current = null;
-    setVersion((v) => v + 1);
+    setSnapState(null);
   }, []);
 
   const deltas: DashboardDeltas | null = useMemo(() => {
-    // Subscribe to version so we recompute when snapshot/clear changes
-    void version;
-
-    const snap = snapshotRef.current;
-    if (!snap) return null;
+    if (!snapState) return null;
+    const snap = snapState;
 
     // Aggregate snapshot stats
     const snapArr = Array.from(snap.values());
@@ -274,7 +268,7 @@ export function useRefreshDeltas(projects: Project[]) {
       projects: projectDeltas,
       causeSummary: { scoresChanged, enriched, unchanged, changedNames, enrichedNames },
     };
-  }, [projects, version]);
+  }, [projects, snapState]);
 
   return { snapshot, deltas, clear };
 }

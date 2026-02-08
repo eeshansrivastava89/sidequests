@@ -258,25 +258,28 @@ export function ProjectDrawer({
 }: ProjectDrawerProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [timelinePage, setTimelinePage] = useState(0);
+  const [activityProjectId, setActivityProjectId] = useState<string | null>(null);
 
-  // Reset timeline page when project changes
-  useEffect(() => {
+  // Track project changes to reset state outside the fetch effect
+  const currentProjectId = project?.id ?? null;
+  if (currentProjectId !== activityProjectId) {
+    setActivityProjectId(currentProjectId);
+    setActivities([]);
     setTimelinePage(0);
-  }, [project?.id]);
+  }
 
   useEffect(() => {
-    if (!project?.id || !open) {
-      setActivities([]);
-      return;
-    }
+    if (!project?.id || !open) return;
+    let cancelled = false;
     fetch(`/api/projects/${project.id}/activity`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.ok) setActivities(data.activities);
+        if (!cancelled && data.ok) setActivities(data.activities);
       })
       .catch(() => {
         // Silently ignore activity fetch failures
       });
+    return () => { cancelled = true; };
   }, [project?.id, open]);
 
   if (!project) return null;
