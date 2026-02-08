@@ -52,3 +52,10 @@ __pycache__/
 # database
 *.db
 *.db-journal
+
+# internal docs (architecture, implementation plan, pitch, session context)
+/docs/internal/
+
+# claude code session files
+.claude/*.md
+.claude/projects/
