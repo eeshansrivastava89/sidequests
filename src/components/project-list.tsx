@@ -139,7 +139,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                   {project.name}
                 </span>
                 {project.isDirty && (
-                  <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500" title="Uncommitted changes" />
+                  <span className="shrink-0 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded px-1 py-0.5 leading-none">uncommitted</span>
                 )}
                 {project.ahead > 0 && (
                   <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>

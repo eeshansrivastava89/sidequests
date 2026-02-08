@@ -11,10 +11,11 @@ import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
 import { RefreshPanel } from "@/components/refresh-panel";
 import { SettingsModal } from "@/components/settings-modal";
+import { MethodologyModal } from "@/components/methodology-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ChevronDown, X } from "lucide-react";
+import { Settings, ChevronDown, X, Moon, Sun } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 
@@ -127,8 +128,20 @@ export default function DashboardPage() {
   const [sortKey, setSortKey] = useState<SortKey>(() => loadSortKey());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [methodologyOpen, setMethodologyOpen] = useState(false);
   const [enrichDropdownOpen, setEnrichDropdownOpen] = useState(false);
   const enrichDropdownRef = useRef<HTMLDivElement>(null);
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("theme") === "dark" ||
+      (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  });
+
+  // Apply dark class to <html>
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("theme", dark ? "dark" : "light");
+  }, [dark]);
 
   // Close enrich dropdown on outside click
   useEffect(() => {
@@ -291,6 +304,22 @@ export default function DashboardPage() {
                   )}
                 </>
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                onClick={() => setMethodologyOpen(true)}
+              >
+                Scoring Methodology
+              </Button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                onClick={() => setDark((d) => !d)}
+                aria-label="Toggle dark mode"
+              >
+                {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </button>
               <button
                 type="button"
                 className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -495,6 +524,11 @@ export default function DashboardPage() {
         onOpenChange={setSettingsOpen}
         config={config}
         onSaved={refetch}
+      />
+
+      <MethodologyModal
+        open={methodologyOpen}
+        onOpenChange={setMethodologyOpen}
       />
     </div>
   );
