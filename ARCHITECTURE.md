@@ -239,7 +239,7 @@ Orchestrates the dashboard:
 | Component | Purpose |
 |-----------|---------|
 | `project-list.tsx` | Compact list view (~40px rows): status dot, pin toggle, name, language badge, health score, days inactive, last commit message, quick actions |
-| `project-drawer.tsx` | Detail sheet: At a Glance, Recent Activity, Details, Workflow sections. All fields inline-editable. |
+| `project-drawer.tsx` | Detail modal: top summary + 5 always-visible bordered sections (Now, Recent Work, Details, Workflow, O-1 Evidence). All fields inline-editable. |
 | `stats-bar.tsx` | Summary counts by status |
 | `refresh-panel.tsx` | Live SSE progress during refresh |
 | `project-card.tsx` | Legacy card view (retained but unused) |

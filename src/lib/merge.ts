@@ -33,13 +33,13 @@ export interface MergedProject {
   scan: RawScan | null;
 
   // Scan-derived fields surfaced at top level
-  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
-  scripts: Record<string, string>;
+  recentCommits: Array<{ hash: string; message: string; date: string }>;
+  scripts: string[];
   services: string[];
   packageManager: string | null;
   branchCount: number;
   stashCount: number;
-  license: string | null;
+  license: boolean;
 
   // Project-level fields
   pinned: boolean;
@@ -55,6 +55,11 @@ export interface MergedProject {
   // O-1 evidence (gated)
   evidence: Record<string, unknown> | null;
   outcomes: Record<string, unknown> | null;
+
+  // New Phase 29 fields
+  pitch: string | null;
+  liveUrl: string | null;
+  llmGeneratedAt: string | null;
 
   // Timestamps
   lastScanned: string | null;
@@ -77,17 +82,18 @@ export interface RawScan {
   todoCount: number;
   fixmeCount: number;
   description: string | null;
-  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
-  scripts: Record<string, string>;
+  recentCommits: Array<{ hash: string; message: string; date: string }>;
+  scripts: string[];
   services: string[];
   packageManager: string | null;
   branchCount: number;
   stashCount: number;
   locEstimate: number;
-  license: string | null;
+  license: boolean;
   ahead: number;
   behind: number;
   framework: string | null;
+  liveUrl: string | null;
 }
 
 function parseJson<T>(json: string | null | undefined, fallback: T): T {
@@ -149,6 +155,8 @@ type ProjectWithRelations = Project & {
     tagsJson: string | null;
     notableFeaturesJson: string | null;
     recommendationsJson: string | null;
+    pitch: string | null;
+    generatedAt: Date;
   } | null;
   override: {
     statusOverride: string | null;
@@ -190,7 +198,7 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
   const tags =
     parseJson<string[]>(override?.tagsOverride, null as unknown as string[]) ??
     parseJson<string[]>(llm?.tagsJson, null as unknown as string[]) ??
-    parseJson<string[]>(derivedData.tags as string | undefined, []);
+    (Array.isArray(derivedData.tags) ? derivedData.tags as string[] : []);
 
   const notableFeatures = parseJson<string[]>(llm?.notableFeaturesJson, []);
   const recommendations = parseJson<string[]>(llm?.recommendationsJson, []);
@@ -222,12 +230,12 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
 
     // Scan-derived fields surfaced at top level
     recentCommits: rawScan?.recentCommits ?? [],
-    scripts: rawScan?.scripts ?? {},
+    scripts: rawScan?.scripts ?? [],
     services: rawScan?.services ?? [],
     packageManager: rawScan?.packageManager ?? null,
     branchCount: rawScan?.branchCount ?? 0,
     stashCount: rawScan?.stashCount ?? 0,
-    license: rawScan?.license ?? null,
+    license: rawScan?.license ?? false,
 
     // Project-level fields
     pinned: project.pinned,
@@ -241,6 +249,10 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
 
     evidence: config.featureO1 ? parseJson(metadata?.evidenceJson, null) : null,
     outcomes: config.featureO1 ? parseJson(metadata?.outcomesJson, null) : null,
+
+    pitch: llm?.pitch ?? null,
+    liveUrl: rawScan?.liveUrl ?? null,
+    llmGeneratedAt: llm?.generatedAt?.toISOString() ?? null,
 
     lastScanned: scan?.scannedAt?.toISOString() ?? null,
     updatedAt: project.updatedAt.toISOString(),

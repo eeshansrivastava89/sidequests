@@ -7,7 +7,6 @@ export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -81,5 +80,5 @@ export function useProjects() {
     fetchProjects();
   }, [fetchProjects]);
 
-  return { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject };
+  return { projects, loading, error, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject };
 }

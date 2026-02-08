@@ -12,6 +12,8 @@ import { RefreshPanel } from "@/components/refresh-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatRelativeTime } from "@/lib/project-helpers";
+import { toast } from "sonner";
 
 /* ── Sort ───────────────────────────────────────────────── */
 
@@ -59,7 +61,7 @@ function needsAttention(p: Project): boolean {
   const di = p.scan?.daysInactive ?? 0;
   return (
     p.healthScore < 40 ||
-    (di > 30 && !p.nextAction) ||
+    di > 30 ||
     (p.isDirty && di > 7)
   );
 }
@@ -117,21 +119,10 @@ function getLastRefreshed(projects: Project[]): string | null {
   return latest;
 }
 
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
 /* ── Page ───────────────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const { projects, loading, error, refreshing, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject } =
+  const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
   const config = useConfig();
   const refreshHook = useRefresh(fetchProjects);
@@ -139,7 +130,6 @@ export default function DashboardPage() {
   const [view, setView] = useState<WorkflowView>("all");
   const [sortKey, setSortKey] = useState<SortKey>("lastCommit");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Hydrate sort key from localStorage after mount
@@ -150,29 +140,6 @@ export default function DashboardPage() {
   const handleSortChange = useCallback((key: SortKey) => {
     setSortKey(key);
     saveSortKey(key);
-  }, []);
-
-  const handleExport = useCallback(async (projectId?: string) => {
-    setExporting(true);
-    try {
-      const res = await fetch("/api/o1/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(projectId ? { projectId } : {}),
-      });
-      const data = await res.json();
-      if (!data.ok) return;
-
-      const blob = new Blob([data.export.markdown], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = projectId ? `${projectId}-evidence.md` : "portfolio-evidence.md";
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
-    }
   }, []);
 
   const handleTogglePin = useCallback(
@@ -278,27 +245,37 @@ export default function DashboardPage() {
         case "v": {
           if (!config.sanitizePaths && selectedProject?.pathDisplay) {
             window.open(`vscode://file${encodeURI(selectedProject.pathDisplay)}`);
+            toast.success("Opening in VS Code");
             touchProject(selectedProject.id, "vscode");
           }
           break;
         }
         case "c": {
           if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`);
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`).then(
+              () => toast.success("Copied Claude command"),
+              () => toast.error("Failed to copy")
+            );
             touchProject(selectedProject.id, "claude");
           }
           break;
         }
         case "x": {
           if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`);
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`).then(
+              () => toast.success("Copied Codex command"),
+              () => toast.error("Failed to copy")
+            );
             touchProject(selectedProject.id, "codex");
           }
           break;
         }
         case "t": {
           if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`);
+            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`).then(
+              () => toast.success("Copied Terminal command"),
+              () => toast.error("Failed to copy")
+            );
             touchProject(selectedProject.id, "terminal");
           }
           break;
@@ -336,7 +313,7 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={refreshHook.start}>Retry</Button>
+        <Button onClick={() => refreshHook.start("scan")}>Retry</Button>
       </div>
     );
   }
@@ -355,16 +332,6 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {config.featureO1 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleExport()}
-                  disabled={exporting}
-                >
-                  {exporting ? "Exporting..." : "Export All"}
-                </Button>
-              )}
               {refreshHook.state.active ? (
                 <Button
                   size="sm"
@@ -374,13 +341,28 @@ export default function DashboardPage() {
                   Cancel
                 </Button>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={refreshHook.start}
-                >
-                  Refresh
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => refreshHook.start("scan")}
+                  >
+                    Scan
+                  </Button>
+                  {config.featureLlm && (
+                    <button
+                      type="button"
+                      className="relative inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm hover:from-amber-600 hover:to-orange-600 transition-all hover:shadow-md hover:shadow-orange-500/20 active:scale-[0.97]"
+                      onClick={() => refreshHook.start("enrich")}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+                        <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
+                        <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
+                      </svg>
+                      Enrich with AI
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -388,7 +370,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <RefreshPanel state={refreshHook.state} />
+        <RefreshPanel state={refreshHook.state} onDismiss={refreshHook.dismiss} />
 
         <StatsBar projects={projects} />
 
@@ -479,11 +461,10 @@ export default function DashboardPage() {
         open={!!selectedId}
         onClose={() => setSelectedId(null)}
         onUpdateOverride={updateOverride}
-        onUpdateMetadata={updateMetadata}
         onTogglePin={handleTogglePin}
         onTouch={handleTouch}
         featureO1={config.featureO1}
-        onExport={handleExport}
+        sanitizePaths={config.sanitizePaths}
       />
     </div>
   );

@@ -46,6 +46,9 @@ export const config = {
   get llmOverwriteMetadata(): boolean {
     return envBool("LLM_OVERWRITE_METADATA", false);
   },
+  get llmForce(): boolean {
+    return envBool("LLM_FORCE", false);
+  },
   get llmConcurrency(): number {
     const v = process.env.LLM_CONCURRENCY;
     if (v === undefined) return 3;

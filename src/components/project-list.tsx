@@ -3,8 +3,8 @@
 import type { Project } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-import { toast } from "sonner";
+import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
+import { healthColor, copyToClipboard, formatLastTouched } from "@/lib/project-helpers";
 import { cn } from "@/lib/utils";
 
 interface ProjectListProps {
@@ -23,10 +23,27 @@ const STATUS_DOT: Record<string, string> = {
   archived: "bg-zinc-400",
 };
 
-function healthColor(score: number): string {
-  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 40) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
+const FRAMEWORK_LABELS: Record<string, string> = {
+  nextjs: "Next.js",
+  express: "Express",
+  fastapi: "FastAPI",
+  django: "Django",
+  flask: "Flask",
+  react: "React",
+  vue: "Vue",
+  axum: "Axum",
+  actix: "Actix",
+};
+
+function getLangLabel(project: Project): string | null {
+  const raw =
+    project.framework ??
+    project.scan?.languages?.primary ??
+    project.packageManager ??
+    project.scan?.languages?.detected?.[0] ??
+    null;
+  if (!raw) return null;
+  return FRAMEWORK_LABELS[raw.toLowerCase()] ?? raw;
 }
 
 function formatDaysInactive(days: number | null | undefined): string {
@@ -34,78 +51,10 @@ function formatDaysInactive(days: number | null | undefined): string {
   return `${days}d`;
 }
 
-function formatLastTouched(iso: string | null): string | null {
-  if (!iso) return null;
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Opened just now";
-  if (mins < 60) return `Opened ${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Opened ${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `Opened ${days}d ago`;
-}
-
-function copyToClipboard(text: string, label: string) {
-  navigator.clipboard.writeText(text).then(
-    () => toast.success(`Copied ${label} command`),
-    () => toast.error("Failed to copy")
-  );
-}
-
-function VsCodeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.583 2.213l-4.52 4.275L7.95 2.213 2.4 4.831v14.338l5.55 2.618 5.113-4.275 4.52 4.275L23.6 19.17V4.831l-6.017-2.618zM7.95 15.6l-3.15-2.1V10.5l3.15 2.1v3zm5.113-3.6L7.95 8.4V5.4l5.113 3.6v3zm4.52 3.6l-3.15-2.1v-3l3.15 2.1v3z" />
-    </svg>
-  );
-}
-
-function ClaudeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-3.5 5h7a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-7a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5zm1 3.5h5a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-5a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5z" />
-    </svg>
-  );
-}
-
-function CodexIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h6v2H8v-2z" />
-    </svg>
-  );
-}
-
-function TerminalIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
-    </svg>
-  );
-}
-
-function PinIcon({ filled, className }: { filled?: boolean; className?: string }) {
-  if (filled) {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-        <path d="M16 2L14.5 3.5L18.5 7.5L20 6L16 2ZM12.5 5.5L8 10L9 14L2 21H3L10 14L14 15L18.5 10.5L12.5 5.5Z" />
-      </svg>
-    );
-  }
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 17v5" />
-      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76z" />
-    </svg>
-  );
-}
-
 export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[auto_auto_1fr_auto_3rem_3rem_auto_1fr]"
-    : "grid-cols-[auto_auto_1fr_auto_3rem_3rem_auto_1fr_auto]";
+    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_3rem_3rem_7.5rem_1fr]"
+    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_3rem_3rem_7.5rem_1fr_8.5rem]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -193,13 +142,16 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
 
             {/* Language badge */}
             <div className="hidden sm:block">
-              {project.scan?.languages?.primary ? (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
-                  {project.scan.languages.primary}
-                </Badge>
-              ) : (
-                <span className="text-muted-foreground text-xs">{"\u2014"}</span>
-              )}
+              {(() => {
+                const label = getLangLabel(project);
+                return label ? (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+                    {label}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground text-xs">{"\u2014"}</span>
+                );
+              })()}
             </div>
 
             {/* Health score */}

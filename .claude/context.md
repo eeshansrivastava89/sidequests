@@ -5,45 +5,65 @@
 ## Project Anchor
 
 **Project:** Projects Dashboard v2 — local web app scanning ~/dev as a "daily starting point" for developers
-**Current Phase:** All 21 phases complete. Awaiting Codex code review feedback.
+**Current Phase:** Phase 28 complete. Codex simplification plan (Chunks 1-4) complete. All uncommitted.
 
 ## Git State
 
 **Branch:** main
-**Last Commit:** c1fbb87 docs: mark all 21 phases complete, rewrite PITCH.md, add rawJsonHash migration
-**Uncommitted Changes:** None (clean working tree)
+**Last Commit:** f30ecc8 phase 23: UX polish — modal, actionable stats, list indicators
+**Uncommitted Changes:** Phases 24-28 + Codex simplification across 25 files (+980 / -1363 lines net reduction)
 
-## Recent Commits (this session)
+## What We Did This Session
 
-| Commit | Content |
-|--------|---------|
-| `4e5b11e` | phase 11+13: enhanced scan pipeline and compact list view (prior session) |
-| `5ca809b` | phases 12-16: schema evolution, derive v2, sort/filter, drawer redesign, API merge updates |
-| `e60aa57` | phases 17-19: enhanced quick actions, project pinning, pipeline optimizations |
-| `adb6556` | phases 20-21: session memory, activity timeline, docs update |
-| `c1fbb87` | docs: mark all 21 phases complete, rewrite PITCH.md, add rawJsonHash migration |
+### Phase 28: Modal Layout Refinement
+- Replaced collapsible `Section` component with always-visible `SectionBox` (bordered containers)
+- 5 sections always visible: Now, Recent Work, Details, Workflow, O-1 Evidence (gated)
+- Removed `ChevronIcon`, `Separator` imports (no longer needed)
+- Font size nudge: `text-xs` → `text-sm` for commit messages, activity entries, fallback text
+- Removed Export Evidence button from drawer (`onExport` prop removed)
+- Updated IMPLEMENTATION_PLAN.md (Phase 28 ✅) and ARCHITECTURE.md (drawer description)
 
-## What We Did
+### Codex Simplification Plan (Agent Team — 3 parallel agents)
+Implemented all 4 chunks from `.claude/codex-review.md`:
 
-### All 21 Phases Complete
-Phases 11-21 implemented using agent teams (parallel Tmux agents). Waves:
-- **Wave A** (prior session): Phase 11 (scan.py 15 new fields) + Phase 13 (compact list view)
-- **Wave B+C** (this session): Phases 12-16 (schema evolution, derive v2, sort/filter, drawer redesign, API merge)
-- **Wave D** (this session): Phases 17-19 (quick actions, pinning, pipeline optimizations)
-- **Wave E+F** (this session): Phases 20-21 (session memory, activity timeline, docs)
+**Chunk 1: Contract & Type Unification** (types-agent)
+- Removed `author` from `recentCommits` type in types.ts and merge.ts (scanner never emitted it)
+- Fixed `license` type: `string | null` → `boolean` (matching scan.py output)
+- Added `linterConfig`, `license`, `lockfile` keys to scan.py `check_files()` — health scoring signals were always 0
+- Fixed derived tags merge bug: `parsJson(derivedData.tags as string)` → `Array.isArray` check
 
-### Issues Resolved This Session
-1. **Memory leak crash** — Prior session crashed at 97% RAM. Root cause: orphaned Claude agent processes from Tmux teams not getting cleaned up on force-kill. Killed orphan PID 82263, cleaned stale team/task dirs.
-2. **Orphan Next.js dev server** — Found running from 12:28 AM eating 750MB. Killed PIDs 38454/38477/38478/39731.
-3. **Missing migration** — Phase 19 added `rawJsonHash` to Prisma schema but no migration was run. Dashboard crashed with `no such column: main.Scan.rawJsonHash`. Fixed with `prisma migrate dev --name add_raw_json_hash`.
+**Chunk 2: API Route Deduplication** (api-agent)
+- Created `src/lib/api-helpers.ts` with 4 shared utilities: `withErrorHandler`, `findProject`/`notFound`, `coercePatchBody`, `safeJsonParse`
+- Refactored 8 route files to use shared helpers
+- All response shapes and status codes preserved
+
+**Chunk 3: UI Dead Code Removal** (ui-agent)
+- Deleted 3 unused files: `project-card.tsx`, `ui/card.tsx`, `ui/sheet.tsx`
+- Created `src/lib/project-helpers.ts` — shared `healthColor`, `copyToClipboard`, `formatRelativeDate`, `formatRelativeTime`, `formatLastTouched`
+- Created `src/components/project-icons.tsx` — shared VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon
+- Removed ~170 lines of duplicated code from project-list.tsx and project-drawer.tsx
+- Removed unused `refreshing` state from use-projects.ts
+
+**Chunk 4: Config Cleanup** (me)
+- Deleted `config.example.json` (no references, env-only config)
+- Deleted empty `next.config.ts`
+- Moved `prisma` from dependencies to devDependencies
+
+### Other
+- Added `CLAUDE_CLI_MODEL=sonnet` to `.env.local` (was unset, now explicit)
 
 ## Decisions Made
 
 | Decision | Rationale |
 |----------|-----------|
-| Use Opus for agents, not Sonnet | User's preference — their money, their session. Memory issue was orphan processes, not model size. |
-| Clean up defensive scanAny casts | Phase 15 agent coded defensively against Phase 16; once both landed, switched to top-level Project fields |
-| PITCH.md full rewrite | Repositioned from "bird's-eye view" to "daily starting point" to match the Phase 11-21 transformation |
+| SectionBox replaces Section | Scrolling faster than clicking for daily-use tool |
+| 5 sections not 4 | O-1 Evidence separate from Workflow — cleaner separation |
+| Remove Export Evidence from drawer | Header "Export All" sufficient; per-project export never used |
+| Remove `author` from recentCommits | Scanner never emitted it — `git log --format="%H\|%aI\|%s"` has no author |
+| `license` type → boolean | scan.py emits bool, not string |
+| Agent team for simplification | 3 chunks touch different files — safe parallel execution |
+| Chunk 5 (schema consolidation) deferred | Highest migration risk, per Codex recommendation |
+| CLAUDE_CLI_MODEL=sonnet | Explicit model choice for LLM enrichment |
 
 ## Working Model
 
@@ -51,16 +71,27 @@ Phases 11-21 implemented using agent teams (parallel Tmux agents). Waves:
 - **Codex:** Architect and code reviewer — reviews work, provides feedback
 - User mediates between the two
 
+## PM Review Backlog (Still Unaddressed)
+
+**P1:** First-run empty state, keyboard nav focus handling
+**P2:** "Recently Active" tab, auto-collapse refresh panel, persist tab to localStorage, pinned section styling
+**P3:** Dark mode toggle, extract shared icons/healthColor (✅ done in Chunk 3)
+
 ## Next Actions
 
-1. **Receive Codex code review feedback** — user will bring it next session
-2. **Address review findings** — implement whatever Codex flags
-3. **Visual QA** — user was about to test the dashboard when session ended
+1. **Visual QA** — Test all changes in browser (modal layout, bordered sections, font sizes, keyboard shortcuts, toasts)
+2. **Commit** — All uncommitted work: Phases 24-28 + Codex simplification (25 files, net -383 lines)
+3. **Codex review** — Send for review of the simplification changes
+4. **Address remaining PM backlog** — P1/P2 items
 
 ## Conversation Essence
 
-- Session started with crash recovery and orphan cleanup
-- Agent teams work well but need graceful shutdown — orphan processes are the real memory risk, not model size
-- User explicitly wants Opus for agents, not Sonnet — don't downgrade without asking
-- All docs updated: IMPLEMENTATION_PLAN (all ✅), ARCHITECTURE.md (comprehensive), PITCH.md (rewritten), README.md (updated)
-- .env.local.example updated with LLM_CONCURRENCY=3
+- User wants Opus for agents — don't downgrade without asking
+- User values honest code review: "have you actually read the code?" — always read before opining
+- Product vision is "daily starting point" (PITCH.md is north star)
+- Codex review doc lives at `.claude/codex-review.md`
+- User prefers brainstorming before committing to implementation — propose, don't execute
+- Agent teams used successfully for parallel simplification work
+- All Phases 24-28 + simplification changes are uncommitted — commit when ready
+- `.env.local` now has `CLAUDE_CLI_MODEL=sonnet`
+- PITCH.md status line says "All 21 phases" — slightly stale but not a feature change

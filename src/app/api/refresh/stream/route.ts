@@ -5,6 +5,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const encoder = new TextEncoder();
   const abort = new AbortController();
+  const url = new URL(request.url);
+  const mode = url.searchParams.get("mode") ?? "enrich";
+  const skipLlm = mode === "scan";
 
   // Wire client disconnect to abort signal
   request.signal.addEventListener("abort", () => abort.abort());
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await runRefreshPipeline(emit, abort.signal);
+        await runRefreshPipeline(emit, abort.signal, { skipLlm });
       } catch (err) {
         if (abort.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);

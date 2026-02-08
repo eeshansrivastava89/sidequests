@@ -201,6 +201,20 @@ def check_files(path: str) -> dict:
         for d in ["tests", "test", "__tests__", "spec", "src/tests", "src/__tests__"]
     ) or bool(list(p.glob("*test*")))
 
+    has_linter = any(
+        (p / f).exists()
+        for f in [
+            ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
+            "eslint.config.js", "eslint.config.mjs", "eslint.config.ts",
+            ".prettierrc", ".prettierrc.js", ".prettierrc.json",
+            "biome.json", "biome.jsonc",
+            ".flake8", ".pylintrc", "pyproject.toml",
+            ".rubocop.yml", "rustfmt.toml",
+        ]
+    )
+
+    has_lockfile = any((p / f).exists() for f, _ in LOCKFILE_MAP)
+
     return {
         "readme": (p / "README.md").exists() or (p / "readme.md").exists(),
         "tests": has_tests,
@@ -212,6 +226,9 @@ def check_files(path: str) -> dict:
             or (p / "docker-compose.yaml").exists()
             or (p / "compose.yml").exists()
         ),
+        "linterConfig": has_linter,
+        "license": detect_license(path),
+        "lockfile": has_lockfile,
     }
 
 
@@ -483,6 +500,12 @@ def scan_project(abs_path: str) -> dict:
     todo_count, fixme_count, loc_estimate = count_todos(abs_path)
     description = get_description(abs_path)
     framework = detect_framework(abs_path)
+    live_url = None
+    pkg = _read_json(str(Path(abs_path) / "package.json"))
+    if pkg:
+        homepage = pkg.get("homepage")
+        if isinstance(homepage, str) and homepage.strip():
+            live_url = homepage.strip()
     scripts = detect_scripts(abs_path)
     services = detect_services(abs_path)
     package_manager = detect_package_manager(abs_path)
@@ -501,6 +524,7 @@ def scan_project(abs_path: str) -> dict:
         "fixmeCount": fixme_count,
         "description": description,
         "framework": framework,
+        "liveUrl": live_url,
         "scripts": scripts,
         "services": services,
         "locEstimate": loc_estimate,

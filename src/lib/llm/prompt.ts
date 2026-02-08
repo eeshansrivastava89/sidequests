@@ -7,6 +7,7 @@ export const SYSTEM_PROMPT = `You are a developer portfolio analyst. Given a pro
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
 - "notableFeatures": An array of 2-5 notable aspects of this project.
 - "recommendations": An array of 2-4 actionable next steps to improve the project.
+- "pitch": A 1-2 sentence product pitch as if selling this project to the world.
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
@@ -44,7 +45,8 @@ export function buildPrompt(input: LlmInput): string {
   "purpose": "1-2 sentence description",
   "tags": ["3-8 descriptive tags"],
   "notableFeatures": ["2-5 notable aspects"],
-  "recommendations": ["2-4 actionable next steps"]${metadataFields}
+  "recommendations": ["2-4 actionable next steps"],
+  "pitch": "1-2 sentence product pitch"${metadataFields}
 }
 
 Project data:
@@ -97,6 +99,7 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   if (typeof obj?.successMetrics === "string") base.successMetrics = obj.successMetrics;
   if (typeof obj?.nextAction === "string") base.nextAction = obj.nextAction;
   if (typeof obj?.publishTarget === "string") base.publishTarget = obj.publishTarget;
+  if (typeof obj?.pitch === "string") base.pitch = obj.pitch;
   if (obj?.evidence && typeof obj.evidence === "object") base.evidence = obj.evidence as Record<string, unknown>;
   if (obj?.outcomes && typeof obj.outcomes === "object") base.outcomes = obj.outcomes as Record<string, unknown>;
 

@@ -1,34 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { withErrorHandler, findProject, notFound } from "@/lib/api-helpers";
 
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> => {
+  const { id } = await params;
 
-    const project = await db.project.findUnique({ where: { id } });
-    if (!project) {
-      return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
-    }
+  const project = await findProject(id);
+  if (!project) return notFound();
 
-    const updated = await db.project.update({
-      where: { id },
-      data: { pinned: !project.pinned },
-    });
+  const updated = await db.project.update({
+    where: { id },
+    data: { pinned: !project.pinned },
+  });
 
-    await db.activity.create({
-      data: {
-        projectId: id,
-        type: "pin",
-        payloadJson: JSON.stringify({ pinned: updated.pinned }),
-      },
-    });
+  await db.activity.create({
+    data: {
+      projectId: id,
+      type: "pin",
+      payloadJson: JSON.stringify({ pinned: updated.pinned }),
+    },
+  });
 
-    return NextResponse.json({ ok: true, pinned: updated.pinned });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
-  }
-}
+  return NextResponse.json({ ok: true, pinned: updated.pinned });
+});

@@ -8,6 +8,7 @@ export interface LlmEnrichment {
   tags: string[];
   notableFeatures: string[];
   recommendations: string[];
+  pitch?: string;
   takeaways?: Record<string, string>;
   // Optional metadata fields (populated when FEATURE_O1=true)
   goal?: string;

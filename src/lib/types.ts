@@ -23,13 +23,13 @@ export interface Project {
   scan: RawScan | null;
 
   // Scan-derived fields surfaced at top level
-  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
-  scripts: Record<string, string>;
+  recentCommits: Array<{ hash: string; message: string; date: string }>;
+  scripts: string[];
   services: string[];
   packageManager: string | null;
   branchCount: number;
   stashCount: number;
-  license: string | null;
+  license: boolean;
 
   // Project-level fields
   pinned: boolean;
@@ -44,6 +44,11 @@ export interface Project {
   outcomes: Record<string, unknown> | null;
   lastScanned: string | null;
   updatedAt: string;
+
+  // Phase 29: new fields
+  pitch: string | null;
+  liveUrl: string | null;
+  llmGeneratedAt: string | null;
 }
 
 export interface RawScan {
@@ -62,17 +67,18 @@ export interface RawScan {
   todoCount: number;
   fixmeCount: number;
   description: string | null;
-  recentCommits: Array<{ hash: string; message: string; date: string; author: string }>;
-  scripts: Record<string, string>;
+  recentCommits: Array<{ hash: string; message: string; date: string }>;
+  scripts: string[];
   services: string[];
   packageManager: string | null;
   branchCount: number;
   stashCount: number;
   locEstimate: number;
-  license: string | null;
+  license: boolean;
   ahead: number;
   behind: number;
   framework: string | null;
+  liveUrl: string | null;
 }
 
 export type WorkflowView = "all" | "active" | "needs-attention" | "stale" | "archived";

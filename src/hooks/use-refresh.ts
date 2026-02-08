@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+export type RefreshMode = "scan" | "enrich";
+
 export interface RefreshEvent {
   type: string;
   name?: string;
@@ -28,22 +30,26 @@ export interface ProjectProgress {
 export interface RefreshState {
   active: boolean;
   phase: string;
+  mode: RefreshMode | null;
   projects: Map<string, ProjectProgress>;
   summary: RefreshEvent | null;
   error: string | null;
 }
 
+const INITIAL_STATE: RefreshState = {
+  active: false,
+  phase: "",
+  mode: null,
+  projects: new Map(),
+  summary: null,
+  error: null,
+};
+
 export function useRefresh(onComplete: () => void) {
-  const [state, setState] = useState<RefreshState>({
-    active: false,
-    phase: "",
-    projects: new Map(),
-    summary: null,
-    error: null,
-  });
+  const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
-  const start = useCallback(() => {
+  const start = useCallback((mode: RefreshMode = "enrich") => {
     if (state.active) return;
 
     const abort = new AbortController();
@@ -52,12 +58,13 @@ export function useRefresh(onComplete: () => void) {
     setState({
       active: true,
       phase: "Connecting...",
+      mode,
       projects: new Map(),
       summary: null,
       error: null,
     });
 
-    const eventSource = new EventSource("/api/refresh/stream");
+    const eventSource = new EventSource(`/api/refresh/stream?mode=${mode}`);
 
     eventSource.addEventListener("scan_start", () => {
       setState((s) => ({ ...s, phase: "Scanning filesystem..." }));
@@ -94,7 +101,7 @@ export function useRefresh(onComplete: () => void) {
 
         projects.set(data.name!, existing);
         const phase = data.step === "llm"
-          ? `LLM enriching ${data.name} (${data.index! + 1}/${data.total})`
+          ? `Enriching ${data.name} (${data.index! + 1}/${data.total})`
           : `Processing ${data.name} (${data.index! + 1}/${data.total})`;
         return { ...s, projects, phase };
       });
@@ -174,5 +181,9 @@ export function useRefresh(onComplete: () => void) {
     abortRef.current?.abort();
   }, []);
 
-  return { state, start, cancel };
+  const dismiss = useCallback(() => {
+    setState(INITIAL_STATE);
+  }, []);
+
+  return { state, start, cancel, dismiss };
 }

@@ -59,6 +59,7 @@ model Llm {
   tagsJson             String?  // JSON array
   notableFeaturesJson  String?  // JSON array
   recommendationsJson  String?  // JSON array
+  pitch                String?
   generatedAt          DateTime @default(now())
 }
 

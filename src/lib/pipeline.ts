@@ -149,7 +149,8 @@ async function runPython(script: string, args: string[], stdin?: string): Promis
  */
 export async function runRefreshPipeline(
   emit: (event: PipelineEvent) => void = () => {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { skipLlm?: boolean }
 ): Promise<{ projectCount: number }> {
   const startTime = Date.now();
   let llmSucceeded = 0;
@@ -308,25 +309,26 @@ export async function runRefreshPipeline(
   }
 
   // 4. LLM phase (batched parallel with concurrency limit)
-  const llmProvider = getLlmProvider();
+  const llmProvider = options?.skipLlm ? null : getLlmProvider();
 
   if (llmProvider && !signal?.aborted) {
     // Filter to projects that need LLM enrichment
+    const forceAll = config.llmForce;
     const llmCandidates = storedProjects.filter((sp) => {
       if (!sp.derived) return false;
-      // Skip if hash unchanged AND LLM record already exists
-      if (!sp.hashChanged && sp.hasExistingLlm) return false;
+      // Skip if hash unchanged AND LLM record already exists (unless LLM_FORCE=true)
+      if (!forceAll && !sp.hashChanged && sp.hasExistingLlm) return false;
       return true;
     });
 
-    const skippedCount = storedProjects.filter((sp) => sp.derived && !sp.hashChanged && sp.hasExistingLlm).length;
+    const skippedCount = storedProjects.filter((sp) => sp.derived && !forceAll && !sp.hashChanged && sp.hasExistingLlm).length;
     const noDerivedCount = storedProjects.filter((sp) => !sp.derived).length;
     llmSkipped += skippedCount + noDerivedCount;
 
     // Emit skipped events
     for (const sp of storedProjects) {
       if (!sp.derived) continue;
-      if (!sp.hashChanged && sp.hasExistingLlm) {
+      if (!forceAll && !sp.hashChanged && sp.hasExistingLlm) {
         emit({ type: "project_complete", name: sp.name, step: "llm", detail: { skipped: "unchanged" } });
       }
     }
@@ -361,12 +363,14 @@ export async function runRefreshPipeline(
               tagsJson: JSON.stringify(enrichment.tags),
               notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
+              pitch: enrichment.pitch ?? null,
             },
             update: {
               purpose: enrichment.purpose,
               tagsJson: JSON.stringify(enrichment.tags),
               notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
+              pitch: enrichment.pitch ?? null,
               generatedAt: new Date(),
             },
           });
