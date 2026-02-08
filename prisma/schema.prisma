@@ -36,31 +36,36 @@ model Scan {
 }
 
 model Derived {
-  id              String    @id @default(cuid())
-  projectId       String    @unique
-  project         Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  statusAuto      String    // active, paused, stale, archived
-  healthScoreAuto Int
-  derivedJson     String    // Full derived output as JSON (tags, etc.)
-  isDirty         Boolean   @default(false)
-  ahead           Int       @default(0)
-  behind          Int       @default(0)
-  framework       String?
-  branchName      String?
-  lastCommitDate  DateTime?
-  locEstimate     Int       @default(0)
+  id                 String    @id @default(cuid())
+  projectId          String    @unique
+  project            Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  statusAuto         String    // active, paused, stale, archived
+  healthScoreAuto    Int
+  hygieneScoreAuto   Int       @default(0)
+  momentumScoreAuto  Int       @default(0)
+  scoreBreakdownJson String    @default("{}")
+  derivedJson        String    // Full derived output as JSON (tags, etc.)
+  isDirty            Boolean   @default(false)
+  ahead              Int       @default(0)
+  behind             Int       @default(0)
+  framework          String?
+  branchName         String?
+  lastCommitDate     DateTime?
+  locEstimate        Int       @default(0)
 }
 
 model Llm {
-  id                   String   @id @default(cuid())
-  projectId            String   @unique
-  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  purpose              String?
-  tagsJson             String?  // JSON array
-  notableFeaturesJson  String?  // JSON array
-  recommendationsJson  String?  // JSON array
-  pitch                String?
-  generatedAt          DateTime @default(now())
+  id                     String    @id @default(cuid())
+  projectId              String    @unique
+  project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  purpose                String?
+  tagsJson               String?   // JSON array
+  notableFeaturesJson    String?   // JSON array
+  recommendationsJson    String?   // JSON array
+  pitch                  String?
+  aiInsightJson          String?   // JSON: { score, confidence, reasons, risks, nextBestAction }
+  aiInsightGeneratedAt   DateTime?
+  generatedAt            DateTime  @default(now())
 }
 
 model Override {

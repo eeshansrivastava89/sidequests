@@ -3,6 +3,14 @@
  * All providers must return this shape.
  */
 
+export interface AiInsight {
+  score: number;
+  confidence: "low" | "medium" | "high";
+  reasons: string[];
+  risks: string[];
+  nextBestAction: string;
+}
+
 export interface LlmEnrichment {
   purpose: string;
   tags: string[];
@@ -18,6 +26,7 @@ export interface LlmEnrichment {
   publishTarget?: string;
   evidence?: Record<string, unknown>;
   outcomes?: Record<string, unknown>;
+  aiInsight?: AiInsight;
 }
 
 export interface LlmInput {

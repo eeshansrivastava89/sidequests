@@ -1,161 +1,120 @@
-# Codex Review (Updated): Post-Progress Simplification Plan
+# Codex Review: Remaining Usability Fixes Only (Post-v2 Screenshot Pass)
 
 ## Context
-This is a fresh review after recent implementation progress (Phases 22-28). Goal remains the same: **smaller codebase, same behavior**, with preference for shared helpers and framework/library primitives over custom duplication.
+This is an updated review after Claude’s latest adjustments (`v2-01-table.png`, `v2-02-header-closeup.png`).
 
-## What Improved Since Last Review
-1. UI polish landed in key areas:
-   - Deterministic list grid tracks and better alignment in `src/components/project-list.tsx`.
-   - Language/framework fallback label logic in `src/components/project-list.tsx`.
-   - Drawer refactored to a single-column action-first flow in `src/components/project-drawer.tsx`.
-2. `scripts` contract was partially aligned to `string[]` in merge/types/UI:
-   - `src/lib/merge.ts`, `src/lib/types.ts`, `src/components/project-drawer.tsx`.
-3. Keyboard shortcut feedback parity improved in `src/app/page.tsx` (toasts for copy/open actions).
-4. Implementation plan reflects completion through Phase 28 in `IMPLEMENTATION_PLAN.md`.
+Items already improved and removed from scope:
+- Score columns are now clearer (`HYGIENE`, `MOMENTUM`) in table header.
+- General table alignment/density is in good shape.
+- Keyboard hint panel and enrich dropdown baseline usability are acceptable.
 
-## Priority Simplification Plan (Remaining)
+Remaining scope below is only what still appears unresolved in latest screenshots.
 
 ---
 
-## Chunk 1: Fix Contract Drift and Latent Data Bugs (Highest Priority)
+## Claude Task Message 1 (Highest): Stats Scope Consistency
+What:
+Make top stat cards use one consistent scope model (global or filtered), and label that scope explicitly.
 
-### Why
-There are still cross-layer mismatches that create hidden complexity and correctness risk.
+Why:
+In current state, `Total` appears filtered (`0/13`) while other cards remain global (`Dirty 8`, `Needs Attention 7`) in filtered/search views, which creates trust/interpretation issues.
 
-### Tasks
-1. **Fix derived tags merge bug**
-   - Current code parses `derivedData.tags` as if it were a JSON string; `derivedData.tags` is already an array.
-   - Use array directly (or robust type guard) in merge fallback chain.
-   - Files: `src/lib/merge.ts`
+How:
+- Choose one model:
+  - All stats global, or
+  - All stats filtered.
+- Implement that model across all stat cards using one shared source.
+- Add visible scope label near stat row (`Global` / `Filtered`).
+- Verify with tab+search no-results state.
 
-2. **Align `recentCommits` shape end-to-end**
-   - Scanner emits `{hash,date,message}` but types still expect `author`.
-   - Choose one canonical shape:
-     - Either add author in scanner git log output, or
-     - remove `author` from TS types.
-   - Files: `pipeline/scan.py`, `src/lib/types.ts`, `src/lib/merge.ts`
+Deliverables:
+- No mixed stat scopes in any state.
+- Users can tell what stat scope they are seeing at a glance.
 
-3. **Align `license` type across scan/merge/types**
-   - Scanner emits boolean; types declare `string | null`.
-   - Normalize to one representation and update all consumers.
-   - Files: `pipeline/scan.py`, `src/lib/types.ts`, `src/lib/merge.ts`
-
-4. **Make health-score signals real**
-   - `derive.py` checks `files.linterConfig`, `files.license`, `files.lockfile`, but scanner doesn’t emit those keys in `files`.
-   - Either emit those keys in scan, or update derive to use existing fields.
-   - Files: `pipeline/scan.py`, `pipeline/derive.py`
-
-### Deliverables
-- No schema/type drift for `tags`, `recentCommits`, `license`, health-score inputs.
-- Refresh pipeline and UI behave identically except corrected data quality.
+Notes / Scope:
+- In scope: stat computation + label + regressions.
+- Out of scope: redesign of stat card visuals.
 
 ---
 
-## Chunk 2: API/Core Deduplication (Shared Helpers, No Behavior Change)
+## Claude Task Message 2 (High): Needs Attention Actionability
+What:
+Expose deterministic reason codes in list and drawer for projects flagged as `Needs Attention`.
 
-### Why
-Route logic still repeats validation/parsing/error patterns and extra queries.
+Why:
+Counts are visible, but users still can’t quickly see *why* a project is flagged and what to do next from list view.
 
-### Tasks
-1. Extract shared PATCH field coercion helper used by both:
-   - `src/app/api/projects/[id]/metadata/route.ts`
-   - `src/app/api/projects/[id]/override/route.ts`
+How:
+- In `Needs Attention` tab, show compact reason chips per row (or row hover in all tabs).
+- In drawer top section, show primary reason + one deterministic suggested action.
+- Reuse existing rules engine/conditions if present; do not introduce verbose LLM-only reasons.
 
-2. Extract shared JSON response/error helpers (`ok/error`) to remove repeated try/catch envelope boilerplate.
+Deliverables:
+- `Needs Attention` tab becomes directly actionable without opening every drawer.
+- Drawer explains the flag immediately.
 
-3. Normalize JSON body parsing behavior across routes (consistent 400 vs 500 handling for invalid JSON).
-
-4. Introduce shared `safeJsonParse` utility and use in activity payload parsing + merge parsing paths.
-
-5. Reduce duplicate “find project then write” where safe (avoid unnecessary pre-check queries when Prisma not-found handling can preserve semantics).
-
-### Deliverables
-- Route files are shorter and consistent.
-- Response envelopes/status semantics unchanged.
-- No functionality loss.
+Notes / Scope:
+- In scope: reason display from deterministic rules.
+- Out of scope: new AI reasoning system.
 
 ---
 
-## Chunk 3: Frontend Redundancy Cleanup + Dead Code Removal
+## Claude Task Message 3 (Medium): Filter/Search State Visibility
+What:
+Add explicit active filter state indicator and one-click `Clear All`.
 
-### Why
-UI still contains repeated utilities and unused files that bloat maintenance.
+Why:
+Empty states are clear, but current UI still lacks a direct summary of active constraints and a fast reset control.
 
-### Tasks
-1. Remove unused files/components if still unreferenced:
-   - `src/components/project-card.tsx`
-   - `src/components/ui/card.tsx` (if only used by `project-card`)
-   - `src/components/ui/sheet.tsx`
-   - `src/components/ui/separator.tsx`
-   - unused exports like `TabsContent` if truly unreferenced
+How:
+- Add chips near controls for active tab + search term.
+- Add `Clear All` to reset tab/search/sort.
+- Keep keyboard behavior/help consistent with this flow.
 
-2. Extract shared quick-actions component (icons + copy + touch telemetry) used by list and drawer.
+Deliverables:
+- User can always explain current result set from visible UI state.
+- One-click return to default list state.
 
-3. Extract shared helpers:
-   - `needsAttention`
-   - health color
-   - time formatting helpers
-
-4. Remove unused hook state:
-   - `refreshing` in `src/hooks/use-projects.ts` and consumer destructure in `src/app/page.tsx`.
-
-### Deliverables
-- Fewer files and less repeated logic.
-- UI behavior unchanged.
+Notes / Scope:
+- In scope: state indicators + reset.
+- Out of scope: advanced query builder.
 
 ---
 
-## Chunk 4: Config/Docs/Tooling Source-of-Truth Cleanup
+## Claude Task Message 4 (Medium): Drawer Long-Scroll Optimization
+What:
+Reduce default scroll burden in data-heavy drawers without removing information.
 
-### Why
-Config/documentation still has multiple representations and stale ambiguity.
+Why:
+Long O-1 evidence/outcomes sections still push common workflow content too far down for quick triage.
 
-### Tasks
-1. Decide and enforce one config surface:
-   - If env-only (current runtime), remove `config.example.json` and references.
+How:
+- Keep high-frequency sections open by default (`top summary`, `details`, `timeline`).
+- Default low-frequency heavy sections collapsed (`O-1 Evidence`, long recommendations).
+- Add lightweight expand/collapse with per-session persistence.
 
-2. Align README/ARCHITECTURE with actual runtime:
-   - Node version requirement matching current Next version.
-   - Clarify whether “LibSQL adapter” is operationally relevant for local default.
-   - Ensure README env table includes active LLM vars in `.env.local.example`.
+Deliverables:
+- Faster open->decide->act flow in drawer.
+- All detail remains accessible.
 
-3. Remove empty `next.config.ts` if intentionally unused.
-
-4. Move `prisma` CLI package to `devDependencies` if not required at runtime.
-
-### Deliverables
-- Single source-of-truth for config instructions.
-- Reduced tooling/config surface with no runtime behavior change.
+Notes / Scope:
+- In scope: section default state and toggles.
+- Out of scope: content deletion.
 
 ---
 
-## Chunk 5 (Optional, Last): Data Model Redundancy Reduction
-
-### Why
-Data is still duplicated across raw scan JSON, derived JSON, and promoted columns.
-
-### Tasks
-- Choose one storage strategy for derived/scanned fields and tag provenance:
-  - keep query-critical scalar columns + minimal JSON blobs, or
-  - keep JSON-first model with fewer duplicated scalar fields.
-- Plan this as a dedicated migration/refactor after Chunks 1-4.
-
-### Deliverables
-- Clear source-of-truth boundaries in data model.
-- Reduced duplication with migration safety.
+## Optional Micro-Polish (Only if Fast)
+- Align top card label `Avg Health` with split score model wording (e.g., clarify as composite in tooltip).
+- Keep this optional; do not block merge.
 
 ---
 
-## Verification Checklist
-1. Run full refresh and confirm no pipeline/type errors.
-2. Validate tags/commits/license render correctly in list + drawer.
-3. Confirm metadata/override patch behavior unchanged.
-4. Confirm all quick actions + keyboard shortcuts unchanged.
-5. Confirm API response envelopes remain backward compatible.
-6. Confirm docs match actual runtime setup and flags.
-7. Confirm dead-file removals do not break imports/build.
-
-## Execution Guidance
-- Implement chunk-by-chunk in small PRs.
-- Do not combine Chunk 5 with earlier cleanup PRs.
-- If any simplification changes behavior, stop and document the tradeoff before merging.
+## Validation Checklist (PR Notes Required)
+- Confirm stat scope consistency in:
+  - default all view
+  - paused tab
+  - paused + search no-results
+- Confirm `Needs Attention` rows expose deterministic reasons.
+- Confirm drawer shows primary reason and suggested action.
+- Confirm active filter chips + `Clear All` behavior.
+- Confirm drawer collapsible heavy sections reduce default scrolling.

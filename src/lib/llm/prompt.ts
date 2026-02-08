@@ -1,5 +1,5 @@
 import { config } from "../config";
-import type { LlmInput, LlmEnrichment } from "./provider";
+import type { LlmInput, LlmEnrichment, AiInsight } from "./provider";
 
 export const SYSTEM_PROMPT = `You are a developer portfolio analyst. Given a project's scan data and derived metrics, produce a JSON object with these exact fields:
 
@@ -8,6 +8,12 @@ export const SYSTEM_PROMPT = `You are a developer portfolio analyst. Given a pro
 - "notableFeatures": An array of 2-5 notable aspects of this project.
 - "recommendations": An array of 2-4 actionable next steps to improve the project.
 - "pitch": A 1-2 sentence product pitch as if selling this project to the world.
+- "aiInsight": An object with structured assessment:
+  - "score": A number 0-100 representing your overall AI assessment of the project.
+  - "confidence": One of "low", "medium", or "high" indicating how confident you are in the assessment.
+  - "reasons": An array of 2-4 short sentences explaining the score.
+  - "risks": An array of 1-3 risks or concerns about the project.
+  - "nextBestAction": A single sentence describing the most impactful next step.
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
@@ -39,6 +45,15 @@ export function buildPrompt(input: LlmInput): string {
   "outcomes": { "status": "description of current outcome", "learnings": ["key learnings"] }`
     : "";
 
+  const aiInsightField = `,
+  "aiInsight": {
+    "score": 0,
+    "confidence": "low|medium|high",
+    "reasons": ["2-4 short explanations for the score"],
+    "risks": ["1-3 risks or concerns"],
+    "nextBestAction": "single most impactful next step"
+  }`;
+
   return `Analyze this project and respond with ONLY a JSON object (no markdown fences, no commentary):
 
 {
@@ -46,7 +61,7 @@ export function buildPrompt(input: LlmInput): string {
   "tags": ["3-8 descriptive tags"],
   "notableFeatures": ["2-5 notable aspects"],
   "recommendations": ["2-4 actionable next steps"],
-  "pitch": "1-2 sentence product pitch"${metadataFields}
+  "pitch": "1-2 sentence product pitch"${metadataFields}${aiInsightField}
 }
 
 Project data:
@@ -103,5 +118,42 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   if (obj?.evidence && typeof obj.evidence === "object") base.evidence = obj.evidence as Record<string, unknown>;
   if (obj?.outcomes && typeof obj.outcomes === "object") base.outcomes = obj.outcomes as Record<string, unknown>;
 
+  // Extract and validate aiInsight with runtime type checks
+  const insight = parseAiInsight(obj?.aiInsight);
+  if (insight) base.aiInsight = insight;
+
   return base;
+}
+
+const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
+
+function parseAiInsight(raw: unknown): AiInsight | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const obj = raw as Record<string, unknown>;
+
+  const score = typeof obj.score === "number" ? obj.score : NaN;
+  if (!Number.isFinite(score) || score < 0 || score > 100) return undefined;
+
+  const confidence = typeof obj.confidence === "string" ? obj.confidence : "";
+  if (!VALID_CONFIDENCE.has(confidence)) return undefined;
+
+  const reasons = Array.isArray(obj.reasons)
+    ? obj.reasons.filter((r): r is string => typeof r === "string")
+    : [];
+  if (reasons.length === 0) return undefined;
+
+  const risks = Array.isArray(obj.risks)
+    ? obj.risks.filter((r): r is string => typeof r === "string")
+    : [];
+
+  const nextBestAction = typeof obj.nextBestAction === "string" ? obj.nextBestAction : "";
+  if (!nextBestAction) return undefined;
+
+  return {
+    score: Math.round(score),
+    confidence: confidence as AiInsight["confidence"],
+    reasons,
+    risks,
+    nextBestAction,
+  };
 }

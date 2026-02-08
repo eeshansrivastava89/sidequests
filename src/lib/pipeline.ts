@@ -27,6 +27,9 @@ interface DeriveOutput {
     pathHash: string;
     statusAuto: string;
     healthScoreAuto: number;
+    hygieneScoreAuto: number;
+    momentumScoreAuto: number;
+    scoreBreakdownJson: Record<string, Record<string, number>>;
     tags: string[];
   }>;
 }
@@ -72,6 +75,9 @@ function validateDeriveOutput(data: unknown): DeriveOutput {
     if (typeof p.pathHash !== "string") throw new Error(`derive.py: projects[${i}] missing 'pathHash'`);
     if (typeof p.statusAuto !== "string") throw new Error(`derive.py: projects[${i}] missing 'statusAuto'`);
     if (typeof p.healthScoreAuto !== "number") throw new Error(`derive.py: projects[${i}] missing 'healthScoreAuto'`);
+    if (typeof p.hygieneScoreAuto !== "number") throw new Error(`derive.py: projects[${i}] missing 'hygieneScoreAuto'`);
+    if (typeof p.momentumScoreAuto !== "number") throw new Error(`derive.py: projects[${i}] missing 'momentumScoreAuto'`);
+    if (typeof p.scoreBreakdownJson !== "object" || p.scoreBreakdownJson === null) throw new Error(`derive.py: projects[${i}] missing 'scoreBreakdownJson'`);
     if (!Array.isArray(p.tags)) throw new Error(`derive.py: projects[${i}] missing 'tags'`);
   }
   return data as DeriveOutput;
@@ -93,7 +99,7 @@ interface StoredProject {
   projectId: string;
   name: string;
   scanned: Record<string, unknown>;
-  derived: { statusAuto: string; healthScoreAuto: number; tags: string[] } | undefined;
+  derived: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] } | undefined;
   path: string;
   hashChanged: boolean;
   hasExistingLlm: boolean;
@@ -150,7 +156,7 @@ async function runPython(script: string, args: string[], stdin?: string): Promis
 export async function runRefreshPipeline(
   emit: (event: PipelineEvent) => void = () => {},
   signal?: AbortSignal,
-  options?: { skipLlm?: boolean }
+  options?: { skipLlm?: boolean; forceLlm?: boolean }
 ): Promise<{ projectCount: number }> {
   const startTime = Date.now();
   let llmSucceeded = 0;
@@ -242,6 +248,7 @@ export async function runRefreshPipeline(
 
     if (derived) {
       const derivedJsonStr = JSON.stringify({ tags: derived.tags });
+      const scoreBreakdownStr = JSON.stringify(derived.scoreBreakdownJson);
 
       // Extract promoted columns from raw scan data
       const scanGit = scanned as Record<string, unknown>;
@@ -260,6 +267,9 @@ export async function runRefreshPipeline(
           projectId: project.id,
           statusAuto: derived.statusAuto,
           healthScoreAuto: derived.healthScoreAuto,
+          hygieneScoreAuto: derived.hygieneScoreAuto,
+          momentumScoreAuto: derived.momentumScoreAuto,
+          scoreBreakdownJson: scoreBreakdownStr,
           derivedJson: derivedJsonStr,
           isDirty,
           ahead,
@@ -272,6 +282,9 @@ export async function runRefreshPipeline(
         update: {
           statusAuto: derived.statusAuto,
           healthScoreAuto: derived.healthScoreAuto,
+          hygieneScoreAuto: derived.hygieneScoreAuto,
+          momentumScoreAuto: derived.momentumScoreAuto,
+          scoreBreakdownJson: scoreBreakdownStr,
           derivedJson: derivedJsonStr,
           isDirty,
           ahead,
@@ -301,7 +314,7 @@ export async function runRefreshPipeline(
       projectId: project.id,
       name: scanned.name,
       scanned: scanned as Record<string, unknown>,
-      derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto, tags: derived.tags } : undefined,
+      derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto, hygieneScoreAuto: derived.hygieneScoreAuto, momentumScoreAuto: derived.momentumScoreAuto, tags: derived.tags } : undefined,
       path: scanned.path,
       hashChanged,
       hasExistingLlm: !!existingLlm,
@@ -313,7 +326,7 @@ export async function runRefreshPipeline(
 
   if (llmProvider && !signal?.aborted) {
     // Filter to projects that need LLM enrichment
-    const forceAll = config.llmForce;
+    const forceAll = config.llmForce || options?.forceLlm;
     const llmCandidates = storedProjects.filter((sp) => {
       if (!sp.derived) return false;
       // Skip if hash unchanged AND LLM record already exists (unless LLM_FORCE=true)
@@ -355,6 +368,8 @@ export async function runRefreshPipeline(
             derived: sp.derived!,
           });
 
+          const aiInsightJson = enrichment.aiInsight ? JSON.stringify(enrichment.aiInsight) : null;
+
           await db.llm.upsert({
             where: { projectId: sp.projectId },
             create: {
@@ -364,6 +379,8 @@ export async function runRefreshPipeline(
               notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
               pitch: enrichment.pitch ?? null,
+              aiInsightJson,
+              aiInsightGeneratedAt: enrichment.aiInsight ? new Date() : null,
             },
             update: {
               purpose: enrichment.purpose,
@@ -371,6 +388,8 @@ export async function runRefreshPipeline(
               notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
               pitch: enrichment.pitch ?? null,
+              aiInsightJson,
+              aiInsightGeneratedAt: enrichment.aiInsight ? new Date() : undefined,
               generatedAt: new Date(),
             },
           });

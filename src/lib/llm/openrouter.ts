@@ -1,5 +1,6 @@
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { SYSTEM_PROMPT, buildPrompt, parseEnrichment } from "./prompt";
+import { config } from "../config";
 
 /**
  * OpenRouter provider — calls the OpenRouter chat completions API.
@@ -9,11 +10,11 @@ export const openrouterProvider: LlmProvider = {
   name: "openrouter",
 
   async enrich(input: LlmInput): Promise<LlmEnrichment> {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = config.openrouterApiKey;
     if (!apiKey) {
       throw new Error("OPENROUTER_API_KEY is required for the openrouter provider");
     }
-    const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4";
+    const model = config.openrouterModel;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",

@@ -6,7 +6,7 @@ import { ollamaProvider } from "./ollama";
 import { mlxProvider } from "./mlx";
 import { codexCliProvider } from "./codex-cli";
 
-export type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
+export type { LlmProvider, LlmInput, LlmEnrichment, AiInsight } from "./provider";
 
 const providers: Record<string, LlmProvider> = {
   "claude-cli": claudeCliProvider,

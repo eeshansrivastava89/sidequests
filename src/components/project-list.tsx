@@ -1,10 +1,11 @@
 "use client";
 
 import type { Project } from "@/lib/types";
+import type { DashboardDeltas } from "@/hooks/use-refresh-deltas";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { healthColor, copyToClipboard, formatLastTouched } from "@/lib/project-helpers";
+import { healthColor, copyToClipboard } from "@/lib/project-helpers";
 import { cn } from "@/lib/utils";
 
 interface ProjectListProps {
@@ -14,6 +15,7 @@ interface ProjectListProps {
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
   sanitizePaths: boolean;
+  deltas?: DashboardDeltas | null;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -51,10 +53,10 @@ function formatDaysInactive(days: number | null | undefined): string {
   return `${days}d`;
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_3rem_3rem_7.5rem_1fr]"
-    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_3rem_3rem_7.5rem_1fr_8.5rem]";
+    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_3.5rem_1fr]"
+    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_3.5rem_1fr_7rem]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -63,15 +65,16 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         "grid items-center gap-x-3 px-3 h-8 bg-muted/50 border-b border-border text-[11px] font-medium text-muted-foreground uppercase tracking-wider select-none",
         gridCols
       )}>
-        <div className="w-2.5" />
+        <div className="w-2.5" title="Status: green=active, blue=paused, amber=stale, gray=archived" />
         <div className="w-5" />
         <div>Name</div>
         <div className="hidden sm:block">Lang</div>
-        <div className="hidden md:block text-right">Health</div>
+        <div className="hidden md:block text-right" title="Structural: README, tests, CI, linter, license, lockfile, deploy, remote">Hygiene</div>
+        <div className="hidden md:block text-right" title="Operational: commit recency, dirty state, ahead/behind, stale branches">Momentum</div>
         <div className="hidden sm:block text-right">Inactive</div>
-        <div className="hidden lg:block text-right">Opened</div>
+        <div className="hidden lg:block text-right">LOC</div>
         <div className="hidden md:block">Last Commit</div>
-        {!sanitizePaths && <div className="text-right">Actions</div>}
+        {!sanitizePaths && <div>Actions</div>}
       </div>
 
       {/* Rows */}
@@ -154,12 +157,18 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               })()}
             </div>
 
-            {/* Health score */}
-            <div className={cn(
-              "hidden md:block text-right font-mono text-sm font-semibold tabular-nums",
-              healthColor(project.healthScore)
-            )}>
-              {project.healthScore}
+            {/* Hygiene */}
+            <div className="hidden md:block text-right font-mono text-xs tabular-nums">
+              <span className={cn("font-semibold", healthColor(project.hygieneScore))}>
+                {project.hygieneScore}
+              </span>
+            </div>
+
+            {/* Momentum */}
+            <div className="hidden md:block text-right font-mono text-xs tabular-nums">
+              <span className={cn("font-semibold", healthColor(project.momentumScore))}>
+                {project.momentumScore}
+              </span>
             </div>
 
             {/* Days inactive */}
@@ -167,9 +176,18 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               {formatDaysInactive(project.scan?.daysInactive)}
             </div>
 
-            {/* Last opened */}
-            <div className="hidden lg:block text-right text-[11px] text-muted-foreground truncate">
-              {formatLastTouched(project.lastTouchedAt) ?? "\u2014"}
+            {/* LOC */}
+            <div className="hidden lg:block text-right font-mono text-xs text-muted-foreground tabular-nums">
+              {project.locEstimate ? project.locEstimate.toLocaleString() : "\u2014"}
+              {(() => {
+                const d = deltas?.projects.get(project.id);
+                if (!d || d.locEstimate === 0) return null;
+                return (
+                  <span className={`ml-1 text-[10px] ${d.locEstimate > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {d.locEstimate > 0 ? `+${d.locEstimate.toLocaleString()}` : d.locEstimate.toLocaleString()}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Last commit message */}
@@ -187,7 +205,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#007ACC] hover:bg-[#007ACC]/10"
-                  title="Open in VS Code (v)"
+                  title="Open in VS Code"
                   asChild
                 >
                   <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
@@ -198,7 +216,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                   size="icon-xs"
                   variant="ghost"
                   className="text-[#D97757] hover:bg-[#D97757]/10"
-                  title="Copy Claude command (c)"
+                  title="Copy Claude command"
                   onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
                 >
                   <ClaudeIcon className="size-4" />
@@ -206,7 +224,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  title="Copy Codex command (x)"
+                  title="Copy Codex command"
                   onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
                 >
                   <CodexIcon className="size-4" />
@@ -214,7 +232,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                 <Button
                   size="icon-xs"
                   variant="ghost"
-                  title="Copy terminal cd command (t)"
+                  title="Copy terminal cd command"
                   onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
                 >
                   <TerminalIcon className="size-4" />

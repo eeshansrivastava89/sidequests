@@ -1,5 +1,6 @@
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { SYSTEM_PROMPT, buildPrompt, parseEnrichment } from "./prompt";
+import { config } from "../config";
 
 /**
  * MLX provider — calls a local mlx-lm-server (OpenAI-compatible API).
@@ -9,8 +10,8 @@ export const mlxProvider: LlmProvider = {
   name: "mlx",
 
   async enrich(input: LlmInput): Promise<LlmEnrichment> {
-    const baseUrl = process.env.MLX_URL || "http://localhost:8080";
-    const model = process.env.MLX_MODEL || "default";
+    const baseUrl = config.mlxUrl;
+    const model = config.mlxModel;
 
     const res = await fetch(`${baseUrl}/v1/chat/completions`, {
       method: "POST",

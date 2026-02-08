@@ -1,3 +1,11 @@
+export interface AiInsight {
+  score: number;
+  confidence: "low" | "medium" | "high";
+  reasons: string[];
+  risks: string[];
+  nextBestAction: string;
+}
+
 /** Client-side mirror of MergedProject from the API. */
 export interface Project {
   id: string;
@@ -5,6 +13,9 @@ export interface Project {
   pathDisplay: string;
   status: string;
   healthScore: number;
+  hygieneScore: number;
+  momentumScore: number;
+  scoreBreakdown: Record<string, Record<string, number>>;
   purpose: string | null;
   tags: string[];
   notableFeatures: string[];
@@ -42,6 +53,7 @@ export interface Project {
   publishTarget: string | null;
   evidence: Record<string, unknown> | null;
   outcomes: Record<string, unknown> | null;
+  aiInsight: AiInsight | null;
   lastScanned: string | null;
   updatedAt: string;
 
@@ -81,7 +93,7 @@ export interface RawScan {
   liveUrl: string | null;
 }
 
-export type WorkflowView = "all" | "active" | "needs-attention" | "stale" | "archived";
+export type WorkflowView = "all" | "active" | "paused" | "needs-attention" | "stale" | "archived";
 
 export type SortKey = "lastCommit" | "name" | "health" | "status" | "daysInactive";
 

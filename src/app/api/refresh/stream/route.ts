@@ -1,13 +1,18 @@
 import { runRefreshPipeline, type PipelineEvent } from "@/lib/pipeline";
+import { clearSettingsCache } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Ensure pipeline reads fresh settings (user may have changed them via UI)
+  clearSettingsCache();
+
   const encoder = new TextEncoder();
   const abort = new AbortController();
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") ?? "enrich";
   const skipLlm = mode === "scan";
+  const forceLlm = url.searchParams.get("force") === "1";
 
   // Wire client disconnect to abort signal
   request.signal.addEventListener("abort", () => abort.abort());
@@ -24,7 +29,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await runRefreshPipeline(emit, abort.signal, { skipLlm });
+        await runRefreshPipeline(emit, abort.signal, { skipLlm, forceLlm });
       } catch (err) {
         if (abort.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);

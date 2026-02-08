@@ -3,17 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
-import { useRefresh } from "@/hooks/use-refresh";
+import { useRefresh, type RefreshMode } from "@/hooks/use-refresh";
+import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import type { Project, WorkflowView, SortKey } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
 import { RefreshPanel } from "@/components/refresh-panel";
+import { SettingsModal } from "@/components/settings-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, ChevronDown } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
-import { toast } from "sonner";
+import { evaluateAttention } from "@/lib/attention";
+
 
 /* ── Sort ───────────────────────────────────────────────── */
 
@@ -57,23 +61,14 @@ function sortProjects(projects: Project[], sortKey: SortKey): Project[] {
 
 /* ── Filter ─────────────────────────────────────────────── */
 
-function needsAttention(p: Project): boolean {
-  const di = p.scan?.daysInactive ?? 0;
-  return (
-    p.healthScore < 40 ||
-    di > 30 ||
-    (p.isDirty && di > 7)
-  );
-}
-
 function filterByView(projects: Project[], view: WorkflowView): Project[] {
   switch (view) {
     case "active":
-      return projects.filter(
-        (p) => p.status === "active" || p.status === "paused"
-      );
+      return projects.filter((p) => p.status === "active");
+    case "paused":
+      return projects.filter((p) => p.status === "paused");
     case "needs-attention":
-      return projects.filter(needsAttention);
+      return projects.filter((p) => evaluateAttention(p).needsAttention);
     case "stale":
       return projects.filter((p) => p.status === "stale");
     case "archived":
@@ -124,18 +119,38 @@ function getLastRefreshed(projects: Project[]): string | null {
 export default function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
-  const config = useConfig();
+  const { config, refetch } = useConfig();
   const refreshHook = useRefresh(fetchProjects);
+  const deltaHook = useRefreshDeltas(projects);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
   const [sortKey, setSortKey] = useState<SortKey>("lastCommit");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [enrichDropdownOpen, setEnrichDropdownOpen] = useState(false);
+  const enrichDropdownRef = useRef<HTMLDivElement>(null);
 
   // Hydrate sort key from localStorage after mount
   useEffect(() => {
     setSortKey(loadSortKey());
   }, []);
+
+  // Close enrich dropdown on outside click
+  useEffect(() => {
+    if (!enrichDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (enrichDropdownRef.current && !enrichDropdownRef.current.contains(e.target as Node)) {
+        setEnrichDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [enrichDropdownOpen]);
+
+  const handleRefresh = useCallback((mode: RefreshMode, opts?: { force?: boolean }) => {
+    deltaHook.snapshot();
+    refreshHook.start(mode, opts);
+  }, [deltaHook, refreshHook]);
 
   const handleSortChange = useCallback((key: SortKey) => {
     setSortKey(key);
@@ -177,6 +192,7 @@ export default function DashboardPage() {
   const tabCounts = useMemo(() => ({
     all: projects.length,
     active: filterByView(projects, "active").length,
+    paused: filterByView(projects, "paused").length,
     "needs-attention": filterByView(projects, "needs-attention").length,
     stale: filterByView(projects, "stale").length,
     archived: filterByView(projects, "archived").length,
@@ -187,119 +203,6 @@ export default function DashboardPage() {
     [projects, selectedId]
   );
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-
-      const allVisible = [...pinnedProjects, ...unpinnedProjects];
-
-      switch (e.key) {
-        case "/": {
-          e.preventDefault();
-          searchRef.current?.focus();
-          break;
-        }
-        case "Escape":
-          if (selectedId) {
-            setSelectedId(null);
-          } else if (document.activeElement === searchRef.current) {
-            searchRef.current?.blur();
-          }
-          break;
-        case "Enter": {
-          if (!selectedId && allVisible.length > 0) {
-            setSelectedId(allVisible[0].id);
-          }
-          break;
-        }
-        case "j":
-        case "ArrowDown": {
-          e.preventDefault();
-          if (allVisible.length === 0) break;
-          if (!selectedId) {
-            setSelectedId(allVisible[0].id);
-          } else {
-            const idx = allVisible.findIndex((p) => p.id === selectedId);
-            if (idx < allVisible.length - 1) {
-              setSelectedId(allVisible[idx + 1].id);
-            }
-          }
-          break;
-        }
-        case "k":
-        case "ArrowUp": {
-          e.preventDefault();
-          if (allVisible.length === 0) break;
-          if (!selectedId) {
-            setSelectedId(allVisible[allVisible.length - 1].id);
-          } else {
-            const idx = allVisible.findIndex((p) => p.id === selectedId);
-            if (idx > 0) {
-              setSelectedId(allVisible[idx - 1].id);
-            }
-          }
-          break;
-        }
-        case "v": {
-          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            window.open(`vscode://file${encodeURI(selectedProject.pathDisplay)}`);
-            toast.success("Opening in VS Code");
-            touchProject(selectedProject.id, "vscode");
-          }
-          break;
-        }
-        case "c": {
-          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && claude`).then(
-              () => toast.success("Copied Claude command"),
-              () => toast.error("Failed to copy")
-            );
-            touchProject(selectedProject.id, "claude");
-          }
-          break;
-        }
-        case "x": {
-          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}" && codex`).then(
-              () => toast.success("Copied Codex command"),
-              () => toast.error("Failed to copy")
-            );
-            touchProject(selectedProject.id, "codex");
-          }
-          break;
-        }
-        case "t": {
-          if (!config.sanitizePaths && selectedProject?.pathDisplay) {
-            navigator.clipboard.writeText(`cd "${selectedProject.pathDisplay}"`).then(
-              () => toast.success("Copied Terminal command"),
-              () => toast.error("Failed to copy")
-            );
-            touchProject(selectedProject.id, "terminal");
-          }
-          break;
-        }
-        case "p": {
-          if (selectedProject) {
-            handleTogglePin(selectedProject.id);
-          }
-          break;
-        }
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, selectedProject, pinnedProjects, unpinnedProjects, handleTogglePin, touchProject, config.sanitizePaths]);
-
-  // Scroll selected project into view on keyboard navigation
-  useEffect(() => {
-    if (selectedId) {
-      const el = document.querySelector(`[data-project-id="${selectedId}"]`);
-      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }, [selectedId]);
 
   if (loading) {
     return (
@@ -313,7 +216,7 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={() => refreshHook.start("scan")}>Retry</Button>
+        <Button onClick={() => handleRefresh("scan")}>Retry</Button>
       </div>
     );
   }
@@ -345,34 +248,76 @@ export default function DashboardPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => refreshHook.start("scan")}
+                    onClick={() => handleRefresh("scan")}
                   >
                     Scan
                   </Button>
                   {config.featureLlm && (
-                    <button
-                      type="button"
-                      className="relative inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm hover:from-amber-600 hover:to-orange-600 transition-all hover:shadow-md hover:shadow-orange-500/20 active:scale-[0.97]"
-                      onClick={() => refreshHook.start("enrich")}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
-                        <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
-                        <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
-                      </svg>
-                      Enrich with AI
-                    </button>
+                    <div className="relative" ref={enrichDropdownRef}>
+                      <div className="inline-flex items-center rounded-md shadow-sm">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-l-md bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97]"
+                          onClick={() => handleRefresh("enrich")}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+                            <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
+                            <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
+                          </svg>
+                          Enrich with AI
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center h-8 px-1.5 text-sm font-medium rounded-r-md border-l border-amber-600/30 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97]"
+                          onClick={() => setEnrichDropdownOpen((v) => !v)}
+                          aria-label="Enrich options"
+                          aria-haspopup="menu"
+                          aria-expanded={enrichDropdownOpen}
+                        >
+                          <ChevronDown className="size-3.5" />
+                        </button>
+                      </div>
+                      {enrichDropdownOpen && (
+                        <div role="menu" className="absolute right-0 mt-1 w-48 rounded-md border border-border bg-popover p-1 shadow-lg z-50">
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-accent transition-colors"
+                            onClick={() => {
+                              setEnrichDropdownOpen(false);
+                              handleRefresh("enrich", { force: true });
+                            }}
+                          >
+                            Force re-enrich all
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </>
               )}
+              <button
+                type="button"
+                className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Settings"
+              >
+                <Settings className="size-4" />
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <RefreshPanel state={refreshHook.state} onDismiss={refreshHook.dismiss} />
+        <RefreshPanel
+          state={refreshHook.state}
+          onDismiss={refreshHook.dismiss}
+          deltaSummary={deltaHook.deltas?.causeSummary}
+          projectDeltas={deltaHook.deltas?.projects}
+        />
 
-        <StatsBar projects={projects} />
+        <StatsBar projects={projects} filteredCount={filtered.length} deltas={deltaHook.deltas} />
 
         {/* Filter tabs + Sort + Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -383,6 +328,9 @@ export default function DashboardPage() {
             <TabsList>
               <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
               <TabsTrigger value="active">Active ({tabCounts.active})</TabsTrigger>
+              {tabCounts.paused > 0 && (
+                <TabsTrigger value="paused">Paused ({tabCounts.paused})</TabsTrigger>
+              )}
               <TabsTrigger value="needs-attention">Needs Attention ({tabCounts["needs-attention"]})</TabsTrigger>
               <TabsTrigger value="stale">Stale ({tabCounts.stale})</TabsTrigger>
               <TabsTrigger value="archived">Archived ({tabCounts.archived})</TabsTrigger>
@@ -403,8 +351,7 @@ export default function DashboardPage() {
             </select>
 
             <Input
-              ref={searchRef}
-              placeholder="Search projects... (/)"
+              placeholder="Search projects..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 w-full sm:w-64"
@@ -432,6 +379,7 @@ export default function DashboardPage() {
                   onTogglePin={handleTogglePin}
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
+                  deltas={deltaHook.deltas}
                 />
               </div>
             )}
@@ -449,6 +397,7 @@ export default function DashboardPage() {
                   onTogglePin={handleTogglePin}
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
+                  deltas={deltaHook.deltas}
                 />
               </div>
             )}
@@ -465,6 +414,14 @@ export default function DashboardPage() {
         onTouch={handleTouch}
         featureO1={config.featureO1}
         sanitizePaths={config.sanitizePaths}
+        delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
+      />
+
+      <SettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        config={config}
+        onSaved={refetch}
       />
     </div>
   );

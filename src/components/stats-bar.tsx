@@ -1,28 +1,31 @@
 "use client";
 
 import type { Project } from "@/lib/types";
+import type { DashboardDeltas } from "@/hooks/use-refresh-deltas";
+import { evaluateAttention } from "@/lib/attention";
 
 interface StatsBarProps {
   projects: Project[];
+  filteredCount?: number;
+  deltas?: DashboardDeltas | null;
 }
 
-export function StatsBar({ projects }: StatsBarProps) {
+export function StatsBar({ projects, filteredCount, deltas }: StatsBarProps) {
   const total = projects.length;
+  const isFiltered = filteredCount != null && filteredCount !== total;
   const dirty = projects.filter((p) => p.isDirty).length;
   const unpushed = projects.filter((p) => p.ahead > 0).length;
-  const needsAttention = projects.filter((p) => {
-    const di = p.scan?.daysInactive ?? 0;
-    return p.healthScore < 40 || (di > 30 && !p.nextAction) || (p.isDirty && di > 7);
-  }).length;
+  const needsAttention = projects.filter((p) => evaluateAttention(p).needsAttention).length;
   const avgHealth =
     total > 0 ? Math.round(projects.reduce((s, p) => s + p.healthScore, 0) / total) : 0;
 
-  const stats = [
-    { label: "Total", value: total },
-    { label: "Dirty", value: dirty, accent: dirty > 0 },
-    { label: "Unpushed", value: unpushed, accent: unpushed > 0 },
-    { label: "Needs Attention", value: needsAttention, accent: needsAttention > 0 },
-    { label: "Avg Health", value: `${avgHealth}/100` },
+  // increaseGood: true = increase is good (green ↑), false = bad (red ↑), null = neutral
+  const stats: Array<{ label: string; value: string | number; accent?: boolean; delta?: number; increaseGood: boolean | null }> = [
+    { label: "Total", value: isFiltered ? `${filteredCount} / ${total}` : total, delta: deltas?.totalCount, increaseGood: null },
+    { label: "Dirty", value: dirty, accent: dirty > 0, delta: deltas?.dirtyCount, increaseGood: false },
+    { label: "Unpushed", value: unpushed, accent: unpushed > 0, delta: deltas?.unpushedCount, increaseGood: false },
+    { label: "Needs Attention", value: needsAttention, accent: needsAttention > 0, delta: deltas?.needsAttention, increaseGood: false },
+    { label: "Avg Health", value: `${avgHealth}/100`, delta: deltas?.avgHealth, increaseGood: true },
   ];
 
   return (
@@ -36,6 +39,17 @@ export function StatsBar({ projects }: StatsBarProps) {
             "accent" in s && s.accent ? "text-amber-600 dark:text-amber-400" : "text-foreground"
           }`}>
             {s.value}
+            {s.delta != null && s.delta !== 0 && (
+              <span className={`text-[10px] font-medium ml-1 ${
+                s.increaseGood === null
+                  ? "text-muted-foreground"
+                  : (s.delta > 0) === s.increaseGood
+                    ? "text-emerald-600"
+                    : "text-red-500"
+              }`}>
+                {s.delta > 0 ? `↑${s.delta}` : `↓${Math.abs(s.delta)}`}
+              </span>
+            )}
           </div>
           <div className="text-xs text-muted-foreground">{s.label}</div>
         </div>

@@ -1,5 +1,6 @@
 import path from "path";
 import os from "os";
+import { getSettings } from "./settings";
 
 function expandHome(p: string): string {
   if (p.startsWith("~/")) {
@@ -14,45 +15,83 @@ function envBool(key: string, fallback: boolean): boolean {
   return v === "true" || v === "1";
 }
 
+/** Resolve: settings.json > env > default */
+function settingBool(settingsKey: keyof ReturnType<typeof getSettings>, envKey: string, fallback: boolean): boolean {
+  const s = getSettings()[settingsKey];
+  if (typeof s === "boolean") return s;
+  return envBool(envKey, fallback);
+}
+
+function settingStr(settingsKey: keyof ReturnType<typeof getSettings>, envKey: string, fallback: string): string {
+  const s = getSettings()[settingsKey];
+  if (typeof s === "string" && s) return s;
+  return process.env[envKey] || fallback;
+}
+
 export const config = {
   get devRoot(): string {
-    return expandHome(process.env.DEV_ROOT || "~/dev");
+    return expandHome(settingStr("devRoot", "DEV_ROOT", "~/dev"));
   },
   get excludeDirs(): string[] {
-    const raw = process.env.EXCLUDE_DIRS || "_projects_dashboard,node_modules,.venv,__pycache__,.git";
+    const raw = settingStr("excludeDirs", "EXCLUDE_DIRS", "_projects_dashboard,node_modules,.venv,__pycache__,.git");
     return raw.split(",").map((s) => s.trim());
   },
   get featureLlm(): boolean {
-    return envBool("FEATURE_LLM", false);
+    return settingBool("featureLlm", "FEATURE_LLM", false);
   },
   get featureO1(): boolean {
-    return envBool("FEATURE_O1", false);
+    return settingBool("featureO1", "FEATURE_O1", false);
   },
   get llmProvider(): string {
-    return process.env.LLM_PROVIDER || "claude-cli";
+    return settingStr("llmProvider", "LLM_PROVIDER", "claude-cli");
   },
   get llmAllowUnsafe(): boolean {
-    return envBool("LLM_ALLOW_UNSAFE", false);
+    return settingBool("llmAllowUnsafe", "LLM_ALLOW_UNSAFE", false);
   },
   get sanitizePaths(): boolean {
-    return envBool("SANITIZE_PATHS", true);
+    return settingBool("sanitizePaths", "SANITIZE_PATHS", true);
   },
   get claudeCliModel(): string | undefined {
+    const s = getSettings().claudeCliModel;
+    if (s) return s;
     return process.env.CLAUDE_CLI_MODEL || undefined;
   },
   get llmDebug(): boolean {
-    return envBool("LLM_DEBUG", false);
+    return settingBool("llmDebug", "LLM_DEBUG", false);
   },
   get llmOverwriteMetadata(): boolean {
-    return envBool("LLM_OVERWRITE_METADATA", false);
+    return settingBool("llmOverwriteMetadata", "LLM_OVERWRITE_METADATA", false);
   },
   get llmForce(): boolean {
     return envBool("LLM_FORCE", false);
   },
   get llmConcurrency(): number {
+    const s = getSettings().llmConcurrency;
+    if (typeof s === "number" && s > 0) return s;
     const v = process.env.LLM_CONCURRENCY;
     if (v === undefined) return 3;
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n > 0 ? n : 3;
+  },
+  // Provider-specific settings
+  get openrouterApiKey(): string | undefined {
+    const s = getSettings().openrouterApiKey;
+    if (s) return s;
+    return process.env.OPENROUTER_API_KEY || undefined;
+  },
+  get openrouterModel(): string {
+    return settingStr("openrouterModel", "OPENROUTER_MODEL", "anthropic/claude-sonnet-4");
+  },
+  get ollamaUrl(): string {
+    return settingStr("ollamaUrl", "OLLAMA_URL", "http://localhost:11434");
+  },
+  get ollamaModel(): string {
+    return settingStr("ollamaModel", "OLLAMA_MODEL", "llama3");
+  },
+  get mlxUrl(): string {
+    return settingStr("mlxUrl", "MLX_URL", "http://localhost:8080");
+  },
+  get mlxModel(): string {
+    return settingStr("mlxModel", "MLX_MODEL", "default");
   },
 } as const;

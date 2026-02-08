@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { config } from "./config";
 import type { Project } from "@/generated/prisma/client";
+import type { AiInsight } from "./llm/provider";
 
 /**
  * Merged project view — the single shape the UI consumes.
@@ -14,6 +15,9 @@ export interface MergedProject {
   // Core fields (derived, overridable)
   status: string;
   healthScore: number;
+  hygieneScore: number;
+  momentumScore: number;
+  scoreBreakdown: Record<string, Record<string, number>>;
   purpose: string | null;
   tags: string[];
   notableFeatures: string[];
@@ -55,6 +59,9 @@ export interface MergedProject {
   // O-1 evidence (gated)
   evidence: Record<string, unknown> | null;
   outcomes: Record<string, unknown> | null;
+
+  // AI structured insight (gated behind featureO1)
+  aiInsight: AiInsight | null;
 
   // New Phase 29 fields
   pitch: string | null;
@@ -105,6 +112,21 @@ function parseJson<T>(json: string | null | undefined, fallback: T): T {
   }
 }
 
+const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
+
+function parseAiInsightJson(json: string | null | undefined): AiInsight | null {
+  if (!json) return null;
+  try {
+    const obj = JSON.parse(json);
+    if (!obj || typeof obj !== "object") return null;
+    if (typeof obj.score !== "number" || !VALID_CONFIDENCE.has(obj.confidence)) return null;
+    if (!Array.isArray(obj.reasons) || typeof obj.nextBestAction !== "string") return null;
+    return obj as AiInsight;
+  } catch {
+    return null;
+  }
+}
+
 function sanitizePath(pathDisplay: string): string {
   if (!config.sanitizePaths) return pathDisplay;
   // Replace home directory with ~
@@ -141,6 +163,9 @@ type ProjectWithRelations = Project & {
   derived: {
     statusAuto: string;
     healthScoreAuto: number;
+    hygieneScoreAuto: number;
+    momentumScoreAuto: number;
+    scoreBreakdownJson: string;
     derivedJson: string;
     isDirty: boolean;
     ahead: number;
@@ -156,6 +181,7 @@ type ProjectWithRelations = Project & {
     notableFeaturesJson: string | null;
     recommendationsJson: string | null;
     pitch: string | null;
+    aiInsightJson: string | null;
     generatedAt: Date;
   } | null;
   override: {
@@ -188,6 +214,9 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
     "archived";
 
   const healthScore = derived?.healthScoreAuto ?? 0;
+  const hygieneScore = derived?.hygieneScoreAuto ?? 0;
+  const momentumScore = derived?.momentumScoreAuto ?? 0;
+  const scoreBreakdown = parseJson<Record<string, Record<string, number>>>(derived?.scoreBreakdownJson, {});
 
   const purpose =
     override?.purposeOverride ??
@@ -211,6 +240,9 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
 
     status,
     healthScore,
+    hygieneScore,
+    momentumScore,
+    scoreBreakdown,
     purpose,
     tags,
     notableFeatures,
@@ -249,6 +281,7 @@ function buildMergedView(project: ProjectWithRelations): MergedProject {
 
     evidence: config.featureO1 ? parseJson(metadata?.evidenceJson, null) : null,
     outcomes: config.featureO1 ? parseJson(metadata?.outcomesJson, null) : null,
+    aiInsight: parseAiInsightJson(llm?.aiInsightJson),
 
     pitch: llm?.pitch ?? null,
     liveUrl: rawScan?.liveUrl ?? null,

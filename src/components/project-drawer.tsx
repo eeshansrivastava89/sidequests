@@ -13,6 +13,7 @@ import {
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
 import { healthColor, copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
 import { cn } from "@/lib/utils";
+import type { ProjectDelta } from "@/hooks/use-refresh-deltas";
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -43,14 +44,16 @@ function StatusSelect({
 function SectionBox({
   title,
   source,
+  highlight,
   children,
 }: {
   title: string;
   source?: { type: "scan" | "llm"; timestamp: string | null };
+  highlight?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-border rounded-lg p-4">
+    <div className={cn("border border-border rounded-lg p-4", highlight && "border-l-2 border-l-amber-400")}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
         {source && (
@@ -180,7 +183,7 @@ function buildTimeline(
   }
 
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  return entries.slice(0, 15);
+  return entries;
 }
 
 /* ── Drawer Props ──────────────────────────────────────── */
@@ -194,6 +197,7 @@ interface ProjectDrawerProps {
   onTouch: (id: string, tool: string) => void;
   featureO1?: boolean;
   sanitizePaths?: boolean;
+  delta?: ProjectDelta | null;
 }
 
 /* ── Main Drawer ───────────────────────────────────────── */
@@ -207,8 +211,15 @@ export function ProjectDrawer({
   onTouch,
   featureO1,
   sanitizePaths,
+  delta,
 }: ProjectDrawerProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [timelinePage, setTimelinePage] = useState(0);
+
+  // Reset timeline page when project changes
+  useEffect(() => {
+    setTimelinePage(0);
+  }, [project?.id]);
 
   useEffect(() => {
     if (!project?.id || !open) {
@@ -263,17 +274,24 @@ export function ProjectDrawer({
 
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
 
-          {/* Line 3: Status/badges LEFT + Quick actions RIGHT */}
+          {/* Line 3: Status/scores LEFT + Quick actions RIGHT */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <StatusSelect
                 value={project.status}
                 onSave={(v) => onUpdateOverride(project.id, { statusOverride: v })}
               />
-              <span className={cn("text-xl font-bold tabular-nums", healthColor(project.healthScore))}>
-                {project.healthScore}
-              </span>
-              <span className="text-xs text-muted-foreground">/100</span>
+              <div className="flex items-center gap-1.5" title={`Hygiene ${project.hygieneScore} / Momentum ${project.momentumScore}`}>
+                <span className={cn("text-sm font-bold tabular-nums", healthColor(project.hygieneScore))}>
+                  {project.hygieneScore}
+                </span>
+                <span className="text-[10px] text-muted-foreground">hyg</span>
+                <span className="text-muted-foreground/40">/</span>
+                <span className={cn("text-sm font-bold tabular-nums", healthColor(project.momentumScore))}>
+                  {project.momentumScore}
+                </span>
+                <span className="text-[10px] text-muted-foreground">mom</span>
+              </div>
               {project.isDirty && (
                 <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
                   dirty
@@ -292,11 +310,6 @@ export function ProjectDrawer({
               {branchName && (
                 <Badge variant="outline" className="text-[10px] font-mono">
                   {branchName}
-                </Badge>
-              )}
-              {framework && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {framework}
                 </Badge>
               )}
             </div>
@@ -359,145 +372,97 @@ export function ProjectDrawer({
             </div>
           )}
 
-          {/* ── Section 1: Recommendations ── */}
+          {/* ── Section 1: Pitch ── */}
           <SectionBox
-            title="Recommendations"
+            title="Pitch"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
+            highlight={delta?.newlyEnriched}
           >
-            {project.recommendations.length > 0 ? (
-              <ul className="list-disc list-inside text-sm space-y-1">
-                {project.recommendations.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+            {project.pitch ? (
+              <p className="text-sm leading-relaxed">{project.pitch}</p>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate recommendations.
+                Run LLM enrichment to generate pitch.
               </p>
             )}
           </SectionBox>
 
-          {/* ── Section 2: Timeline ── */}
-          <SectionBox title="Timeline">
-            {timeline.length > 0 ? (
-              <div className="space-y-1">
-                {timeline.map((entry) => (
-                  <div key={entry.key} className="flex items-center gap-2 text-sm py-0.5">
-                    <span
-                      className={cn(
-                        "text-[10px] font-medium rounded px-1.5 py-0.5 shrink-0",
-                        TIMELINE_BADGE_CLASSES[entry.type] ?? "bg-zinc-100 text-zinc-600"
-                      )}
-                    >
-                      {entry.type}
-                    </span>
-                    <span className="text-foreground/80 truncate">{entry.description}</span>
-                    <span className="text-muted-foreground shrink-0 ml-auto tabular-nums text-xs">
-                      {formatRelativeDate(entry.date)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">No activity yet.</p>
-            )}
-          </SectionBox>
-
-          {/* ── Section 3: Details ── */}
+          {/* ── Section 2: Details (compressed) ── */}
           <SectionBox
             title="Details"
             source={{ type: "scan", timestamp: project.lastScanned }}
           >
             <div className="space-y-3">
-              {framework && (
+              {/* 4-column grid: Framework, Languages, Services, LOC */}
+              <div className="grid grid-cols-4 gap-3">
                 <div>
-                  <span className="text-xs text-muted-foreground">Frameworks</span>
-                  <p className="text-sm">{framework}</p>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Framework</span>
+                  <p className="text-sm mt-0.5">{framework ?? "\u2014"}</p>
                 </div>
-              )}
-
-              {scan?.languages?.detected && scan.languages.detected.length > 0 && (
                 <div>
-                  <span className="text-xs text-muted-foreground">Languages</span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {scan.languages.detected.map((lang) => (
-                      <Badge key={lang} variant="secondary" className="text-[10px]">
-                        {lang}
-                      </Badge>
-                    ))}
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Languages</span>
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {scan?.languages?.detected?.length ? scan.languages.detected.map((lang) => (
+                      <Badge key={lang} variant="secondary" className="text-[9px] px-1 py-0">{lang}</Badge>
+                    )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
                   </div>
                 </div>
-              )}
-
-              {services && (
                 <div>
-                  <span className="text-xs text-muted-foreground">Services</span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {services.map((svc) => (
-                      <Badge key={svc} variant="secondary" className="text-[10px]">
-                        {svc}
-                      </Badge>
-                    ))}
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Services</span>
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {services ? services.map((svc) => (
+                      <Badge key={svc} variant="secondary" className="text-[9px] px-1 py-0">{svc}</Badge>
+                    )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
                   </div>
                 </div>
-              )}
-
-              {scan?.cicd && Object.values(scan.cicd).some(Boolean) && (
                 <div>
-                  <span className="text-xs text-muted-foreground">CI/CD</span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {Object.entries(scan.cicd)
-                      .filter(([, v]) => v)
-                      .map(([k]) => (
-                        <Badge key={k} variant="outline" className="text-[10px]">
-                          {k}
-                        </Badge>
-                      ))}
-                  </div>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">LOC</span>
+                  <p className="text-sm font-mono tabular-nums mt-0.5">{loc != null ? loc.toLocaleString() : "\u2014"}</p>
                 </div>
-              )}
+              </div>
 
-              {scan?.deployment && Object.values(scan.deployment).some(Boolean) && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Deploy</span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {Object.entries(scan.deployment)
-                      .filter(([, v]) => v)
-                      .map(([k]) => (
-                        <Badge key={k} variant="outline" className="text-[10px]">
-                          {k}
-                        </Badge>
-                      ))}
-                  </div>
+              {/* CI/CD + Deploy + Live URL in a row if present */}
+              {(scan?.cicd && Object.values(scan.cicd).some(Boolean)) ||
+               (scan?.deployment && Object.values(scan.deployment).some(Boolean)) ||
+               project.liveUrl ? (
+                <div className="flex flex-wrap gap-3">
+                  {scan?.cicd && Object.values(scan.cicd).some(Boolean) && (
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CI/CD</span>
+                      <div className="flex flex-wrap gap-0.5 mt-0.5">
+                        {Object.entries(scan.cicd).filter(([, v]) => v).map(([k]) => (
+                          <Badge key={k} variant="outline" className="text-[9px] px-1 py-0">{k}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {scan?.deployment && Object.values(scan.deployment).some(Boolean) && (
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Deploy</span>
+                      <div className="flex flex-wrap gap-0.5 mt-0.5">
+                        {Object.entries(scan.deployment).filter(([, v]) => v).map(([k]) => (
+                          <Badge key={k} variant="outline" className="text-[9px] px-1 py-0">{k}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {project.liveUrl && (
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Live</span>
+                      <p className="text-sm mt-0.5">
+                        <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
+                          {project.liveUrl}
+                        </a>
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : null}
 
-              {project.liveUrl && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Live URL</span>
-                  <p className="text-sm">
-                    <a
-                      href={project.liveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      {project.liveUrl}
-                    </a>
-                  </p>
-                </div>
-              )}
-
-              {loc != null && (
-                <div>
-                  <span className="text-xs text-muted-foreground">Lines of Code</span>
-                  <p className="text-sm font-mono tabular-nums">{loc.toLocaleString()}</p>
-                </div>
-              )}
-
+              {/* Features */}
               {project.notableFeatures.length > 0 && (
                 <div>
-                  <span className="text-xs text-muted-foreground">Features</span>
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Features</span>
                   <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
                     {project.notableFeatures.map((f, i) => (
                       <li key={i}>{f}</li>
@@ -514,23 +479,157 @@ export function ProjectDrawer({
             </div>
           </SectionBox>
 
-          {/* ── Section 4: Pitch ── */}
+          {/* ── Section 3: Timeline ── */}
+          <SectionBox title="Timeline">
+            {timeline.length > 0 ? (() => {
+              const ITEMS_PER_PAGE = 10;
+              const totalPages = Math.ceil(timeline.length / ITEMS_PER_PAGE);
+              const pageItems = timeline.slice(timelinePage * ITEMS_PER_PAGE, (timelinePage + 1) * ITEMS_PER_PAGE);
+
+              return (
+                <>
+                  <div className="space-y-1">
+                    {pageItems.map((entry) => (
+                      <div key={entry.key} className="flex items-center gap-2 text-sm py-0.5">
+                        <span
+                          className={cn(
+                            "text-[10px] font-medium rounded px-1.5 py-0.5 shrink-0",
+                            TIMELINE_BADGE_CLASSES[entry.type] ?? "bg-zinc-100 text-zinc-600"
+                          )}
+                        >
+                          {entry.type}
+                        </span>
+                        <span className="text-foreground/80 truncate">{entry.description}</span>
+                        <span className="text-muted-foreground shrink-0 ml-auto tabular-nums text-xs">
+                          {formatRelativeDate(entry.date)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1 mt-3">
+                      <button
+                        type="button"
+                        className="text-xs px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        disabled={timelinePage === 0}
+                        onClick={() => setTimelinePage((p) => p - 1)}
+                      >
+                        &lt;
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className={cn(
+                            "text-xs px-1.5 py-0.5 rounded",
+                            i === timelinePage
+                              ? "bg-foreground text-background font-semibold"
+                              : "text-muted-foreground hover:bg-muted"
+                          )}
+                          onClick={() => setTimelinePage(i)}
+                        >
+                          {i + 1}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="text-xs px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
+                        disabled={timelinePage === totalPages - 1}
+                        onClick={() => setTimelinePage((p) => p + 1)}
+                      >
+                        &gt;
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })() : (
+              <p className="text-sm text-muted-foreground italic">No activity yet.</p>
+            )}
+          </SectionBox>
+
+          {/* ── Section 4: AI Insights + Recommendations (merged) ── */}
           <SectionBox
-            title="Pitch"
+            title="AI Insights"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
+            highlight={delta?.newlyEnriched}
           >
-            {project.pitch ? (
-              <p className="text-sm leading-relaxed">{project.pitch}</p>
+            {project.aiInsight ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-bold tabular-nums">{project.aiInsight.score}</span>
+                  <span className="text-xs text-muted-foreground">/100</span>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "text-[10px]",
+                      project.aiInsight.confidence === "high" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+                      project.aiInsight.confidence === "medium" && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+                      project.aiInsight.confidence === "low" && "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+                    )}
+                  >
+                    {project.aiInsight.confidence} confidence
+                  </Badge>
+                </div>
+
+                {project.aiInsight.reasons.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Reasons</span>
+                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
+                      {project.aiInsight.reasons.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {project.aiInsight.risks.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Risks</span>
+                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
+                      {project.aiInsight.risks.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="rounded-md bg-muted p-2.5">
+                  <span className="text-xs font-medium text-muted-foreground">Next Best Action</span>
+                  <p className="text-sm font-medium mt-0.5">{project.aiInsight.nextBestAction}</p>
+                </div>
+              </div>
+            ) : project.recommendations.length > 0 ? (
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
+                <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
+                  {project.recommendations.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate pitch.
+                Run LLM enrichment to generate insights.
               </p>
+            )}
+
+            {/* Show recommendations below AI insight when both exist */}
+            {project.aiInsight && project.recommendations.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
+                <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
+                  {project.recommendations.map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </SectionBox>
 
           {/* ── Section 5: O-1 Evidence ── */}
           {featureO1 && (
-            <SectionBox title="O-1 Evidence" source={{ type: "llm", timestamp: project.llmGeneratedAt }}>
+            <SectionBox title="O-1 Evidence" source={{ type: "llm", timestamp: project.llmGeneratedAt }} highlight={delta?.newlyEnriched}>
               <div className="space-y-3">
                 <div>
                   <span className="text-xs font-medium text-muted-foreground">Evidence</span>

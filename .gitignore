@@ -43,6 +43,12 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# settings (user-specific, template is settings.example.json)
+settings.json
+
+# python
+__pycache__/
+
 # database
 *.db
 *.db-journal
