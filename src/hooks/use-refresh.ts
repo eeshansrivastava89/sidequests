@@ -49,7 +49,7 @@ export function useRefresh(onComplete: () => void) {
   const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
-  const start = useCallback((mode: RefreshMode = "enrich", opts?: { force?: boolean }) => {
+  const start = useCallback((mode: RefreshMode = "enrich") => {
     if (state.active) return;
 
     const abort = new AbortController();
@@ -64,7 +64,7 @@ export function useRefresh(onComplete: () => void) {
       error: null,
     });
 
-    const eventSource = new EventSource(`/api/refresh/stream?mode=${mode}${opts?.force ? "&force=1" : ""}`);
+    const eventSource = new EventSource(`/api/refresh/stream?mode=${mode}`);
 
     eventSource.addEventListener("scan_start", () => {
       setState((s) => ({ ...s, phase: "Scanning filesystem..." }));

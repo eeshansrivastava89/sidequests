@@ -101,8 +101,6 @@ interface StoredProject {
   scanned: Record<string, unknown>;
   derived: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] } | undefined;
   path: string;
-  hashChanged: boolean;
-  hasExistingLlm: boolean;
 }
 
 function hashRawJson(rawJson: string): string {
@@ -156,7 +154,7 @@ async function runPython(script: string, args: string[], stdin?: string): Promis
 export async function runRefreshPipeline(
   emit: (event: PipelineEvent) => void = () => {},
   signal?: AbortSignal,
-  options?: { skipLlm?: boolean; forceLlm?: boolean }
+  options?: { skipLlm?: boolean }
 ): Promise<{ projectCount: number }> {
   const startTime = Date.now();
   let llmSucceeded = 0;
@@ -223,13 +221,6 @@ export async function runRefreshPipeline(
 
     const rawJson = JSON.stringify(scanned);
     const newHash = hashRawJson(rawJson);
-
-    // Load existing scan to compare hash
-    const existingScan = await db.scan.findUnique({
-      where: { projectId: project.id },
-      select: { rawJsonHash: true },
-    });
-    const hashChanged = existingScan?.rawJsonHash !== newHash;
 
     await db.scan.upsert({
       where: { projectId: project.id },
@@ -304,20 +295,12 @@ export async function runRefreshPipeline(
       detail: { status: derived?.statusAuto, healthScore: derived?.healthScoreAuto },
     });
 
-    // Check if an LLM record already exists for this project
-    const existingLlm = await db.llm.findUnique({
-      where: { projectId: project.id },
-      select: { id: true },
-    });
-
     storedProjects.push({
       projectId: project.id,
       name: scanned.name,
       scanned: scanned as Record<string, unknown>,
       derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto, hygieneScoreAuto: derived.hygieneScoreAuto, momentumScoreAuto: derived.momentumScoreAuto, tags: derived.tags } : undefined,
       path: scanned.path,
-      hashChanged,
-      hasExistingLlm: !!existingLlm,
     });
   }
 
@@ -325,26 +308,10 @@ export async function runRefreshPipeline(
   const llmProvider = options?.skipLlm ? null : getLlmProvider();
 
   if (llmProvider && !signal?.aborted) {
-    // Filter to projects that need LLM enrichment
-    const forceAll = config.llmForce || options?.forceLlm;
-    const llmCandidates = storedProjects.filter((sp) => {
-      if (!sp.derived) return false;
-      // Skip if hash unchanged AND LLM record already exists (unless LLM_FORCE=true)
-      if (!forceAll && !sp.hashChanged && sp.hasExistingLlm) return false;
-      return true;
-    });
-
-    const skippedCount = storedProjects.filter((sp) => sp.derived && !forceAll && !sp.hashChanged && sp.hasExistingLlm).length;
-    const noDerivedCount = storedProjects.filter((sp) => !sp.derived).length;
-    llmSkipped += skippedCount + noDerivedCount;
-
-    // Emit skipped events
-    for (const sp of storedProjects) {
-      if (!sp.derived) continue;
-      if (!forceAll && !sp.hashChanged && sp.hasExistingLlm) {
-        emit({ type: "project_complete", name: sp.name, step: "llm", detail: { skipped: "unchanged" } });
-      }
-    }
+    // All projects with derived data are LLM candidates
+    const llmCandidates = storedProjects.filter((sp) => sp.derived);
+    const noDerivedCount = storedProjects.length - llmCandidates.length;
+    llmSkipped += noDerivedCount;
 
     const concurrency = config.llmConcurrency;
 
@@ -470,9 +437,7 @@ export async function runRefreshPipeline(
   // 5. Log activity for each project
   for (const sp of storedProjects) {
     if (signal?.aborted) break;
-    const llmResult = !llmProvider
-      ? "skipped"
-      : (!sp.derived ? "skipped" : (!sp.hashChanged && sp.hasExistingLlm ? "skipped" : "attempted"));
+    const llmResult = !llmProvider ? "skipped" : (!sp.derived ? "skipped" : "attempted");
 
     await db.activity.create({
       data: {

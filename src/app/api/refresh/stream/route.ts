@@ -12,7 +12,6 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const mode = url.searchParams.get("mode") ?? "enrich";
   const skipLlm = mode === "scan";
-  const forceLlm = url.searchParams.get("force") === "1";
 
   // Wire client disconnect to abort signal
   request.signal.addEventListener("abort", () => abort.abort());
@@ -29,7 +28,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await runRefreshPipeline(emit, abort.signal, { skipLlm, forceLlm });
+        await runRefreshPipeline(emit, abort.signal, { skipLlm });
       } catch (err) {
         if (abort.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);

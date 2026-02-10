@@ -340,7 +340,7 @@ export function ProjectDrawer({
               </div>
               {project.isDirty && (
                 <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                  dirty
+                  uncommitted
                 </Badge>
               )}
               {project.ahead != null && project.ahead > 0 && (

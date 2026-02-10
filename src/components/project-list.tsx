@@ -72,7 +72,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         <div>Name</div>
         <div className="hidden sm:block">Lang</div>
         <div className="hidden md:block text-right" title="Structural: README, tests, CI, linter, license, lockfile, deploy, remote">Hygiene</div>
-        <div className="hidden md:block text-right" title="Operational: commit recency, dirty state, ahead/behind, stale branches">Momentum</div>
+        <div className="hidden md:block text-right" title="Operational: commit recency, uncommitted changes, ahead/behind, stale branches">Momentum</div>
         <div className="hidden sm:block text-right">Inactive</div>
         <div className="hidden lg:block text-right">LOC</div>
         <div className="hidden md:block">Last Commit</div>
@@ -187,6 +187,15 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               <span className={cn("font-semibold", healthColor(project.hygieneScore))}>
                 {project.hygieneScore}
               </span>
+              {(() => {
+                const d = deltas?.projects.get(project.id);
+                if (!d || d.hygieneScore === 0) return null;
+                return (
+                  <span className={`ml-1 text-[10px] ${d.hygieneScore > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {d.hygieneScore > 0 ? `+${d.hygieneScore}` : d.hygieneScore}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Momentum */}
@@ -194,6 +203,15 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               <span className={cn("font-semibold", healthColor(project.momentumScore))}>
                 {project.momentumScore}
               </span>
+              {(() => {
+                const d = deltas?.projects.get(project.id);
+                if (!d || d.momentumScore === 0) return null;
+                return (
+                  <span className={`ml-1 text-[10px] ${d.momentumScore > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                    {d.momentumScore > 0 ? `+${d.momentumScore}` : d.momentumScore}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Days inactive */}

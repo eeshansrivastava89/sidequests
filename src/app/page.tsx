@@ -15,7 +15,7 @@ import { MethodologyModal } from "@/components/methodology-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, ChevronDown, X, Moon, Sun } from "lucide-react";
+import { Settings, X, Moon, Sun } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 
@@ -129,8 +129,6 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [methodologyOpen, setMethodologyOpen] = useState(false);
-  const [enrichDropdownOpen, setEnrichDropdownOpen] = useState(false);
-  const enrichDropdownRef = useRef<HTMLDivElement>(null);
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
@@ -143,21 +141,10 @@ export default function DashboardPage() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Close enrich dropdown on outside click
-  useEffect(() => {
-    if (!enrichDropdownOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (enrichDropdownRef.current && !enrichDropdownRef.current.contains(e.target as Node)) {
-        setEnrichDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [enrichDropdownOpen]);
 
-  const handleRefresh = useCallback((mode: RefreshMode, opts?: { force?: boolean }) => {
+  const handleRefresh = useCallback((mode: RefreshMode) => {
     deltaHook.snapshot();
-    refreshHook.start(mode, opts);
+    refreshHook.start(mode);
   }, [deltaHook, refreshHook]);
 
   const handleSortChange = useCallback((key: SortKey) => {
@@ -261,46 +248,17 @@ export default function DashboardPage() {
                     Scan
                   </Button>
                   {config.featureLlm && (
-                    <div className="relative" ref={enrichDropdownRef}>
-                      <div className="inline-flex items-center rounded-md shadow-sm">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-l-md bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97]"
-                          onClick={() => handleRefresh("enrich")}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
-                            <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
-                            <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
-                          </svg>
-                          Enrich with AI
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center h-8 px-1.5 text-sm font-medium rounded-r-md border-l border-amber-600/30 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97]"
-                          onClick={() => setEnrichDropdownOpen((v) => !v)}
-                          aria-label="Enrich options"
-                          aria-haspopup="menu"
-                          aria-expanded={enrichDropdownOpen}
-                        >
-                          <ChevronDown className="size-3.5" />
-                        </button>
-                      </div>
-                      {enrichDropdownOpen && (
-                        <div role="menu" className="absolute right-0 mt-1 w-48 rounded-md border border-border bg-popover p-1 shadow-lg z-50">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-accent transition-colors"
-                            onClick={() => {
-                              setEnrichDropdownOpen(false);
-                              handleRefresh("enrich", { force: true });
-                            }}
-                          >
-                            Force re-enrich all
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97] shadow-sm"
+                      onClick={() => handleRefresh("enrich")}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
+                        <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
+                        <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
+                      </svg>
+                      Enrich with AI
+                    </button>
                   )}
                 </>
               )}

@@ -35,30 +35,55 @@ function scoreTransitions(delta: ProjectDelta): Array<{ label: string; className
   const badges: Array<{ label: string; className: string }> = [];
   const causes = delta.deltaCause;
 
-  // Hygiene score transition
+  // Hygiene score delta
   if (causes.includes("hygiene_up")) {
     badges.push({
-      label: `hyg ${delta.prevHygieneScore}\u2192${delta.curHygieneScore}`,
+      label: `hyg +${delta.hygieneScore}`,
       className: "text-emerald-600 dark:text-emerald-400",
     });
   } else if (causes.includes("hygiene_down")) {
     badges.push({
-      label: `hyg ${delta.prevHygieneScore}\u2192${delta.curHygieneScore}`,
+      label: `hyg ${delta.hygieneScore}`,
       className: "text-amber-600 dark:text-amber-400",
     });
   }
 
-  // Momentum score transition
+  // Momentum score delta
   if (causes.includes("momentum_up")) {
     badges.push({
-      label: `mom ${delta.prevMomentumScore}\u2192${delta.curMomentumScore}`,
+      label: `mom +${delta.momentumScore}`,
       className: "text-emerald-600 dark:text-emerald-400",
     });
   } else if (causes.includes("momentum_down")) {
     badges.push({
-      label: `mom ${delta.prevMomentumScore}\u2192${delta.curMomentumScore}`,
+      label: `mom ${delta.momentumScore}`,
       className: "text-amber-600 dark:text-amber-400",
     });
+  }
+
+  // Scan-changed badges (LOC, dirty toggle, days inactive)
+  if (causes.includes("scan_changed")) {
+    if (delta.locEstimate !== 0) {
+      const sign = delta.locEstimate > 0 ? "+" : "";
+      badges.push({
+        label: `LOC ${sign}${delta.locEstimate.toLocaleString()}`,
+        className: delta.locEstimate > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400",
+      });
+    }
+    if (delta.dirtyChanged) {
+      badges.push({
+        label: delta.curIsDirty ? "committed \u2192 uncommitted" : "uncommitted \u2192 committed",
+        className: delta.curIsDirty ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400",
+      });
+    }
+    if (delta.curDaysInactive !== delta.prevDaysInactive) {
+      const diff = delta.curDaysInactive - delta.prevDaysInactive;
+      const sign = diff > 0 ? "+" : "";
+      badges.push({
+        label: `inactive ${sign}${diff}d`,
+        className: diff > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400",
+      });
+    }
   }
 
   // Enriched badge
@@ -207,11 +232,11 @@ export function RefreshPanel({ state, onDismiss, deltaSummary, projectDeltas }: 
       )}
 
       {/* Delta cause summary (shown after completion when delta data is available) */}
-      {isDone && deltaSummary && (deltaSummary.scoresChanged > 0 || deltaSummary.enriched > 0) && (
+      {isDone && deltaSummary && (deltaSummary.projectsChanged > 0 || deltaSummary.enriched > 0) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-1.5 text-xs border-b border-border bg-muted/20">
-          {deltaSummary.scoresChanged > 0 && (
+          {deltaSummary.projectsChanged > 0 && (
             <span className="text-amber-600 dark:text-amber-400">
-              {deltaSummary.scoresChanged} scores changed
+              {deltaSummary.projectsChanged} projects changed
               {deltaSummary.changedNames.length > 0 && (
                 <span className="text-muted-foreground font-normal">
                   {": "}{formatNameList(deltaSummary.changedNames)}

@@ -33,10 +33,17 @@ export interface ProjectDelta {
   prevMomentumScore: number;
   curHygieneScore: number;
   curMomentumScore: number;
+  /* Scan-level detail for refresh panel badges */
+  prevLocEstimate: number;
+  curLocEstimate: number;
+  dirtyChanged: boolean;
+  curIsDirty: boolean;
+  prevDaysInactive: number;
+  curDaysInactive: number;
 }
 
 export interface DeltaSummary {
-  scoresChanged: number;
+  projectsChanged: number;
   enriched: number;
   unchanged: number;
   changedNames: string[];
@@ -175,7 +182,7 @@ export function useRefreshDeltas(projects: Project[]) {
 
     // Per-project deltas + cause summary counters
     const projectDeltas = new Map<string, ProjectDelta>();
-    let scoresChanged = 0;
+    let projectsChanged = 0;
     let enriched = 0;
     let unchanged = 0;
     const changedNames: string[] = [];
@@ -202,8 +209,14 @@ export function useRefreshDeltas(projects: Project[]) {
           prevMomentumScore: 0,
           curHygieneScore: curSnap.hygieneScore,
           curMomentumScore: curSnap.momentumScore,
+          prevLocEstimate: 0,
+          curLocEstimate: curSnap.locEstimate,
+          dirtyChanged: false,
+          curIsDirty: curSnap.isDirty,
+          prevDaysInactive: 0,
+          curDaysInactive: curSnap.daysInactive,
         });
-        scoresChanged++;
+        projectsChanged++;
         changedNames.push(p.name);
         continue;
       }
@@ -244,6 +257,12 @@ export function useRefreshDeltas(projects: Project[]) {
         prevMomentumScore: old.momentumScore,
         curHygieneScore: curSnap.hygieneScore,
         curMomentumScore: curSnap.momentumScore,
+        prevLocEstimate: old.locEstimate,
+        curLocEstimate: curLoc,
+        dirtyChanged: curSnap.isDirty !== old.isDirty,
+        curIsDirty: curSnap.isDirty,
+        prevDaysInactive: old.daysInactive,
+        curDaysInactive: curSnap.daysInactive,
       });
 
       // Aggregate cause summary
@@ -254,7 +273,7 @@ export function useRefreshDeltas(projects: Project[]) {
         enriched++;
         enrichedNames.push(p.name);
       } else {
-        scoresChanged++;
+        projectsChanged++;
         changedNames.push(p.name);
       }
     }
@@ -266,7 +285,7 @@ export function useRefreshDeltas(projects: Project[]) {
       needsAttention: curAttention - snapAttention,
       avgHealth: curAvgHealth - snapAvgHealth,
       projects: projectDeltas,
-      causeSummary: { scoresChanged, enriched, unchanged, changedNames, enrichedNames },
+      causeSummary: { projectsChanged, enriched, unchanged, changedNames, enrichedNames },
     };
   }, [projects, snapState]);
 
