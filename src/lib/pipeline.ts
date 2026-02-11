@@ -35,7 +35,7 @@ interface DeriveOutput {
 }
 
 /** Validate scan.py output at the Python→TS boundary. */
-function validateScanOutput(data: unknown): ScanOutput {
+export function validateScanOutput(data: unknown): ScanOutput {
   if (!data || typeof data !== "object") {
     throw new Error("scan.py: output is not an object");
   }
@@ -59,7 +59,7 @@ function validateScanOutput(data: unknown): ScanOutput {
 }
 
 /** Validate derive.py output at the Python→TS boundary. */
-function validateDeriveOutput(data: unknown): DeriveOutput {
+export function validateDeriveOutput(data: unknown): DeriveOutput {
   if (!data || typeof data !== "object") {
     throw new Error("derive.py: output is not an object");
   }

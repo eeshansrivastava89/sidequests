@@ -62,7 +62,7 @@ export interface DashboardDeltas {
 
 /* ── Snapshot shape (only fields we diff) ──────────────── */
 
-interface ProjectSnapshot {
+export interface ProjectSnapshot {
   healthScore: number;
   hygieneScore: number;
   momentumScore: number;
@@ -78,7 +78,7 @@ interface ProjectSnapshot {
 
 /* ── Helpers ───────────────────────────────────────────── */
 
-function isNeedsAttention(p: { healthScore: number; isDirty: boolean; daysInactive: number; nextAction: string | null }): boolean {
+export function isNeedsAttention(p: { healthScore: number; isDirty: boolean; daysInactive: number; nextAction: string | null }): boolean {
   return (
     p.healthScore < 40 ||
     (p.daysInactive > 30 && !p.nextAction) ||
@@ -86,7 +86,7 @@ function isNeedsAttention(p: { healthScore: number; isDirty: boolean; daysInacti
   );
 }
 
-function snapProject(p: Project): ProjectSnapshot {
+export function snapProject(p: Project): ProjectSnapshot {
   return {
     healthScore: p.healthScore,
     hygieneScore: ((p as unknown as Record<string, unknown>).hygieneScore as number) ?? 0,
@@ -102,7 +102,7 @@ function snapProject(p: Project): ProjectSnapshot {
   };
 }
 
-function computeCauses(old: ProjectSnapshot, cur: ProjectSnapshot, newlyEnriched: boolean): DeltaCause[] {
+export function computeCauses(old: ProjectSnapshot, cur: ProjectSnapshot, newlyEnriched: boolean): DeltaCause[] {
   const causes: DeltaCause[] = [];
 
   // Health score changes

@@ -103,7 +103,7 @@ export interface RawScan {
   liveUrl: string | null;
 }
 
-function parseJson<T>(json: string | null | undefined, fallback: T): T {
+export function parseJson<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback;
   try {
     return JSON.parse(json) as T;
@@ -114,7 +114,7 @@ function parseJson<T>(json: string | null | undefined, fallback: T): T {
 
 const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
 
-function parseAiInsightJson(json: string | null | undefined): AiInsight | null {
+export function parseAiInsightJson(json: string | null | undefined): AiInsight | null {
   if (!json) return null;
   try {
     const obj = JSON.parse(json);
@@ -127,7 +127,7 @@ function parseAiInsightJson(json: string | null | undefined): AiInsight | null {
   }
 }
 
-function sanitizePath(pathDisplay: string): string {
+export function sanitizePath(pathDisplay: string): string {
   if (!config.sanitizePaths) return pathDisplay;
   // Replace home directory with ~
   const parts = pathDisplay.split("/");
@@ -158,7 +158,7 @@ export async function mergeAllProjects(): Promise<MergedProject[]> {
   return projects.map(buildMergedView);
 }
 
-type ProjectWithRelations = Project & {
+export type ProjectWithRelations = Project & {
   scan: { rawJson: string; scannedAt: Date } | null;
   derived: {
     statusAuto: string;
@@ -201,7 +201,7 @@ type ProjectWithRelations = Project & {
   } | null;
 };
 
-function buildMergedView(project: ProjectWithRelations): MergedProject {
+export function buildMergedView(project: ProjectWithRelations): MergedProject {
   const { scan, derived, llm, override, metadata } = project;
 
   const rawScan = parseJson<RawScan | null>(scan?.rawJson, null);
