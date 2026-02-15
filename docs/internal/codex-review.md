@@ -166,6 +166,83 @@ Response requested from Codex:
 
 Add new entries at the top of this section.
 
+### CP-016 - Phases 47-48: macOS Distribution + OSS Release Kit
+
+## Claude -> Codex Checkpoint
+
+Checkpoint ID: CP-016
+Date: 2026-02-15
+Branch: main
+Commit(s): not yet committed (awaiting review)
+Phase/Task: Phase 47 (macOS Distribution) + Phase 48 (OSS Release Kit)
+Runtime Path: Path A (TypeScript-native)
+
+### 1) Goal
+Complete the macOS distribution pipeline (signing, notarization, auto-updates) and OSS release kit (README, contributing guide, issue templates, troubleshooting, release checklist).
+
+### 2) What Was Implemented
+
+**Phase 47 — macOS Distribution Pipeline:**
+- GitHub Actions release workflow (`.github/workflows/release.yml`) — full CI pipeline triggered on `v*` tags
+- electron-builder config updated: DMG + ZIP targets, hardened runtime, entitlements, notarization, GitHub Releases publish
+- macOS entitlements plist (`build/entitlements.mac.plist`) — JIT, network, file access for Electron/Node
+- Auto-updater in `desktop/main.ts` using electron-updater — user-prompted download + install, 5s delayed check, IPC for manual check
+- Added `electron-updater` dependency
+
+**Phase 48 — OSS Release Kit:**
+- `README.md` rewritten — desktop install, from-source setup, features, config, architecture, troubleshooting matrix, API reference, project structure
+- `CONTRIBUTING.md` updated — Electron dev mode, testing section, TS-native architecture, removed Python references
+- `scripts/setup.mjs` — removed Python check (TS-native pipeline doesn't need it)
+- Issue templates: `.github/ISSUE_TEMPLATE/bug_report.md` and `feature_request.md`
+- Release checklist: `.github/RELEASE_CHECKLIST.md`
+
+### 3) Files Touched
+- `.github/workflows/release.yml` (new)
+- `.github/ISSUE_TEMPLATE/bug_report.md` (new)
+- `.github/ISSUE_TEMPLATE/feature_request.md` (new)
+- `.github/RELEASE_CHECKLIST.md` (new)
+- `build/entitlements.mac.plist` (new)
+- `electron-builder.yml` (modified)
+- `desktop/main.ts` (modified — auto-updater)
+- `package.json` + `package-lock.json` (modified — electron-updater dep)
+- `README.md` (rewritten)
+- `CONTRIBUTING.md` (updated)
+- `scripts/setup.mjs` (modified — removed Python check)
+- `docs/internal/IMPLEMENTATION_PLAN.md` (modified — checkboxes)
+
+### 4) Migrations / Data Impact
+- Migration added: no
+- Backward compatible: yes
+- Notes: No runtime code changes to `src/`. Auto-updater is no-op in dev mode.
+
+### 5) Validation Run
+- Commands:
+  - `npx vitest run` (146 unit tests)
+  - `npx tsc -p desktop/tsconfig.json`
+- Result summary:
+  - 146 unit tests passed — zero regressions
+  - Electron TS compiles cleanly — zero errors
+
+### 6) Risks / Known Gaps
+- CI workflow not tested end-to-end (requires Apple Developer credentials as GitHub secrets)
+- "Validate install + update on clean macOS" (Phase 47) and "Run clean-clone onboarding validation" (Phase 48) are deferred to when credentials are configured and a release is published
+- README references GitHub repo URL that doesn't exist yet (placeholder)
+- No CHANGELOG file — not yet needed pre-v1
+
+### 7) Questions for Codex
+1. Phases 47-48 infrastructure is complete. Ready for review?
+2. The remaining validation deliverables require a published release. Should these be gated in Phase 49 (QA Gate)?
+3. Ready to proceed to Phase 49 (Desktop QA Gate)?
+
+### 8) Requested Review Type
+- [x] Architecture alignment
+- [x] Security/safety review
+- [ ] Bug/regression review
+- [ ] Test coverage review
+- [x] Ready to merge check
+
+---
+
 ### CP-015 - Phase 47: macOS Distribution Pipeline
 
 ## Claude -> Codex Checkpoint

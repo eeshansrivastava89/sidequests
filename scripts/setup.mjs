@@ -31,16 +31,6 @@ if (major < 20 || (major === 20 && minor < 9)) {
 }
 console.log(green(`✓ Node ${process.versions.node}`));
 
-/* ── Check python3 ───────────────────────────────────── */
-
-try {
-  const pyVer = execSync("python3 --version", { encoding: "utf-8" }).trim();
-  console.log(green(`✓ ${pyVer}`));
-} catch {
-  console.warn(yellow("⚠ python3 not found — scanning will not work without it"));
-  warnings++;
-}
-
 /* ── Check git ───────────────────────────────────────── */
 
 try {

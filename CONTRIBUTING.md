@@ -14,15 +14,33 @@ Thank you for your interest in contributing! This guide will help you get starte
    ```bash
    npm run dev
    ```
-4. Open http://localhost:3000, go to Settings, set your Dev Root, and run a Scan.
+4. Open http://localhost:3000 — the onboarding wizard will guide you through initial configuration.
+
+### Electron Dev Mode
+
+```bash
+npm run electron:dev
+```
+
+This compiles the Electron TypeScript, starts Next.js dev server, and launches Electron.
 
 ## Development Workflow
 
 1. Create a branch from `main`
 2. Make your changes
-3. Ensure lint passes: `npm run lint`
-4. Ensure the build succeeds: `npm run build`
+3. Run tests: `npm test` and `npm run test:integration`
+4. Ensure lint passes: `npm run lint`
 5. Submit a pull request
+
+## Testing
+
+```bash
+npm test                    # 146 unit tests
+npm run test:integration    # 60 integration tests
+npm run test:watch          # watch mode
+```
+
+Tests use Vitest. Unit tests are in `src/**/__tests__/`. Integration tests use `vitest.integration.config.ts`.
 
 ## Code Style
 
@@ -30,24 +48,34 @@ Thank you for your interest in contributing! This guide will help you get starte
 - Lint with `npm run lint` (ESLint with Next.js config)
 - Use existing patterns in the codebase as reference
 - Prefer editing existing files over creating new ones
+- UI components use shadcn/ui patterns with Tailwind v4
 
 ## Project Structure
 
 ```
-src/app/          — Next.js App Router pages and API routes
-src/components/   — React components (shadcn/ui based)
-src/hooks/        — Custom React hooks
-src/lib/          — Utilities, config, database, LLM providers
-pipeline/         — Python scripts for scanning and deriving project data
-prisma/           — Database schema and migrations
+src/app/            Next.js App Router pages and API routes
+src/components/     React components (shadcn/ui based)
+src/hooks/          Custom React hooks
+src/lib/            Utilities, config, database, pipeline, LLM providers
+desktop/            Electron main process, preload, secrets
+prisma/             Database schema
+build/              Electron build resources (entitlements)
 ```
+
+## Key Architecture
+
+- **Pipeline:** TypeScript-native scan + derive (no Python dependency)
+- **Database:** Prisma 7 + SQLite with LibSQL adapter
+- **Merge model:** Override > Metadata > Derived > LLM > Scan
+- **Desktop:** Electron wraps Next.js standalone server; secrets use `safeStorage`
+- **Config:** Settings UI > settings.json > env vars > defaults
 
 ## Reporting Bugs
 
 Open an issue with:
 - Steps to reproduce
 - Expected vs actual behavior
-- Node.js version and OS
+- Node.js version, OS, and whether using desktop app or dev mode
 
 ## Suggesting Features
 

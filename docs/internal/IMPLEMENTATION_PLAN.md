@@ -228,9 +228,9 @@ What:
 - contributor and user launch readiness
 
 Deliverables:
-- [ ] Finalize README for desktop and dev workflows
-- [ ] Publish troubleshooting matrix and support boundaries
-- [ ] Add issue templates + release checklist
+- [x] Finalize README for desktop and dev workflows
+- [x] Publish troubleshooting matrix and support boundaries
+- [x] Add issue templates + release checklist
 - [ ] Run clean-clone onboarding validation
 
 Exit Criteria:
@@ -272,6 +272,7 @@ Deliverables:
 - [ ] Eliminate duplicate logic/config that violates DRY where safe to unify
 - [ ] Remove unused dependencies and scripts (with lockfile refresh)
 - [ ] Trim packaged artifact contents to runtime-essential files only
+- [ ] Add a privacy leak gate: verify no user-specific paths, local settings/db/env files, or secrets are tracked in git or bundled in release artifacts
 - [ ] Document intentional duplication that remains (if any) with rationale
 
 Exit Criteria:
