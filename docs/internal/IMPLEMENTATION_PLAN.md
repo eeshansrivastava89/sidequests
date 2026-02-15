@@ -247,6 +247,28 @@ Deliverables:
 Exit Criteria:
 - release candidate passes deterministic smoke suite
 
+## Phase 50 - De-Bloat + Simplification Gate (YAGNI/DRY)
+
+What:
+- run a final architecture hygiene pass to remove dead code, redundancy, and non-essential runtime/package artifacts before public release
+
+How:
+- prune replaced/legacy paths now superseded by selected runtime architecture
+- consolidate duplicate logic and config where a single source of truth is possible
+- remove unused dependencies and verify no behavior regressions
+
+Deliverables:
+- [ ] Remove dead code and stale fallback paths that are no longer used
+- [ ] Eliminate duplicate logic/config that violates DRY where safe to unify
+- [ ] Remove unused dependencies and scripts (with lockfile refresh)
+- [ ] Trim packaged artifact contents to runtime-essential files only
+- [ ] Document intentional duplication that remains (if any) with rationale
+
+Exit Criteria:
+- no known dead code paths in active runtime
+- no high-value duplicate logic left without explicit rationale
+- packaged app footprint and runtime file set are intentionally minimal
+
 ## Future Consideration (Not Scheduled): Tauri Evaluation
 
 - Keep as an unscheduled architecture option after Electron production learnings.
@@ -272,6 +294,7 @@ gantt
   Phase 48 OSS Release Kit         :p48, after p47, 7d
   section Hardening
   Phase 49 Desktop QA Gate         :p49, after p48, 10d
+  Phase 50 De-Bloat + Simplify Gate :p50, after p49, 5d
 ```
 
 ## Schedule Model
@@ -279,6 +302,7 @@ gantt
 - Aggressive track (if TS rewrite parity is achieved in Phase 42.5): ~6-8 weeks to notarized beta.
 - Conservative track (if Python sidecar fallback is chosen): ~8-10 weeks to notarized beta.
 - Timeline includes risk buffer for packaging, signing, and first-run UX defects.
+- Final public release gate includes Phase 50 simplification pass before broad launch.
 
 ## Acceptance Criteria (Current)
 
@@ -309,5 +333,6 @@ gantt
 - Checkpoint C: after Phase 44 (pipeline integration validated)
 - Checkpoint D: after Phase 47 (first notarized install)
 - Checkpoint E: after Phase 49 (desktop quality gate green)
+- Checkpoint F: after Phase 50 (de-bloat/simplification gate complete)
 
 At each checkpoint, run a user-path demo: `install/open/configure/scan/enrich` and capture regressions before advancing.

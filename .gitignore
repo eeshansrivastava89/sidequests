@@ -56,6 +56,10 @@ __pycache__/
 # internal docs (architecture, implementation plan, pitch, session context)
 /docs/internal/
 
+# electron
+/dist-electron/
+/dist/
+
 # claude code session files
 .claude/*.md
 .claude/projects/

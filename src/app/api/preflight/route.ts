@@ -35,8 +35,7 @@ async function checkUrl(name: string, url: string): Promise<PreflightCheck> {
 export async function GET() {
   const checks: PreflightCheck[] = [];
 
-  // Core dependencies
-  checks.push(checkBinary("python3", "python3"));
+  // Core dependencies (git only — pipeline is TS-native, no Python required)
   checks.push(checkBinary("git", "git"));
 
   // Provider-specific checks (only when LLM is enabled)

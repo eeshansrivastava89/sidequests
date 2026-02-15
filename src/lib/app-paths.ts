@@ -66,6 +66,9 @@ export const paths: AppPaths = {
   get isDesktopMode() { return resolve().isDesktopMode; },
 };
 
+// Pipeline dir resolution — legacy (Python scripts no longer used at runtime).
+// Kept for backward compatibility with tooling that may reference pipeline dir.
+// Never throws — returns best-effort path.
 function resolvePipelineDir(isDesktopMode: boolean, dataDir: string): string {
   if (process.env.PIPELINE_DIR) {
     return path.resolve(process.env.PIPELINE_DIR);
@@ -77,23 +80,18 @@ function resolvePipelineDir(isDesktopMode: boolean, dataDir: string): string {
     return dataDirPipeline; // cwd/pipeline — same as before
   }
 
-  // Desktop mode: prefer dataDir/pipeline if it exists (Phase 44 will copy scripts there),
-  // otherwise fall back to cwd/pipeline (where scripts live during development)
-  if (fs.existsSync(path.join(dataDirPipeline, "scan.py"))) {
+  // Desktop mode: prefer dataDir/pipeline if it exists, otherwise cwd/pipeline
+  if (fs.existsSync(dataDirPipeline)) {
     return dataDirPipeline;
   }
 
   const cwdPipeline = path.resolve(process.cwd(), "pipeline");
-  if (fs.existsSync(path.join(cwdPipeline, "scan.py"))) {
+  if (fs.existsSync(cwdPipeline)) {
     return cwdPipeline;
   }
 
-  throw new Error(
-    `Pipeline scripts not found. Searched:\n` +
-    `  1. ${dataDirPipeline}\n` +
-    `  2. ${cwdPipeline}\n` +
-    `Set PIPELINE_DIR to the directory containing scan.py and derive.py.`
-  );
+  // Fallback to dataDir/pipeline — won't throw, caller can check existence if needed
+  return dataDirPipeline;
 }
 
 export function resetPaths(): void {

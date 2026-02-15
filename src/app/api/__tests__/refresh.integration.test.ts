@@ -21,50 +21,19 @@ vi.mock("@/lib/settings", () => ({
   clearSettingsCache: () => {},
 }));
 
-// Mock child_process for pipeline
-const mockIO = vi.hoisted(() => ({
-  scanOutput: "",
-  deriveOutput: "",
+// Mock TS-native pipeline modules
+const mockPipeline = vi.hoisted(() => ({
+  scanResult: {} as Record<string, unknown>,
+  deriveResult: {} as Record<string, unknown>,
 }));
 
-vi.mock("child_process", () => {
-  const customPromisify = Symbol.for("nodejs.util.promisify.custom");
-  const execFile = () => {};
-  (execFile as unknown as Record<symbol, unknown>)[customPromisify] = async () => ({
-    stdout: mockIO.scanOutput,
-    stderr: "",
-  });
-  const spawn = () => {
-    const handlers: Record<string, Function[]> = {};
-    return {
-      stdin: {
-        write: () => {},
-        end: () => {
-          setTimeout(() => {
-            for (const fn of handlers["data"] ?? []) fn(Buffer.from(mockIO.deriveOutput));
-            for (const fn of handlers["close"] ?? []) fn(0);
-          }, 5);
-        },
-      },
-      stdout: {
-        on: (evt: string, fn: Function) => {
-          if (evt === "data") (handlers["data"] ??= []).push(fn);
-        },
-      },
-      stderr: {
-        on: (evt: string, fn: Function) => {
-          if (evt === "data") (handlers["stderr_data"] ??= []).push(fn);
-        },
-      },
-      on: (evt: string, fn: Function) => {
-        if (evt === "close") (handlers["close"] ??= []).push(fn);
-        if (evt === "error") (handlers["error"] ??= []).push(fn);
-      },
-      kill: () => {},
-    };
-  };
-  return { execFile, spawn };
-});
+vi.mock("@/lib/pipeline-native/scan", () => ({
+  scanAll: () => mockPipeline.scanResult,
+}));
+
+vi.mock("@/lib/pipeline-native/derive", () => ({
+  deriveAll: () => mockPipeline.deriveResult,
+}));
 
 vi.mock("@/lib/llm", () => ({
   getLlmProvider: () => {
@@ -88,8 +57,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   mockConfig.featureLlm = false;
-  mockIO.scanOutput = JSON.stringify(SCAN_FIXTURE);
-  mockIO.deriveOutput = JSON.stringify(DERIVE_FIXTURE);
+  mockPipeline.scanResult = SCAN_FIXTURE;
+  mockPipeline.deriveResult = DERIVE_FIXTURE;
   await cleanDb(db);
 });
 
@@ -103,7 +72,8 @@ describe("POST /api/refresh", () => {
   });
 
   it("catches pipeline errors → 500", async () => {
-    mockIO.scanOutput = "invalid json{{{";
+    // Make scanAll throw to simulate a pipeline failure
+    mockPipeline.scanResult = null as unknown as Record<string, unknown>;
 
     const res = await refreshPOST();
     const body = await res.json();

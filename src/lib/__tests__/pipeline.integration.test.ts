@@ -30,71 +30,19 @@ vi.mock("@/lib/settings", () => ({
   clearSettingsCache: () => {},
 }));
 
-// Hoisted mutable state for child_process mocks
-const mockIO = vi.hoisted(() => ({
-  scanOutput: "",
-  deriveOutput: "",
+// Hoisted mutable mock return values for TS-native pipeline modules
+const mockPipeline = vi.hoisted(() => ({
+  scanResult: {} as Record<string, unknown>,
+  deriveResult: {} as Record<string, unknown>,
 }));
 
-vi.mock("child_process", () => {
-  const customPromisify = Symbol.for("nodejs.util.promisify.custom");
+vi.mock("@/lib/pipeline-native/scan", () => ({
+  scanAll: () => mockPipeline.scanResult,
+}));
 
-  const execFile = (_cmd: string, _args: string[], _opts: unknown, cb?: Function) => {
-    if (cb) cb(null, mockIO.scanOutput, "");
-  };
-  // util.promisify uses this symbol to create the async version
-  (execFile as unknown as Record<symbol, unknown>)[customPromisify] = async () => ({
-    stdout: mockIO.scanOutput,
-    stderr: "",
-  });
-
-  const spawn = () => {
-    const handlers: Record<string, Function[]> = {};
-    const stdin = {
-      write: () => {},
-      end: () => {
-        setTimeout(() => {
-          for (const fn of handlers["data"] ?? []) fn(Buffer.from(mockIO.deriveOutput));
-          for (const fn of handlers["close"] ?? []) fn(0);
-        }, 5);
-      },
-    };
-    const stdout = {
-      on: (evt: string, fn: Function) => {
-        if (evt === "data") {
-          handlers["data"] = handlers["data"] ?? [];
-          handlers["data"].push(fn);
-        }
-      },
-    };
-    const stderr = {
-      on: (evt: string, fn: Function) => {
-        if (evt === "data") {
-          handlers["stderr_data"] = handlers["stderr_data"] ?? [];
-          handlers["stderr_data"].push(fn);
-        }
-      },
-    };
-    return {
-      stdin,
-      stdout,
-      stderr,
-      on: (evt: string, fn: Function) => {
-        if (evt === "close") {
-          handlers["close"] = handlers["close"] ?? [];
-          handlers["close"].push(fn);
-        }
-        if (evt === "error") {
-          handlers["error"] = handlers["error"] ?? [];
-          handlers["error"].push(fn);
-        }
-      },
-      kill: () => {},
-    };
-  };
-
-  return { execFile, spawn };
-});
+vi.mock("@/lib/pipeline-native/derive", () => ({
+  deriveAll: () => mockPipeline.deriveResult,
+}));
 
 // Mock LLM provider
 const mockEnrich = vi.fn().mockResolvedValue(LLM_ENRICHMENT_FIXTURE);
@@ -121,8 +69,8 @@ beforeAll(async () => {
 beforeEach(async () => {
   mockConfig.featureLlm = false;
   mockConfig.llmOverwriteMetadata = false;
-  mockIO.scanOutput = JSON.stringify(SCAN_FIXTURE);
-  mockIO.deriveOutput = JSON.stringify(DERIVE_FIXTURE);
+  mockPipeline.scanResult = SCAN_FIXTURE;
+  mockPipeline.deriveResult = DERIVE_FIXTURE;
   mockEnrich.mockClear();
   mockEnrich.mockResolvedValue(LLM_ENRICHMENT_FIXTURE);
   await cleanDb(db);
@@ -212,8 +160,8 @@ describe("pipeline integration — soft-prune", () => {
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     // Second run: only 2 projects (proj-b missing)
-    mockIO.scanOutput = JSON.stringify(SCAN_FIXTURE_REDUCED);
-    mockIO.deriveOutput = JSON.stringify(DERIVE_FIXTURE_REDUCED);
+    mockPipeline.scanResult = SCAN_FIXTURE_REDUCED;
+    mockPipeline.deriveResult = DERIVE_FIXTURE_REDUCED;
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const pruned = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });
@@ -225,16 +173,16 @@ describe("pipeline integration — soft-prune", () => {
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     // Second run: only 2 (prune proj-b)
-    mockIO.scanOutput = JSON.stringify(SCAN_FIXTURE_REDUCED);
-    mockIO.deriveOutput = JSON.stringify(DERIVE_FIXTURE_REDUCED);
+    mockPipeline.scanResult = SCAN_FIXTURE_REDUCED;
+    mockPipeline.deriveResult = DERIVE_FIXTURE_REDUCED;
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const pruned = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });
     expect(pruned.prunedAt).not.toBeNull();
 
     // Third run: all 3 again
-    mockIO.scanOutput = JSON.stringify(SCAN_FIXTURE);
-    mockIO.deriveOutput = JSON.stringify(DERIVE_FIXTURE);
+    mockPipeline.scanResult = SCAN_FIXTURE;
+    mockPipeline.deriveResult = DERIVE_FIXTURE;
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const restored = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });

@@ -84,11 +84,10 @@ describe("app-paths", () => {
       expect(paths.pipelineDir).toBe(path.resolve(process.cwd(), "pipeline"));
     });
 
-    it("prefers APP_DATA_DIR/pipeline when scan.py exists there", async () => {
+    it("prefers APP_DATA_DIR/pipeline when directory exists there", async () => {
       const testDir = "/tmp/pd-test-with-scripts";
       const pipeDir = path.join(testDir, "pipeline");
       fs.mkdirSync(pipeDir, { recursive: true });
-      fs.writeFileSync(path.join(pipeDir, "scan.py"), "# stub");
       try {
         process.env.APP_DATA_DIR = testDir;
         const { paths } = await loadFresh();
@@ -98,19 +97,17 @@ describe("app-paths", () => {
       }
     });
 
-    it("throws with remediation message when no pipeline scripts found anywhere", async () => {
-      // Point both APP_DATA_DIR and cwd override to empty dirs
+    it("falls back to dataDir/pipeline when no pipeline dir found anywhere", async () => {
       const emptyDir = "/tmp/pd-test-empty-pipeline";
       fs.mkdirSync(emptyDir, { recursive: true });
       process.env.APP_DATA_DIR = emptyDir;
-      // Override cwd to an empty temp dir so cwd/pipeline also doesn't exist
       const originalCwd = process.cwd;
       process.cwd = () => "/tmp/pd-test-nonexistent-cwd";
       try {
         const mod = await import("@/lib/app-paths");
         mod.resetPaths();
-        expect(() => mod.paths.pipelineDir).toThrow("Pipeline scripts not found");
-        expect(() => mod.paths.pipelineDir).toThrow("PIPELINE_DIR");
+        // No longer throws — returns best-effort path (dataDir/pipeline)
+        expect(mod.paths.pipelineDir).toBe(path.resolve(emptyDir, "pipeline"));
       } finally {
         process.cwd = originalCwd;
         fs.rmSync(emptyDir, { recursive: true, force: true });
