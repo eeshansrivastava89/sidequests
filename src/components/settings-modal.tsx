@@ -57,13 +57,35 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const isDesktop = typeof window !== "undefined" && !!window.electron?.secrets;
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Handle secret keys separately from regular settings
+      const { openrouterApiKey, ...nonSecretDraft } = draft;
+      const keyChanged = openrouterApiKey !== config.openrouterApiKey;
+
+      if (keyChanged && openrouterApiKey !== "***") {
+        if (isDesktop) {
+          // Desktop: persist via encrypted IPC
+          if (openrouterApiKey) {
+            await window.electron!.secrets.set("openrouterApiKey", openrouterApiKey);
+          } else {
+            await window.electron!.secrets.delete("openrouterApiKey");
+          }
+          toast.info("API key saved securely. Restart app for changes to take effect.");
+        } else {
+          // Non-desktop: env vars only — warn user
+          toast.warning("API key cannot be saved in web mode. Set OPENROUTER_API_KEY in .env.local instead.");
+        }
+      }
+
+      // Save non-secret settings via API
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(nonSecretDraft),
       });
       if (!res.ok) throw new Error("Save failed");
       toast.success("Settings saved");
@@ -211,12 +233,17 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
               {draft.llmProvider === "openrouter" && (
                 <>
-                  <Field label="API Key">
+                  <Field label="API Key" description={
+                    isDesktop
+                      ? "Stored securely in OS keychain"
+                      : "Set OPENROUTER_API_KEY in .env.local"
+                  }>
                     <Input
                       type="password"
                       value={draft.openrouterApiKey}
                       onChange={(e) => set("openrouterApiKey", e.target.value)}
                       placeholder="sk-or-..."
+                      disabled={!isDesktop && draft.openrouterApiKey === "***"}
                     />
                   </Field>
                   <Field label="Model">

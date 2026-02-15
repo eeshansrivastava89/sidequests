@@ -2,9 +2,13 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { ChildProcess, fork } from "child_process";
 import path from "path";
 import net from "net";
+import { decryptSecretsFile, setSecret, deleteSecret, hasSecret, migrateSettingsSecrets } from "./secrets";
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = "http://localhost:3000";
+
+// Allowlist of secret keys that can be managed via IPC
+const ALLOWED_SECRET_KEYS = new Set(["openrouterApiKey"]);
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
@@ -52,13 +56,16 @@ function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 async function startProductionServer(): Promise<string> {
   const port = await findFreePort();
   const serverPath = path.join(app.getAppPath(), ".next", "standalone", "server.js");
+  const userDataPath = app.getPath("userData");
+  const secrets = decryptSecretsFile(userDataPath);
 
   serverProcess = fork(serverPath, [], {
     env: {
       ...process.env,
+      ...secrets,
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
-      APP_DATA_DIR: app.getPath("userData"),
+      APP_DATA_DIR: userDataPath,
     },
     stdio: "pipe",
   });
@@ -119,9 +126,26 @@ function createWindow(url: string) {
 ipcMain.handle("app:getVersion", () => app.getVersion());
 ipcMain.handle("app:getDataDir", () => app.getPath("userData"));
 
+// IPC handlers for secret management (renderer → main → encrypted disk)
+ipcMain.handle("secrets:set", (_event, key: string, value: string) => {
+  if (!ALLOWED_SECRET_KEYS.has(key)) throw new Error(`Secret key not allowed: ${key}`);
+  setSecret(app.getPath("userData"), key, value);
+});
+ipcMain.handle("secrets:delete", (_event, key: string) => {
+  if (!ALLOWED_SECRET_KEYS.has(key)) throw new Error(`Secret key not allowed: ${key}`);
+  deleteSecret(app.getPath("userData"), key);
+});
+ipcMain.handle("secrets:has", (_event, key: string) => {
+  if (!ALLOWED_SECRET_KEYS.has(key)) return false;
+  return hasSecret(app.getPath("userData"), key);
+});
+
 app.whenReady().then(async () => {
   // Set APP_DATA_DIR for the main process (used by app-paths.ts if imported here)
   process.env.APP_DATA_DIR = app.getPath("userData");
+
+  // Migrate plaintext secrets from settings.json to encrypted storage
+  migrateSettingsSecrets(app.getPath("userData"));
 
   let url: string;
   if (isDev) {

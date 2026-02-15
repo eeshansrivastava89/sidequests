@@ -2,11 +2,12 @@
 
 This plan is the execution map from current local-web architecture to a standalone macOS desktop app that is open-source friendly and easy to onboard.
 
-## Status (2026-02-14)
+## Status (2026-02-15)
 
 - [Completed] Historical delivery (Phases 0-40): completed
 - [Completed] Test expansion delivered (unit + integration + pipeline checks)
-- [In Progress] Current focus: Phase 42.5 decision gate (pipeline runtime path) + desktop packaging runway
+- [Completed] Phases 42-44: Runtime boundaries, TS pipeline rewrite, Electron shell, pipeline integration
+- [In Progress] Current focus: Phase 45 secrets + safety hardening (complete), Phase 46 next
 - [Goal] Goal: `download -> configure -> run` on macOS with minimal friction
 
 ```mermaid
@@ -130,10 +131,10 @@ How:
 - secure IPC for only required actions
 
 Deliverables:
-- [ ] Create `desktop/main` app lifecycle bootstrap
-- [ ] Create `desktop/preload` with minimal secure IPC surface
-- [ ] Run dashboard UI + API from packaged shell locally
-- [ ] Document startup/shutdown behavior and failure paths
+- [x] Create `desktop/main` app lifecycle bootstrap
+- [x] Create `desktop/preload` with minimal secure IPC surface
+- [x] Run dashboard UI + API from packaged shell locally
+- [x] Document startup/shutdown behavior and failure paths
 
 Exit Criteria:
 - user can run packaged app without terminal
@@ -148,10 +149,10 @@ How:
 - Validate parity against fixtures and live baselines
 
 Deliverables:
-- [ ] Integrate TS scan/derive into pipeline.ts refresh flow
-- [ ] Ensure runtime works on clean macOS without Python installed
-- [ ] Pass parity fixture tests against baseline outputs
-- [ ] Validate integration with preflight and refresh flow
+- [x] Integrate TS scan/derive into pipeline.ts refresh flow
+- [x] Ensure runtime works on clean macOS without Python installed
+- [x] Pass parity fixture tests against baseline outputs
+- [x] Validate integration with preflight and refresh flow
 
 Exit Criteria:
 - preflight is green for pipeline runtime on fresh machine
@@ -160,14 +161,22 @@ Exit Criteria:
 ## Phase 45 - Secrets + Safety Hardening
 
 What:
-- move provider secrets to OS-secure storage
-- tighten unsafe-provider controls and messaging
+- move provider secrets to OS-secure storage via Electron `safeStorage` API
+- strip secrets from plaintext settings persistence
+- migrate existing plaintext secrets on first desktop launch
+
+How:
+- `desktop/secrets.ts` — encrypt/decrypt using `safeStorage`, migration from settings.json
+- Main process decrypts secrets and injects as env vars to forked server
+- IPC bridge for renderer to set/delete/check secrets
+- `writeSettings()` strips secret keys, API route skips persisting them
 
 Deliverables:
-- [ ] Store provider secrets in OS-secure storage
-- [ ] Ensure plaintext key leakage is removed from persisted settings
-- [ ] Align safety messaging in UI/docs with actual behavior
-- [ ] Add tests for secure read/write and migration behavior
+- [x] Store provider secrets in OS-secure storage (`safeStorage` + `secrets.enc`)
+- [x] Ensure plaintext key leakage is removed from persisted settings
+- [x] IPC bridge for secret management (set/delete/has) from renderer
+- [x] Auto-migration of plaintext secrets from settings.json on desktop startup
+- [x] Add tests for secure read/write and migration behavior (11 new tests)
 
 Exit Criteria:
 - secret at-rest posture documented and verified

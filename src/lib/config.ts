@@ -72,8 +72,8 @@ export const config = {
   },
   // Provider-specific settings
   get openrouterApiKey(): string | undefined {
-    const s = getSettings().openrouterApiKey;
-    if (s) return s;
+    // Desktop: main process injects decrypted secret as env var
+    // Dev/web: comes from .env.local
     return process.env.OPENROUTER_API_KEY || undefined;
   },
   get openrouterModel(): string {

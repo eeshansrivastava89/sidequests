@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
-import { type AppSettings, getSettings, writeSettings, clearSettingsCache } from "@/lib/settings";
+import { type AppSettings, getSettings, writeSettings, clearSettingsCache, SECRET_KEYS } from "@/lib/settings";
+import { paths } from "@/lib/app-paths";
 
 /** GET — returns all effective config (settings.json > env > defaults). Masks API keys. */
 export async function GET() {
@@ -16,12 +17,14 @@ export async function GET() {
     llmAllowUnsafe: config.llmAllowUnsafe,
     llmDebug: config.llmDebug,
     claudeCliModel: config.claudeCliModel ?? "",
+    // Mask secret: show "***" if present (via env var), empty string if not
     openrouterApiKey: config.openrouterApiKey ? "***" : "",
     openrouterModel: config.openrouterModel,
     ollamaUrl: config.ollamaUrl,
     ollamaModel: config.ollamaModel,
     mlxUrl: config.mlxUrl,
     mlxModel: config.mlxModel,
+    isDesktopMode: paths.isDesktopMode,
   });
 }
 
@@ -36,13 +39,14 @@ const STR_KEYS: (keyof AppSettings)[] = [
 ];
 const NUM_KEYS: (keyof AppSettings)[] = ["llmConcurrency"];
 
-/** PUT — merge incoming fields into settings.json. */
+/** PUT — merge incoming fields into settings.json. Secrets are NOT persisted here. */
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
     clearSettingsCache();
     const current = getSettings();
     const updated: AppSettings = { ...current };
+    const secretsSkipped: string[] = [];
 
     for (const key of BOOL_KEYS) {
       if (key in body && typeof body[key] === "boolean") {
@@ -51,8 +55,17 @@ export async function PUT(req: Request) {
     }
     for (const key of STR_KEYS) {
       if (key in body && typeof body[key] === "string") {
-        // Don't overwrite real API key with masked placeholder
+        // Skip masked placeholders
         if (key === "openrouterApiKey" && body[key] === "***") continue;
+        // Secret keys: never persist to settings.json.
+        // Desktop: renderer handles via IPC (secrets:set) before calling this route.
+        // Web/dev: secrets come from .env.local only.
+        if ((SECRET_KEYS as string[]).includes(key)) {
+          if (body[key] && body[key] !== "***") {
+            secretsSkipped.push(key);
+          }
+          continue;
+        }
         (updated as Record<string, unknown>)[key] = body[key];
       }
     }
@@ -62,8 +75,9 @@ export async function PUT(req: Request) {
       }
     }
 
+    // writeSettings already strips SECRET_KEYS as a safety net
     writeSettings(updated);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, secretsSkipped });
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
