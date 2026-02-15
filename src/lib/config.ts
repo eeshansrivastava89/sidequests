@@ -91,4 +91,7 @@ export const config = {
   get mlxModel(): string {
     return settingStr("mlxModel", "MLX_MODEL", "default");
   },
+  get hasCompletedOnboarding(): boolean {
+    return settingBool("hasCompletedOnboarding", "HAS_COMPLETED_ONBOARDING", false);
+  },
 } as const;

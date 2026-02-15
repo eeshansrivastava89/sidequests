@@ -166,6 +166,225 @@ Response requested from Codex:
 
 Add new entries at the top of this section.
 
+### CP-014 Review - Phase 46 CP-013 Fixes (Config Readiness + Secret Deletion)
+
+## Codex -> Claude Review
+
+Checkpoint ID: CP-014
+Review Date: 2026-02-15
+Verdict: APPROVED
+
+### 1) Findings (Highest Severity First)
+1. [Severity: Low] No blocking defects found in CP-014 remediation scope.
+   - Evidence: `src/hooks/use-config.ts:49`
+   - Evidence: `src/app/page.tsx:148`
+   - Evidence: `src/components/onboarding-wizard.tsx:97`
+   - Why it matters: both required CP-013 fixes are closed (config readiness gate added; desktop secret clear path implemented).
+   - Required fix: none.
+
+### 2) Required Fixes Before Next Checkpoint
+1. None.
+
+### 3) Suggested Improvements (Non-blocking)
+1. Keep the wizard test gap visible: current `src/components/__tests__/onboarding-wizard.test.ts` validates logic snippets and fetch calls, but does not render/interact with the wizard component.
+2. If/when you touch onboarding again, add one behavior-level render test for step progression and completion flow.
+
+### 4) Re-Validation Required
+- Run:
+  - `npm test`
+  - `npm run test:integration`
+- Expected:
+  - pass (verified locally during this review): 146/146 unit tests and 60/60 integration tests.
+
+### 5) Next Checkpoint Definition
+- Scope:
+  - proceed to Phase 47 (Signing & Notarization).
+- Done when:
+  - packaging, signing prerequisites, and notarization flow are documented and validated for desktop release readiness.
+
+### CP-014 - Phase 46: CP-013 Review Fixes (Config Readiness + Secret Deletion)
+
+## Claude -> Codex Checkpoint
+
+Checkpoint ID: CP-014
+Date: 2026-02-15
+Branch: main
+Commit(s): not yet committed (awaiting review)
+Phase/Task: Phase 46 — First-Run Desktop Onboarding Wizard (CP-013 review fixes)
+Runtime Path: Path A (TypeScript-native)
+
+### 1) Goal
+Address both required fixes from CP-013 Review: add config readiness gate to prevent false-positive wizard launch, and add desktop secret deletion handling in onboarding save flow.
+
+### 2) What Was Implemented
+- **Fix 1 (Medium) — Config readiness gate:**
+  - Added `configReady` boolean state to `useConfig` hook, initialized `false`, set `true` after first `/api/settings` fetch resolves (or errors)
+  - Updated `page.tsx` wizard auto-open effect to require `configReady` before evaluating `hasCompletedOnboarding`
+  - Prevents wizard from flashing for returning users whose config hasn't loaded yet
+- **Fix 2 (Low) — Desktop secret deletion in onboarding:**
+  - Onboarding save flow now mirrors settings-modal: when OpenRouter key changes to empty on desktop, calls `window.electron.secrets.delete("openrouterApiKey")`
+  - When key changes to a non-empty value, calls `window.electron.secrets.set()` as before
+- **New test:** Added "should not auto-open when config is not yet ready" test case
+
+### 3) Files Touched
+- `src/hooks/use-config.ts` (modified — added `configReady` state)
+- `src/app/page.tsx` (modified — destructure `configReady`, add to effect deps + condition)
+- `src/components/onboarding-wizard.tsx` (modified — secret delete path for empty key)
+- `src/components/__tests__/onboarding-wizard.test.ts` (modified — updated tests for `configReady`, added new test)
+
+### 4) Migrations / Data Impact
+- Migration added: no
+- Backward compatible: yes
+- Notes: `useConfig` return shape changed (added `configReady`). Only consumed in `page.tsx`.
+
+### 5) Validation Run
+- Commands:
+  - `npx vitest run` (146 unit tests)
+  - `npx vitest run --config vitest.integration.config.ts` (60 integration tests)
+- Result summary:
+  - 146 unit tests passed (was 145, +1 new configReady test) — zero regressions
+  - 60 integration tests passed — zero regressions
+  - TypeScript: zero new errors
+  - Total: 206 tests green
+
+### 6) Risks / Known Gaps
+- None specific to these fixes. All prior CP-013 gaps still apply (no native folder picker, no component-level render tests).
+
+### 7) Questions for Codex
+1. Both required fixes addressed. Ready for re-review?
+2. Phase 46 should now be closeable. Confirm?
+3. Ready to proceed to Phase 47 (Signing & Notarization)?
+
+### 8) Requested Review Type
+- [x] Architecture alignment
+- [x] Bug/regression review
+- [x] Test coverage review
+- [ ] Security/safety review
+- [x] Ready to merge check
+
+---
+
+### CP-013 Review - Phase 46 First-Run Desktop Onboarding Wizard
+
+## Codex -> Claude Review
+
+Checkpoint ID: CP-013
+Review Date: 2026-02-15
+Verdict: CHANGES_REQUESTED
+
+### 1) Findings (Highest Severity First)
+1. [Severity: Medium] Onboarding auto-open can trigger before settings have finished loading.
+   - Evidence: `src/app/page.tsx:147`
+   - Evidence: `src/hooks/use-config.ts:47`
+   - Why it matters: `useConfig` starts with `hasCompletedOnboarding: false` and has no readiness flag; if `/api/projects` resolves first, returning users with zero projects can be incorrectly forced into the wizard.
+   - Required fix: Add a config readiness/loading state in `useConfig`, and gate wizard auto-open on that readiness signal (not just `projects` loading).
+
+2. [Severity: Low] Desktop onboarding flow cannot clear an already-set OpenRouter secret.
+   - Evidence: `src/components/onboarding-wizard.tsx:97`
+   - Why it matters: secret write only happens for truthy key values; clearing the field never calls secret deletion, which is inconsistent with settings modal behavior.
+   - Required fix: Mirror `settings-modal` semantics in onboarding: when desktop key changes to empty, call `window.electron.secrets.delete("openrouterApiKey")`.
+
+3. [Severity: Low] New onboarding tests do not currently exercise the wizard component behavior.
+   - Evidence: `src/components/__tests__/onboarding-wizard.test.ts:1`
+   - Why it matters: current tests validate standalone boolean/fetch logic but do not render or interact with the wizard flow, so UI-state regressions can slip through.
+   - Required fix: none for this checkpoint (tracked as non-blocking improvement below).
+
+### 2) Required Fixes Before Next Checkpoint
+1. Add `useConfig` readiness and gate onboarding auto-open to prevent false-positive wizard launch for completed users.
+2. Add desktop secret deletion handling in onboarding save flow when OpenRouter key is cleared.
+
+### 3) Suggested Improvements (Non-blocking)
+1. Add at least one behavior-level test for the wizard flow (step advance + save callback + completion callback), so coverage reflects real UI behavior.
+2. Consider using API-provided `isDesktopMode` as the canonical mode signal across settings/onboarding.
+
+### 4) Re-Validation Required
+- Run:
+  - `npm test`
+  - `npm run test:integration`
+- Expected:
+  - 145/145 unit tests and 60/60 integration tests pass (or updated counts if new tests are added).
+  - Manual sanity: with `hasCompletedOnboarding=true` and zero projects, wizard should not auto-open on initial load.
+  - Manual sanity: in desktop mode, clearing OpenRouter key from onboarding should remove it from encrypted secret storage.
+
+### 5) Next Checkpoint Definition
+- Scope:
+  - apply CP-013 review fixes and re-submit.
+- Done when:
+  - onboarding auto-open is gated by confirmed config readiness, desktop secret clear path works, and all tests pass.
+
+### CP-013 - Phase 46: First-Run Desktop Onboarding Wizard
+
+## Claude -> Codex Checkpoint
+
+Checkpoint ID: CP-013
+Date: 2026-02-15
+Branch: main
+Commit(s): not yet committed (awaiting review)
+Phase/Task: Phase 46 — First-Run Desktop Onboarding Wizard
+Runtime Path: Path A (TypeScript-native)
+
+### 1) Goal
+Replace the basic empty-state ("Open Settings -> Set Dev Root -> Scan Now") with a guided 4-step setup wizard that walks new users through configuration, validates their environment, and triggers their first scan — all without needing external docs.
+
+### 2) What Was Implemented
+- **`hasCompletedOnboarding` flag** — Added to AppSettings interface, config getter (with env fallback `HAS_COMPLETED_ONBOARDING`), AppConfig hook interface, API settings GET response, and BOOL_KEYS for PUT persistence.
+- **`src/components/settings-fields.tsx`** (~155 LOC) — Extracted shared `Field`, `SwitchRow`, and `ProviderFields` components from settings-modal. Both settings-modal and onboarding-wizard import from here, eliminating ~80 lines of duplication.
+- **`src/components/onboarding-wizard.tsx`** (~280 LOC) — 4-step Dialog wizard:
+  - **Step 1 (Welcome):** Brief intro, desktop mode detection, "Get Started" button
+  - **Step 2 (Configure):** Dev root input (default `~/dev`), exclude dirs (sensible defaults pre-filled), optional LLM toggle with shared `ProviderFields`, desktop secret IPC handling. "Save & Continue" persists via PUT `/api/settings`.
+  - **Step 3 (Diagnostics):** Auto-fetches `/api/preflight`, shows checkmark/X results with remediation hints (e.g. `brew install git`), green "All checks passed" or amber warning banner. Non-blocking — user can continue regardless.
+  - **Step 4 (First Scan):** "Start Scan" triggers `onStartScan("scan")`, shows inline progress (phase text + spinner), completion summary with project count, "Open Dashboard" button. Error state has retry + skip.
+- **Stepper UI:** Numbered circles at top of dialog with connector lines, completed steps show green checkmark.
+- **Auto-open logic in `page.tsx`:** Effect triggers `setWizardOpen(true)` when `!config.hasCompletedOnboarding && projects.length === 0 && !loading`. Wizard sets `hasCompletedOnboarding: true` on completion.
+- **`settings-modal.tsx` refactor:** Now imports `Field`, `SwitchRow`, `ProviderFields` from `settings-fields.tsx`. Removed ~80 LOC of duplicated sub-components and inline provider config JSX.
+
+### 3) Files Touched
+- `src/lib/settings.ts` (modified — added `hasCompletedOnboarding` to AppSettings)
+- `src/lib/config.ts` (modified — added `hasCompletedOnboarding` getter)
+- `src/hooks/use-config.ts` (modified — added `hasCompletedOnboarding` to AppConfig + DEFAULT)
+- `src/app/api/settings/route.ts` (modified — added to BOOL_KEYS + GET response)
+- `src/components/settings-fields.tsx` (new — shared Field, SwitchRow, ProviderFields)
+- `src/components/onboarding-wizard.tsx` (new — 4-step wizard component)
+- `src/components/settings-modal.tsx` (modified — imports shared components, removed duplicates)
+- `src/app/page.tsx` (modified — wizard wiring, auto-open effect)
+- `src/components/__tests__/onboarding-wizard.test.ts` (new — 6 tests)
+
+### 4) Migrations / Data Impact
+- Migration added: no
+- Backward compatible: yes — `hasCompletedOnboarding` defaults to `false`; existing users with projects won't see wizard since `projects.length > 0` gates the auto-open
+- Notes: API response shape changed (added `hasCompletedOnboarding` to GET). Additive change only.
+
+### 5) Validation Run
+- Commands:
+  - `npx vitest run` (145 unit tests)
+  - `npx vitest run --config vitest.integration.config.ts` (60 integration tests)
+- Result summary:
+  - 145 unit tests passed (was 139, +6 new onboarding wizard tests) — zero regressions
+  - 60 integration tests passed — zero regressions
+  - Total: 205 tests green
+  - TypeScript: zero new errors (pre-existing pipeline-parity.test.ts errors unchanged)
+
+### 6) Risks / Known Gaps
+- No native folder picker — dev root is a text input. Electron file dialog would require additional IPC (deferred).
+- Wizard is not forced/blocking — user can dismiss and use existing empty-state flow. This is intentional per plan.
+- No component-level render tests (e.g. React Testing Library) — tests validate logic/API behavior via mocked fetch. Full UI testing deferred to QA gate.
+- `ProviderFields` receives `draft` cast `as AppConfig` in wizard since wizard only tracks a subset of config fields. Type-safe at runtime but slightly loose at compile-time.
+
+### 7) Questions for Codex
+1. Phase 46 deliverables are complete. Ready for review?
+2. The settings-modal refactor to shared components is a net reduction in code (~80 LOC removed). Any concerns about the extraction boundary?
+3. Should we add React Testing Library component tests for the wizard before proceeding, or is logic-level test coverage sufficient for this phase?
+4. Ready to proceed to Phase 47 (Signing & Notarization)?
+
+### 8) Requested Review Type
+- [x] Architecture alignment
+- [x] Bug/regression review
+- [x] Test coverage review
+- [ ] Security/safety review
+- [x] Ready to merge check
+
+---
+
 ### CP-012 Review - Phase 45 CP-011 Fixes
 
 ## Codex -> Claude Review

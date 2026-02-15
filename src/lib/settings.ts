@@ -20,6 +20,7 @@ export interface AppSettings {
   ollamaModel?: string;
   mlxUrl?: string;
   mlxModel?: string;
+  hasCompletedOnboarding?: boolean;
 }
 
 /** Keys that must never be persisted to settings.json (stored in encrypted secrets). */

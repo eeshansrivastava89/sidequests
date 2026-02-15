@@ -20,6 +20,7 @@ export interface AppConfig {
   ollamaModel: string;
   mlxUrl: string;
   mlxModel: string;
+  hasCompletedOnboarding: boolean;
 }
 
 const DEFAULT: AppConfig = {
@@ -40,21 +41,28 @@ const DEFAULT: AppConfig = {
   ollamaModel: "",
   mlxUrl: "",
   mlxModel: "",
+  hasCompletedOnboarding: false,
 };
 
 export function useConfig() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT);
+  const [configReady, setConfigReady] = useState(false);
 
   const refetch = useCallback(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => setConfig({ ...DEFAULT, ...data }))
-      .catch(() => {});
+      .then((data) => {
+        setConfig({ ...DEFAULT, ...data });
+        setConfigReady(true);
+      })
+      .catch(() => {
+        setConfigReady(true);
+      });
   }, []);
 
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  return { config, refetch };
+  return { config, configReady, refetch };
 }

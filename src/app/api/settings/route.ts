@@ -24,6 +24,7 @@ export async function GET() {
     ollamaModel: config.ollamaModel,
     mlxUrl: config.mlxUrl,
     mlxModel: config.mlxModel,
+    hasCompletedOnboarding: config.hasCompletedOnboarding,
     isDesktopMode: paths.isDesktopMode,
   });
 }
@@ -31,6 +32,7 @@ export async function GET() {
 const BOOL_KEYS: (keyof AppSettings)[] = [
   "sanitizePaths", "featureLlm", "featureO1",
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
+  "hasCompletedOnboarding",
 ];
 const STR_KEYS: (keyof AppSettings)[] = [
   "devRoot", "excludeDirs", "llmProvider", "claudeCliModel",

@@ -11,6 +11,7 @@ import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
 import { RefreshPanel } from "@/components/refresh-panel";
 import { SettingsModal } from "@/components/settings-modal";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { MethodologyModal } from "@/components/methodology-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,7 +121,7 @@ function getLastRefreshed(projects: Project[]): string | null {
 export default function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
-  const { config, refetch } = useConfig();
+  const { config, configReady, refetch } = useConfig();
   const refreshHook = useRefresh(fetchProjects);
   const deltaHook = useRefreshDeltas(projects);
   const [search, setSearch] = useState("");
@@ -129,6 +130,7 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [methodologyOpen, setMethodologyOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
@@ -140,6 +142,13 @@ export default function DashboardPage() {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
+
+  // Auto-open onboarding wizard for first-run users
+  useEffect(() => {
+    if (!loading && configReady && !config.hasCompletedOnboarding && projects.length === 0) {
+      setWizardOpen(true);
+    }
+  }, [loading, configReady, config.hasCompletedOnboarding, projects.length]);
 
 
   const handleRefresh = useCallback((mode: RefreshMode) => {
@@ -487,6 +496,15 @@ export default function DashboardPage() {
       <MethodologyModal
         open={methodologyOpen}
         onOpenChange={setMethodologyOpen}
+      />
+
+      <OnboardingWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        config={config}
+        onSaved={refetch}
+        onStartScan={handleRefresh}
+        scanState={refreshHook.state}
       />
     </div>
   );
