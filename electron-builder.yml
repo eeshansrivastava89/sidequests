@@ -19,8 +19,24 @@ files:
 # The electron:build script copies them there before packaging.
 
 mac:
-  target: dmg
+  target:
+    - dmg
+    - zip
   category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: true
+
+dmg:
+  sign: false
+
+# Auto-update: publish to GitHub Releases
+publish:
+  provider: github
+  owner: eeshans
+  repo: projects-dashboard
 
 extraMetadata:
   main: dist-electron/main.js

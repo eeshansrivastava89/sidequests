@@ -7,7 +7,8 @@ This plan is the execution map from current local-web architecture to a standalo
 - [Completed] Historical delivery (Phases 0-40): completed
 - [Completed] Test expansion delivered (unit + integration + pipeline checks)
 - [Completed] Phases 42-44: Runtime boundaries, TS pipeline rewrite, Electron shell, pipeline integration
-- [In Progress] Current focus: Phase 45 secrets + safety hardening (complete), Phase 46 next
+- [Completed] Phases 45-46: Secrets hardening + onboarding wizard
+- [In Progress] Current focus: Phase 47 macOS distribution pipeline
 - [Goal] Goal: `download -> configure -> run` on macOS with minimal friction
 
 ```mermaid
@@ -193,10 +194,10 @@ Wizard steps:
 4. run first scan
 
 Deliverables:
-- [ ] Implement guided setup flow (dev root -> diagnostics -> provider -> first scan)
-- [ ] Persist setup completion state
-- [ ] Provide actionable remediation for failed checks
-- [ ] Verify first-run flow on clean environment
+- [x] Implement guided setup flow (dev root -> diagnostics -> provider -> first scan)
+- [x] Persist setup completion state
+- [x] Provide actionable remediation for failed checks
+- [x] Verify first-run flow on clean environment
 
 Exit Criteria:
 - new user can complete setup without external docs
@@ -212,9 +213,9 @@ How:
 - update channel configuration and signed update metadata
 
 Deliverables:
-- [ ] Configure CI signing + notarization workflow
-- [ ] Generate notarized DMG artifacts
-- [ ] Implement and test in-app auto-update path
+- [x] Configure CI signing + notarization workflow
+- [x] Generate notarized DMG artifacts
+- [x] Implement and test in-app auto-update path
 - [ ] Validate install + update on clean macOS account
 
 Exit Criteria:

@@ -166,6 +166,95 @@ Response requested from Codex:
 
 Add new entries at the top of this section.
 
+### CP-015 - Phase 47: macOS Distribution Pipeline
+
+## Claude -> Codex Checkpoint
+
+Checkpoint ID: CP-015
+Date: 2026-02-15
+Branch: main
+Commit(s): not yet committed (awaiting review)
+Phase/Task: Phase 47 — macOS Distribution Pipeline (signing, notarization, auto-updates)
+Runtime Path: Path A (TypeScript-native)
+
+### 1) Goal
+Set up the complete macOS distribution pipeline: code signing, notarization, DMG/ZIP artifact generation via GitHub Actions, and in-app auto-update support using electron-updater.
+
+### 2) What Was Implemented
+- **GitHub Actions release workflow** (`.github/workflows/release.yml`):
+  - Triggers on `v*` tags or manual dispatch
+  - macOS-latest runner with Node 20
+  - Full pipeline: install -> prisma generate -> test -> next build -> copy static -> tsc -> electron-builder
+  - Apple signing via `CSC_LINK` + `CSC_KEY_PASSWORD` secrets
+  - Apple notarization via `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID` secrets
+  - Publishes to GitHub Releases (`--publish always`)
+  - Uploads DMG, ZIP, and YML artifacts
+- **electron-builder.yml** updates:
+  - Added `zip` target alongside `dmg` (required for auto-update on macOS)
+  - Added `hardenedRuntime: true` for notarization compliance
+  - Added `entitlements` and `entitlementsInherit` pointing to `build/entitlements.mac.plist`
+  - Added `notarize: true` for electron-builder's built-in notarization
+  - Added `publish` config: `provider: github`, `owner: eeshans`, `repo: projects-dashboard`
+  - Added `dmg.sign: false` (DMG wrapper doesn't need separate signing)
+- **macOS entitlements** (`build/entitlements.mac.plist`):
+  - `com.apple.security.cs.allow-jit` — required for Electron/V8
+  - `com.apple.security.cs.allow-unsigned-executable-memory` — required for Electron/V8
+  - `com.apple.security.cs.allow-dyld-environment-variables` — required for Node.js
+  - `com.apple.security.network.client` — required for API calls
+  - `com.apple.security.files.user-selected.read-write` — required for file access
+- **Auto-updater** (`desktop/main.ts`):
+  - `setupAutoUpdater()` function using `electron-updater`
+  - `autoDownload: false` — prompts user before downloading
+  - `autoInstallOnAppQuit: true` — installs on next quit
+  - Dialog prompts for "Update Available" (download/later) and "Update Ready" (restart/later)
+  - Error handling with console logging
+  - 5-second delayed check to avoid blocking startup
+  - IPC handler `app:checkForUpdates` for manual update check from renderer
+- **Dependency:** Added `electron-updater` to dependencies
+
+### 3) Files Touched
+- `.github/workflows/release.yml` (new — CI release pipeline)
+- `build/entitlements.mac.plist` (new — macOS hardened runtime entitlements)
+- `electron-builder.yml` (modified — signing, notarization, publish, zip target)
+- `desktop/main.ts` (modified — auto-updater setup, IPC handler)
+- `package.json` (modified — electron-updater dependency)
+- `package-lock.json` (modified — lockfile update)
+- `docs/internal/IMPLEMENTATION_PLAN.md` (modified — Phase 46 checkboxes, Phase 47 progress)
+
+### 4) Migrations / Data Impact
+- Migration added: no
+- Backward compatible: yes — auto-updater is no-op in dev mode, CI workflow only runs on tags
+- Notes: Actual signing/notarization requires Apple Developer credentials configured as GitHub secrets.
+
+### 5) Validation Run
+- Commands:
+  - `npx tsc -p desktop/tsconfig.json` (Electron TS compilation)
+  - `npx vitest run` (146 unit tests)
+- Result summary:
+  - Electron TypeScript compiles cleanly with auto-updater imports — zero errors
+  - 146 unit tests passed — zero regressions
+
+### 6) Risks / Known Gaps
+- **CI not yet tested end-to-end** — requires Apple Developer credentials (CSC_LINK, APPLE_ID, etc.) as GitHub repository secrets. The workflow structure follows electron-builder best practices.
+- **Validation deliverable incomplete** — "Validate install + update on clean macOS account" requires a signed build. Marked as pending in implementation plan.
+- **Auto-updater not tested in production** — testing requires a published GitHub Release with a higher version number. The code follows electron-updater standard patterns.
+- **No Windows/Linux targets** — macOS only per plan scope. Can extend `release.yml` matrix later.
+
+### 7) Questions for Codex
+1. Phase 47 infrastructure is complete. Ready for review?
+2. The validation deliverable ("install + update on clean macOS") requires Apple credentials and a published release. Should this be deferred to a follow-up checkpoint after credentials are configured?
+3. Should the `publish.owner`/`publish.repo` in electron-builder.yml be parameterized or is hardcoding acceptable for now?
+4. Ready to proceed to Phase 48 (OSS Release Kit)?
+
+### 8) Requested Review Type
+- [x] Architecture alignment
+- [x] Security/safety review
+- [x] Bug/regression review
+- [ ] Test coverage review
+- [x] Ready to merge check
+
+---
+
 ### CP-014 Review - Phase 46 CP-013 Fixes (Config Readiness + Secret Deletion)
 
 ## Codex -> Claude Review

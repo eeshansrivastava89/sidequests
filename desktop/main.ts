@@ -3,6 +3,7 @@ import { ChildProcess, fork } from "child_process";
 import path from "path";
 import net from "net";
 import { decryptSecretsFile, setSecret, deleteSecret, hasSecret, migrateSettingsSecrets } from "./secrets";
+import { autoUpdater } from "electron-updater";
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = "http://localhost:3000";
@@ -140,6 +141,64 @@ ipcMain.handle("secrets:has", (_event, key: string) => {
   return hasSecret(app.getPath("userData"), key);
 });
 
+// Auto-update setup (production only)
+function setupAutoUpdater() {
+  if (isDev) return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-available", (info) => {
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `Version ${info.version} is available. Download now?`,
+      buttons: ["Download", "Later"],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Ready",
+      message: "Update downloaded. The app will restart to apply the update.",
+      buttons: ["Restart Now", "Later"],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.error("[auto-updater]", err.message);
+  });
+
+  // Check for updates after a short delay to avoid blocking startup
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error("[auto-updater] check failed:", err.message);
+    });
+  }, 5_000);
+}
+
+// IPC handler for manual update check from renderer
+ipcMain.handle("app:checkForUpdates", async () => {
+  if (isDev) return { updateAvailable: false };
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { updateAvailable: !!result?.updateInfo };
+  } catch {
+    return { updateAvailable: false };
+  }
+});
+
 app.whenReady().then(async () => {
   // Set APP_DATA_DIR for the main process (used by app-paths.ts if imported here)
   process.env.APP_DATA_DIR = app.getPath("userData");
@@ -166,6 +225,7 @@ app.whenReady().then(async () => {
 
   serverUrl = url;
   createWindow(url);
+  setupAutoUpdater();
 });
 
 app.on("window-all-closed", () => {
