@@ -26,8 +26,11 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Run tests
+      - name: Run unit tests
         run: npm test
+
+      - name: Run integration tests
+        run: npm run test:integration
 
       - name: Build Next.js
         run: npm run build

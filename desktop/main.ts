@@ -1,58 +1,16 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { ChildProcess, fork } from "child_process";
 import path from "path";
-import net from "net";
 import { decryptSecretsFile, setSecret, deleteSecret, hasSecret, migrateSettingsSecrets } from "./secrets";
 import { autoUpdater } from "electron-updater";
+import { isAllowedSecretKey, WINDOW_CONFIG, findFreePort, waitForServer, shouldBlockNavigation, setupAutoUpdater } from "./main-helpers";
 
 const isDev = !app.isPackaged;
 const DEV_SERVER_URL = "http://localhost:3000";
 
-// Allowlist of secret keys that can be managed via IPC
-const ALLOWED_SECRET_KEYS = new Set(["openrouterApiKey"]);
-
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: ChildProcess | null = null;
 let serverUrl: string | null = null;
-
-function findFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.listen(0, () => {
-      const addr = srv.address();
-      if (addr && typeof addr === "object") {
-        const port = addr.port;
-        srv.close(() => resolve(port));
-      } else {
-        reject(new Error("Could not determine port"));
-      }
-    });
-    srv.on("error", reject);
-  });
-}
-
-function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Server did not start within ${timeoutMs}ms`));
-        return;
-      }
-      const protocol = url.startsWith("https") ? require("https") : require("http");
-      const req = protocol.get(url, (res: { statusCode?: number }) => {
-        if (res.statusCode && res.statusCode < 500) {
-          resolve();
-        } else {
-          setTimeout(check, 200);
-        }
-      });
-      req.on("error", () => setTimeout(check, 200));
-      req.end();
-    };
-    check();
-  });
-}
 
 async function startProductionServer(): Promise<string> {
   const port = await findFreePort();
@@ -86,23 +44,16 @@ async function startProductionServer(): Promise<string> {
 
 function createWindow(url: string) {
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 800,
-    minHeight: 600,
-    title: "Projects Dashboard",
+    ...WINDOW_CONFIG,
     webPreferences: {
+      ...WINDOW_CONFIG.webPreferences,
       preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
     },
   });
 
   // Block navigation to external URLs
   mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
-    const parsed = new URL(navigationUrl);
-    if (parsed.origin !== new URL(url).origin) {
+    if (shouldBlockNavigation(navigationUrl, url)) {
       event.preventDefault();
     }
   });
@@ -129,64 +80,17 @@ ipcMain.handle("app:getDataDir", () => app.getPath("userData"));
 
 // IPC handlers for secret management (renderer → main → encrypted disk)
 ipcMain.handle("secrets:set", (_event, key: string, value: string) => {
-  if (!ALLOWED_SECRET_KEYS.has(key)) throw new Error(`Secret key not allowed: ${key}`);
+  if (!isAllowedSecretKey(key)) throw new Error(`Secret key not allowed: ${key}`);
   setSecret(app.getPath("userData"), key, value);
 });
 ipcMain.handle("secrets:delete", (_event, key: string) => {
-  if (!ALLOWED_SECRET_KEYS.has(key)) throw new Error(`Secret key not allowed: ${key}`);
+  if (!isAllowedSecretKey(key)) throw new Error(`Secret key not allowed: ${key}`);
   deleteSecret(app.getPath("userData"), key);
 });
 ipcMain.handle("secrets:has", (_event, key: string) => {
-  if (!ALLOWED_SECRET_KEYS.has(key)) return false;
+  if (!isAllowedSecretKey(key)) return false;
   return hasSecret(app.getPath("userData"), key);
 });
-
-// Auto-update setup (production only)
-function setupAutoUpdater() {
-  if (isDev) return;
-
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on("update-available", (info) => {
-    dialog.showMessageBox({
-      type: "info",
-      title: "Update Available",
-      message: `Version ${info.version} is available. Download now?`,
-      buttons: ["Download", "Later"],
-      defaultId: 0,
-    }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.downloadUpdate();
-      }
-    });
-  });
-
-  autoUpdater.on("update-downloaded", () => {
-    dialog.showMessageBox({
-      type: "info",
-      title: "Update Ready",
-      message: "Update downloaded. The app will restart to apply the update.",
-      buttons: ["Restart Now", "Later"],
-      defaultId: 0,
-    }).then(({ response }) => {
-      if (response === 0) {
-        autoUpdater.quitAndInstall();
-      }
-    });
-  });
-
-  autoUpdater.on("error", (err) => {
-    console.error("[auto-updater]", err.message);
-  });
-
-  // Check for updates after a short delay to avoid blocking startup
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch((err) => {
-      console.error("[auto-updater] check failed:", err.message);
-    });
-  }, 5_000);
-}
 
 // IPC handler for manual update check from renderer
 ipcMain.handle("app:checkForUpdates", async () => {
@@ -225,7 +129,12 @@ app.whenReady().then(async () => {
 
   serverUrl = url;
   createWindow(url);
-  setupAutoUpdater();
+  setupAutoUpdater(
+    autoUpdater,
+    isDev,
+    (opts) => dialog.showMessageBox(opts as unknown as Electron.MessageBoxOptions),
+    () => autoUpdater.quitAndInstall(),
+  );
 });
 
 app.on("window-all-closed", () => {

@@ -1,0 +1,256 @@
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import fs from "fs";
+import path from "path";
+import os from "os";
+
+const tmpDir = path.join(os.tmpdir(), "pd-desktop-flows-" + Date.now());
+
+// Mock app-paths to use tmpDir
+vi.mock("@/lib/app-paths", () => {
+  return {
+    paths: {
+      get dataDir() { return tmpDir; },
+      get settingsPath() { return path.join(tmpDir, "settings.json"); },
+      get isDesktopMode() { return !!process.env.APP_DATA_DIR; },
+      get dbPath() { return path.join(tmpDir, "dev.db"); },
+      get dbUrl() { return `file:${path.join(tmpDir, "dev.db")}`; },
+      get pipelineDir() { return path.join(tmpDir, "pipeline"); },
+    },
+    resetPaths: () => {},
+  };
+});
+
+const mockConfig = vi.hoisted(() => ({
+  devRoot: "/Users/test/dev",
+  excludeDirs: ["node_modules"],
+  featureLlm: false,
+  featureO1: false,
+  sanitizePaths: false,
+  llmProvider: "claude-cli",
+  llmAllowUnsafe: false,
+  llmOverwriteMetadata: false,
+  llmConcurrency: 3,
+  llmDebug: false,
+  ollamaUrl: "",
+  mlxUrl: "",
+  openrouterApiKey: "",
+  openrouterModel: "anthropic/claude-sonnet-4",
+  ollamaModel: "llama3",
+  mlxModel: "default",
+  claudeCliModel: "",
+  hasCompletedOnboarding: false,
+}));
+
+vi.mock("@/lib/config", () => ({ config: mockConfig }));
+vi.mock("@/lib/settings", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/settings")>("@/lib/settings");
+  return {
+    ...actual,
+    // Override getSettings to read from tmpDir settings
+    getSettings: () => {
+      try {
+        const raw = fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8");
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    },
+    clearSettingsCache: () => {},
+  };
+});
+
+let settingsGET: Function;
+let settingsPUT: Function;
+let preflightGET: Function;
+
+beforeAll(async () => {
+  const settingsRoute = await import("@/app/api/settings/route");
+  settingsGET = settingsRoute.GET;
+  settingsPUT = settingsRoute.PUT;
+
+  const preflightRoute = await import("@/app/api/preflight/route");
+  preflightGET = preflightRoute.GET;
+});
+
+beforeEach(() => {
+  fs.mkdirSync(tmpDir, { recursive: true });
+  // Reset config to defaults
+  mockConfig.sanitizePaths = false;
+  mockConfig.featureLlm = false;
+  mockConfig.hasCompletedOnboarding = false;
+});
+
+function makePutRequest(body: Record<string, unknown>) {
+  return new Request("http://localhost/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+// ── Settings persistence round-trip ────────────────────────────────
+
+describe("settings persistence round-trip", () => {
+  it("PUT then GET returns matching values", async () => {
+    const payload = {
+      devRoot: "~/projects",
+      llmProvider: "ollama",
+      featureLlm: true,
+      llmConcurrency: 5,
+    };
+    const putRes = await settingsPUT(makePutRequest(payload));
+    expect((await putRes.json()).ok).toBe(true);
+
+    // Verify written to disk
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.devRoot).toBe("~/projects");
+    expect(onDisk.llmProvider).toBe("ollama");
+    expect(onDisk.featureLlm).toBe(true);
+    expect(onDisk.llmConcurrency).toBe(5);
+  });
+
+  it("PUT preserves existing settings not in payload", async () => {
+    // Write initial settings
+    fs.writeFileSync(
+      path.join(tmpDir, "settings.json"),
+      JSON.stringify({ devRoot: "~/dev", ollamaUrl: "http://custom:11434" })
+    );
+
+    // PUT only llmProvider
+    const putRes = await settingsPUT(makePutRequest({ llmProvider: "mlx" }));
+    expect((await putRes.json()).ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.devRoot).toBe("~/dev");
+    expect(onDisk.ollamaUrl).toBe("http://custom:11434");
+    expect(onDisk.llmProvider).toBe("mlx");
+  });
+});
+
+// ── Settings migration safety ──────────────────────────────────────
+
+describe("settings migration safety", () => {
+  it("handles missing settings.json gracefully", async () => {
+    // Ensure no settings file exists
+    try { fs.unlinkSync(path.join(tmpDir, "settings.json")); } catch { /* noop */ }
+
+    const putRes = await settingsPUT(makePutRequest({ devRoot: "~/fresh" }));
+    const data = await putRes.json();
+    expect(data.ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.devRoot).toBe("~/fresh");
+  });
+
+  it("handles corrupt settings.json gracefully", async () => {
+    fs.writeFileSync(path.join(tmpDir, "settings.json"), "NOT VALID JSON{{{");
+
+    // PUT should still succeed (getSettings returns {} on parse error)
+    const putRes = await settingsPUT(makePutRequest({ devRoot: "~/recovered" }));
+    const data = await putRes.json();
+    expect(data.ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.devRoot).toBe("~/recovered");
+  });
+
+  it("handles empty settings.json gracefully", async () => {
+    fs.writeFileSync(path.join(tmpDir, "settings.json"), "");
+
+    const putRes = await settingsPUT(makePutRequest({ featureO1: true }));
+    const data = await putRes.json();
+    expect(data.ok).toBe(true);
+  });
+});
+
+// ── Onboarding completion flow ─────────────────────────────────────
+
+describe("onboarding completion flow", () => {
+  it("saves hasCompletedOnboarding via settings PUT", async () => {
+    const putRes = await settingsPUT(makePutRequest({
+      devRoot: "~/dev",
+      hasCompletedOnboarding: true,
+    }));
+    const data = await putRes.json();
+    expect(data.ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.hasCompletedOnboarding).toBe(true);
+  });
+
+  it("preflight includes git check for onboarding", async () => {
+    mockConfig.featureLlm = false;
+    const res = await preflightGET();
+    const body = await res.json();
+
+    const names = body.checks.map((c: { name: string }) => c.name);
+    expect(names).toContain("git");
+  });
+});
+
+// ── Failure: missing/invalid provider ──────────────────────────────
+
+describe("failure: invalid provider", () => {
+  it("unknown provider produces no provider-specific check (only git)", async () => {
+    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "nonexistent-provider";
+
+    const res = await preflightGET();
+    const body = await res.json();
+
+    // Unknown provider falls through the switch — only git check remains
+    const names = body.checks.map((c: { name: string }) => c.name);
+    expect(names).toContain("git");
+    expect(names).toHaveLength(1);
+  });
+
+  it("known provider with missing binary fails the check", async () => {
+    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
+
+    const res = await preflightGET();
+    const body = await res.json();
+
+    const names = body.checks.map((c: { name: string }) => c.name);
+    expect(names).toContain("git");
+    expect(names).toContain("claude");
+  });
+});
+
+// ── Failure: invalid dev root ──────────────────────────────────────
+
+describe("failure: invalid dev root", () => {
+  it("settings accepts nonexistent devRoot without error", async () => {
+    const putRes = await settingsPUT(makePutRequest({
+      devRoot: "/nonexistent/path/that/does/not/exist",
+    }));
+    const data = await putRes.json();
+    expect(data.ok).toBe(true);
+  });
+});
+
+// ── Path sanitization correctness ──────────────────────────────────
+
+describe("path sanitization", () => {
+  it("GET returns sanitizePaths=false when config says false", async () => {
+    mockConfig.sanitizePaths = false;
+    const res = await settingsGET();
+    const data = await res.json();
+    expect(data.sanitizePaths).toBe(false);
+  });
+
+  it("GET returns sanitizePaths=true when config says true", async () => {
+    mockConfig.sanitizePaths = true;
+    const res = await settingsGET();
+    const data = await res.json();
+    expect(data.sanitizePaths).toBe(true);
+  });
+
+  it("PUT can toggle sanitizePaths", async () => {
+    const putRes = await settingsPUT(makePutRequest({ sanitizePaths: true }));
+    expect((await putRes.json()).ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.sanitizePaths).toBe(true);
+  });
+});

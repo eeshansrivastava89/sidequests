@@ -13,6 +13,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:smoke": "vitest run --config vitest.config.ts desktop/__tests__/main.test.ts",
     "test:watch": "vitest",
     "setup": "node scripts/setup.mjs",
     "electron:dev": "tsc -p desktop/tsconfig.json && concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",

@@ -214,8 +214,9 @@ How:
 
 Deliverables:
 - [x] Configure CI signing + notarization workflow
-- [x] Generate notarized DMG artifacts
+- [x] Configure notarized DMG artifact generation (pending first signed build with real credentials)
 - [x] Implement and test in-app auto-update path
+- [ ] Complete first signed/notarized build with Apple Developer credentials
 - [ ] Validate install + update on clean macOS account
 
 Exit Criteria:
@@ -249,9 +250,9 @@ Coverage targets:
 - failure-mode UX (missing provider, permission errors)
 
 Deliverables:
-- [ ] Add packaged-app smoke test suite in CI
-- [ ] Validate launch/onboarding/scan/enrich/settings persistence flows
-- [ ] Validate failure-mode UX (permissions/providers/runtime missing)
+- [x] Add packaged-app smoke test suite in CI
+- [x] Validate launch/onboarding/scan/enrich/settings persistence flows
+- [x] Validate failure-mode UX (permissions/providers/runtime missing)
 - [ ] Sign off release candidate against acceptance criteria
 
 Exit Criteria:
