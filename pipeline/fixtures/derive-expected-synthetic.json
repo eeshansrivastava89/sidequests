@@ -1,0 +1,82 @@
+{
+  "derivedAt": "2026-01-15T12:00:00+00:00",
+  "projects": [
+    {
+      "pathHash": "aaaa111122223333",
+      "statusAuto": "active",
+      "healthScoreAuto": 100,
+      "hygieneScoreAuto": 100,
+      "momentumScoreAuto": 100,
+      "scoreBreakdownJson": {
+        "hygiene": {
+          "readme": 15,
+          "tests": 20,
+          "cicd": 15,
+          "remote": 10,
+          "lowTodos": 10,
+          "deployment": 10,
+          "linter": 5,
+          "license": 5,
+          "lockfile": 5
+        },
+        "momentum": {
+          "recency": 25,
+          "cleanTree": 20,
+          "pushedUp": 15,
+          "lowBranches": 10
+        }
+      },
+      "tags": [
+        "ci-cd",
+        "deployed",
+        "docker",
+        "javascript-typescript",
+        "nextjs",
+        "prisma",
+        "supabase",
+        "tested",
+        "typescript"
+      ]
+    },
+    {
+      "pathHash": "bbbb444455556666",
+      "statusAuto": "stale",
+      "healthScoreAuto": 21,
+      "hygieneScoreAuto": 32,
+      "momentumScoreAuto": 0,
+      "scoreBreakdownJson": {
+        "hygiene": {
+          "readme": 15,
+          "remote": 10,
+          "linter": 5
+        },
+        "momentum": {}
+      },
+      "tags": [
+        "flask",
+        "python"
+      ]
+    },
+    {
+      "pathHash": "cccc777788889999",
+      "statusAuto": "archived",
+      "healthScoreAuto": 33,
+      "hygieneScoreAuto": 16,
+      "momentumScoreAuto": 64,
+      "scoreBreakdownJson": {
+        "hygiene": {
+          "lowTodos": 10,
+          "lockfile": 5
+        },
+        "momentum": {
+          "cleanTree": 20,
+          "pushedUp": 15,
+          "lowBranches": 10
+        }
+      },
+      "tags": [
+        "rust"
+      ]
+    }
+  ]
+}

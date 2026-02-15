@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { paths } from "./app-paths";
 
 export interface AppSettings {
   devRoot?: string;
@@ -21,14 +22,12 @@ export interface AppSettings {
   mlxModel?: string;
 }
 
-const SETTINGS_PATH = path.join(process.cwd(), "settings.json");
-
 let cache: AppSettings | null = null;
 
 export function getSettings(): AppSettings {
   if (cache) return cache;
   try {
-    const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
+    const raw = fs.readFileSync(paths.settingsPath, "utf-8");
     cache = JSON.parse(raw) as AppSettings;
     return cache;
   } catch {
@@ -37,7 +36,8 @@ export function getSettings(): AppSettings {
 }
 
 export function writeSettings(settings: AppSettings): void {
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + "\n");
+  fs.mkdirSync(path.dirname(paths.settingsPath), { recursive: true });
+  fs.writeFileSync(paths.settingsPath, JSON.stringify(settings, null, 2) + "\n");
   cache = settings;
 }
 

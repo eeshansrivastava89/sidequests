@@ -5,10 +5,9 @@ import { promisify } from "util";
 import { config } from "./config";
 import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
+import { paths } from "./app-paths";
 
 const execFileAsync = promisify(execFile);
-
-const PIPELINE_DIR = path.resolve(process.cwd(), "pipeline");
 
 interface ScanOutput {
   scannedAt: string;
@@ -108,7 +107,7 @@ function hashRawJson(rawJson: string): string {
 }
 
 async function runPython(script: string, args: string[], stdin?: string): Promise<string> {
-  const scriptPath = path.join(PIPELINE_DIR, script);
+  const scriptPath = path.join(paths.pipelineDir, script);
 
   if (stdin) {
     return new Promise((resolve, reject) => {

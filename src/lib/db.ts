@@ -1,17 +1,9 @@
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
-import path from "path";
-
-function resolveDbUrl(): string {
-  const raw = process.env.DATABASE_URL ?? "file:./dev.db";
-  // DATABASE_URL is "file:./dev.db" — resolve relative to project root
-  const filePath = raw.replace(/^file:/, "");
-  const absolute = path.resolve(process.cwd(), filePath);
-  return `file:${absolute}`;
-}
+import { paths } from "./app-paths";
 
 function createPrismaClient() {
-  const adapter = new PrismaLibSql({ url: resolveDbUrl() });
+  const adapter = new PrismaLibSql({ url: paths.dbUrl });
   return new PrismaClient({ adapter });
 }
 
