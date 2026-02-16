@@ -2,6 +2,7 @@ import { db } from "./db";
 import { config } from "./config";
 import type { Project } from "@/generated/prisma/client";
 import type { AiInsight } from "./llm/provider";
+import type { RawScan } from "./types";
 
 /**
  * Merged project view — the single shape the UI consumes.
@@ -73,35 +74,6 @@ export interface MergedProject {
   updatedAt: string;
 }
 
-export interface RawScan {
-  isRepo: boolean;
-  lastCommitDate: string | null;
-  lastCommitMessage: string | null;
-  branch: string | null;
-  remoteUrl: string | null;
-  commitCount: number;
-  daysInactive: number | null;
-  isDirty: boolean;
-  languages: { primary: string | null; detected: string[] };
-  files: Record<string, boolean>;
-  cicd: Record<string, boolean>;
-  deployment: Record<string, boolean>;
-  todoCount: number;
-  fixmeCount: number;
-  description: string | null;
-  recentCommits: Array<{ hash: string; message: string; date: string }>;
-  scripts: string[];
-  services: string[];
-  packageManager: string | null;
-  branchCount: number;
-  stashCount: number;
-  locEstimate: number;
-  license: boolean;
-  ahead: number;
-  behind: number;
-  framework: string | null;
-  liveUrl: string | null;
-}
 
 export function parseJson<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback;

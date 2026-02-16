@@ -47,7 +47,8 @@ vi.mock("@/lib/llm", () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let db: any;
-let refreshPOST: Function;
+type RouteHandler = (...args: unknown[]) => unknown;
+let refreshPOST: RouteHandler;
 
 beforeAll(async () => {
   db = await getTestDb();

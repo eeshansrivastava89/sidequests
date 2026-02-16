@@ -22,7 +22,8 @@ vi.mock("@/lib/settings", () => ({
   clearSettingsCache: () => {},
 }));
 
-let preflightGET: Function;
+type RouteHandler = (...args: unknown[]) => unknown;
+let preflightGET: RouteHandler;
 
 beforeAll(async () => {
   const route = await import("@/app/api/preflight/route");

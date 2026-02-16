@@ -17,9 +17,10 @@ vi.mock("@/lib/settings", () => ({
 let db: any;
 
 // Route handlers — imported after DB init
-let projectsGET: Function;
-let projectByIdGET: Function;
-let activityGET: Function;
+type RouteHandler = (...args: unknown[]) => unknown;
+let projectsGET: RouteHandler;
+let projectByIdGET: RouteHandler;
+let activityGET: RouteHandler;
 
 beforeAll(async () => {
   db = await getTestDb();

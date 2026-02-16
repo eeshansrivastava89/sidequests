@@ -2,16 +2,16 @@
 
 This plan is the execution map from current local-web architecture to a standalone macOS desktop app that is open-source friendly and easy to onboard.
 
-## Status (2026-02-16)
+## Status (2026-02-15)
 
 - [Completed] Historical delivery (Phases 0-40): completed
 - [Completed] Test expansion delivered (unit + integration + pipeline checks)
 - [Completed] Phases 42-44: Runtime boundaries, TS pipeline rewrite, Electron shell, pipeline integration
 - [Completed] Phases 45-46: Secrets hardening + onboarding wizard
 - [Completed] Phases 47-48 baseline: source-first desktop distribution + OSS release kit
-- [In Progress] Phase 49: Desktop QA gate final RC signoff
-- [In Progress] Current focus: Phase 49 RC signoff + Phase 50 de-bloat/privacy gate
-- [Goal] Goal: `clone -> build -> run` on macOS with minimal friction
+- [Completed] Phase 49: Desktop QA gate — RC passes all acceptance criteria
+- [Completed] Phase 50: De-bloat/simplification gate — dead code removed, deps pruned, privacy gate passed
+- [Done] All phases 0-50 complete. Source-first desktop distribution ready.
 
 ```mermaid
 flowchart LR
@@ -254,7 +254,7 @@ Deliverables:
 - [x] Add packaged-app smoke test suite in CI
 - [x] Validate launch/onboarding/scan/enrich/settings persistence flows
 - [x] Validate failure-mode UX (permissions/providers/runtime missing)
-- [ ] Sign off release candidate against acceptance criteria
+- [x] Sign off release candidate against acceptance criteria
 
 Exit Criteria:
 - release candidate passes deterministic smoke suite
@@ -270,12 +270,12 @@ How:
 - remove unused dependencies and verify no behavior regressions
 
 Deliverables:
-- [ ] Remove dead code and stale fallback paths that are no longer used
-- [ ] Eliminate duplicate logic/config that violates DRY where safe to unify
-- [ ] Remove unused dependencies and scripts (with lockfile refresh)
-- [ ] Trim packaged artifact contents to runtime-essential files only
-- [ ] Add a privacy leak gate: verify no user-specific paths, local settings/db/env files, or secrets are tracked in git or bundled in release artifacts
-- [ ] Document intentional duplication that remains (if any) with rationale
+- [x] Remove dead code and stale fallback paths that are no longer used
+- [x] Eliminate duplicate logic/config that violates DRY where safe to unify
+- [x] Remove unused dependencies and scripts (with lockfile refresh)
+- [x] Trim packaged artifact contents to runtime-essential files only
+- [x] Add a privacy leak gate: verify no user-specific paths, local settings/db/env files, or secrets are tracked in git or bundled in release artifacts
+- [x] Document intentional duplication that remains (if any) with rationale
 
 Exit Criteria:
 - no known dead code paths in active runtime
@@ -306,8 +306,8 @@ gantt
   Phase 47 Source-First Distribution :done, p47, after p46, 10d
   Phase 48 OSS Release Kit         :done,   p48, after p47, 7d
   section Hardening
-  Phase 49 Desktop QA Gate         :active, p49, after p48, 10d
-  Phase 50 De-Bloat + Simplify Gate :p50, after p49, 5d
+  Phase 49 Desktop QA Gate         :done, p49, after p48, 10d
+  Phase 50 De-Bloat + Simplify Gate :done, p50, after p49, 5d
 ```
 
 ## Schedule Model

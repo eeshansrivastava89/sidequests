@@ -59,9 +59,10 @@ vi.mock("@/lib/settings", async () => {
   };
 });
 
-let settingsGET: Function;
-let settingsPUT: Function;
-let preflightGET: Function;
+type RouteHandler = (...args: unknown[]) => unknown;
+let settingsGET: RouteHandler;
+let settingsPUT: RouteHandler;
+let preflightGET: RouteHandler;
 
 beforeAll(async () => {
   const settingsRoute = await import("@/app/api/settings/route");

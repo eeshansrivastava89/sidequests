@@ -48,6 +48,7 @@ export function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
         reject(new Error(`Server did not start within ${timeoutMs}ms`));
         return;
       }
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const protocol = url.startsWith("https") ? require("https") : require("http");
       const req = protocol.get(url, (res: { statusCode?: number }) => {
         if (res.statusCode && res.statusCode < 500) {

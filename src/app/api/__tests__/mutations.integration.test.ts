@@ -17,10 +17,11 @@ vi.mock("@/lib/settings", () => ({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let db: any;
 
-let overridePATCH: Function;
-let metadataPATCH: Function;
-let pinPATCH: Function;
-let touchPOST: Function;
+type RouteHandler = (...args: unknown[]) => unknown;
+let overridePATCH: RouteHandler;
+let metadataPATCH: RouteHandler;
+let pinPATCH: RouteHandler;
+let touchPOST: RouteHandler;
 
 beforeAll(async () => {
   db = await getTestDb();

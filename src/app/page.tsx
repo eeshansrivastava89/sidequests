@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh, type RefreshMode } from "@/hooks/use-refresh";
@@ -130,7 +130,7 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [methodologyOpen, setMethodologyOpen] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardDismissed, setWizardDismissed] = useState(false);
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
@@ -143,12 +143,11 @@ export default function DashboardPage() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Auto-open onboarding wizard for first-run users
-  useEffect(() => {
-    if (!loading && configReady && !config.hasCompletedOnboarding && projects.length === 0) {
-      setWizardOpen(true);
-    }
-  }, [loading, configReady, config.hasCompletedOnboarding, projects.length]);
+  // Derive wizard open state — no effects, no render-phase setState
+  const wizardOpen = !wizardDismissed && !loading && configReady && !config.hasCompletedOnboarding && projects.length === 0;
+  const setWizardOpen = useCallback((open: boolean) => {
+    if (!open) setWizardDismissed(true);
+  }, []);
 
 
   const handleRefresh = useCallback((mode: RefreshMode) => {

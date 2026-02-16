@@ -14,6 +14,7 @@ files:
   - "!.next/standalone/node_modules/.cache"
   - "!**/*.db"
   - "!**/*.db-journal"
+  - "!**/pipeline/*.py"
 
 # Static assets must live at .next/standalone/.next/static for the standalone server.
 # The electron:build script copies them there before packaging.
