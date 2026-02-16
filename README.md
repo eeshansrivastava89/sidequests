@@ -6,23 +6,25 @@ Runs entirely on your machine. No cloud services, no telemetry.
 
 ## Install
 
-### Desktop App (macOS)
-
-Download the latest `.dmg` from [Releases](https://github.com/eeshans/projects-dashboard/releases), open it, and drag to Applications. The app is signed and notarized.
-
-On first launch, the setup wizard walks you through configuration.
-
-### From Source
+### Recommended: Build From Source (macOS)
 
 ```bash
 git clone https://github.com/eeshans/projects-dashboard.git
 cd projects-dashboard
 npm install
 npm run setup    # creates DB, copies default settings
-npm run dev      # start on http://localhost:3000
+npm run electron:dev   # desktop app in dev shell
+# or:
+npm run electron:build # local packaged app build
 ```
 
 **Prerequisites:** Node.js >= 20.9, git
+
+On first launch, the setup wizard walks you through configuration.
+
+### Optional: Prebuilt DMG (When Published)
+
+Some maintainers may publish `.dmg` artifacts in [Releases](https://github.com/eeshans/projects-dashboard/releases). Signed/notarized distribution depends on maintainer Apple credentials and is not required to run from source.
 
 ## How It Works
 
@@ -43,7 +45,8 @@ All data stays in a local SQLite database. The pipeline is TypeScript-native (no
 - Dark mode
 - SSE-based live refresh progress
 - Optional LLM enrichment (Claude CLI, OpenRouter, Ollama, MLX, Codex CLI)
-- Desktop app with encrypted secret storage and auto-updates
+- Desktop app with encrypted secret storage
+- Optional auto-updates when using published release channel
 - First-run onboarding wizard
 
 ## Configuration

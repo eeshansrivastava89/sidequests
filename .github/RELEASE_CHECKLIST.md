@@ -1,4 +1,4 @@
-# Release Checklist
+# Release Checklist (Source-First Default)
 
 ## Pre-Release
 
@@ -20,13 +20,15 @@
 ## Release
 
 - [ ] Create and push git tag: `git tag v<version> && git push origin v<version>`
-- [ ] GitHub Actions `release.yml` workflow completes
-- [ ] DMG artifact is signed and notarized
-- [ ] GitHub Release created with artifacts
+- [ ] Source-first release notes published (build/run commands verified)
+- [ ] GitHub Actions `release.yml` workflow completes (if using prebuilt artifacts)
+- [ ] Optional: DMG artifact is signed and notarized (only when maintainer credentials are configured)
+- [ ] Optional: GitHub Release includes desktop artifacts (`.dmg/.zip/.yml`)
 
 ## Post-Release
 
-- [ ] Download DMG from release and verify install on clean macOS
-- [ ] Gatekeeper accepts app without manual bypass
-- [ ] Auto-update delivers to previous version (if applicable)
+- [ ] Clean-clone validation: clone -> install -> setup -> desktop run works
 - [ ] Smoke test: configure > scan > enrich flow works
+- [ ] Optional signed lane: Download DMG and verify install on clean macOS
+- [ ] Optional signed lane: Gatekeeper accepts app without manual bypass
+- [ ] Optional signed lane: Auto-update delivers to previous version (if applicable)

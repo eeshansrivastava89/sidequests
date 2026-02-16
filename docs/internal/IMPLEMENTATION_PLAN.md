@@ -2,21 +2,24 @@
 
 This plan is the execution map from current local-web architecture to a standalone macOS desktop app that is open-source friendly and easy to onboard.
 
-## Status (2026-02-15)
+## Status (2026-02-16)
 
 - [Completed] Historical delivery (Phases 0-40): completed
 - [Completed] Test expansion delivered (unit + integration + pipeline checks)
 - [Completed] Phases 42-44: Runtime boundaries, TS pipeline rewrite, Electron shell, pipeline integration
 - [Completed] Phases 45-46: Secrets hardening + onboarding wizard
-- [In Progress] Current focus: Phase 47 macOS distribution pipeline
-- [Goal] Goal: `download -> configure -> run` on macOS with minimal friction
+- [Completed] Phases 47-48 baseline: source-first desktop distribution + OSS release kit
+- [In Progress] Phase 49: Desktop QA gate final RC signoff
+- [In Progress] Current focus: Phase 49 RC signoff + Phase 50 de-bloat/privacy gate
+- [Goal] Goal: `clone -> build -> run` on macOS with minimal friction
 
 ```mermaid
 flowchart LR
   A[Phases 0-40 Complete] --> B[Stabilize Docs + Runtime Boundaries]
   B --> C[Desktop Packaging]
-  C --> D[Signed + Notarized Release]
+  C --> D[Source-First Build Release]
   D --> E[OSS Onboarding Excellence]
+  D --> F[Optional Signed Lane Later]
 ```
 
 ## Agent Team Strategy
@@ -28,7 +31,7 @@ Use parallel streams with strict file ownership:
 | Runtime/Core | `src/lib`, `src/app/api`, `pipeline`, `prisma` | preserve behavior while decoupling host assumptions |
 | Desktop Shell | `desktop/*` | app lifecycle, IPC, packaging, updates |
 | Product UX | `src/components`, `src/app/page.tsx` | first-run onboarding, diagnostics, setup experience |
-| Release/OSS | `.github/workflows`, root docs | signing/notarization pipeline, contributor-ready docs |
+| Release/OSS | `.github/workflows`, root docs | source-build distribution UX, contributor-ready docs, optional signed lane docs |
 
 ## Historical Log (Compressed)
 
@@ -106,7 +109,7 @@ What:
 
 How:
 - Build a focused spike to estimate TypeScript rewrite parity for `scan.py` and `derive.py`
-- Compare against Python sidecar complexity for packaging/signing/notarization
+- Compare against Python sidecar complexity for packaging/distribution
 
 Deliverables:
 - [x] Create parity fixture set for `scan.py` and `derive.py` behavior
@@ -157,7 +160,7 @@ Deliverables:
 
 Exit Criteria:
 - preflight is green for pipeline runtime on fresh machine
-- packaging path is stable for signing/notarization
+- packaging path is stable for source-first distribution (signed lane optional)
 
 ## Phase 45 - Secrets + Safety Hardening
 
@@ -202,26 +205,24 @@ Deliverables:
 Exit Criteria:
 - new user can complete setup without external docs
 
-## Phase 47 - macOS Distribution Pipeline
+## Phase 47 - Source-First Desktop Distribution (Default Path)
 
 What:
-- sign + notarize + produce DMG artifacts + enable desktop auto-updates
+- make desktop distribution usable without Apple Developer credentials
 
 How:
-- CI workflow with Apple credentials (secure secrets)
-- release artifact verification
-- update channel configuration and signed update metadata
+- one-command source build path in docs/scripts
+- CI verification of build-from-source behavior
+- keep signed/notarized lane as optional future enhancement
 
 Deliverables:
-- [x] Configure CI signing + notarization workflow
-- [x] Configure notarized DMG artifact generation (pending first signed build with real credentials)
-- [x] Implement and test in-app auto-update path
-- [ ] Complete first signed/notarized build with Apple Developer credentials
-- [ ] Validate install + update on clean macOS account
+- [x] Document source-first desktop build path (`clone -> install -> setup -> build/run`)
+- [x] Ensure desktop app can be built locally without Apple credentials
+- [x] Gate release quality on tests + compile checks for source builds
+- [x] Keep optional signed/notarized workflow documented but non-blocking
 
 Exit Criteria:
-- Gatekeeper accepts app without manual bypass
-- update flow successfully delivers a newer build in test channel
+- first external user can build and run desktop app from source in one session
 
 ## Phase 48 - OSS Release Kit
 
@@ -232,7 +233,7 @@ Deliverables:
 - [x] Finalize README for desktop and dev workflows
 - [x] Publish troubleshooting matrix and support boundaries
 - [x] Add issue templates + release checklist
-- [ ] Run clean-clone onboarding validation
+- [x] Run clean-clone onboarding validation
 
 Exit Criteria:
 - first external user can install and run successfully
@@ -294,26 +295,27 @@ gantt
   dateFormat  YYYY-MM-DD
   section Foundation
   Phase 41 Docs Baseline           :done,   p41, 2026-02-14, 4d
-  Phase 42 Runtime Boundaries      :active, p42, after p41, 8d
-  Phase 42.5 Runtime Decision      :p425, after p42, 5d
+  Phase 42 Runtime Boundaries      :done,   p42, after p41, 8d
+  Phase 42.5 Runtime Decision      :done,   p425, after p42, 5d
   section Desktop Core
-  Phase 43 Shell Bootstrap         :p43, after p425, 10d
-  Phase 44 Pipeline Integration    :p44, after p43, 10d
-  Phase 45 Secrets/Safety          :p45, after p44, 7d
+  Phase 43 Shell Bootstrap         :done,   p43, after p425, 10d
+  Phase 44 Pipeline Integration    :done,   p44, after p43, 10d
+  Phase 45 Secrets/Safety          :done,   p45, after p44, 7d
   section Product + Distribution
-  Phase 46 First-Run Wizard        :p46, after p45, 8d
-  Phase 47 Sign + Notarize + Updates :p47, after p46, 10d
-  Phase 48 OSS Release Kit         :p48, after p47, 7d
+  Phase 46 First-Run Wizard        :done,   p46, after p45, 8d
+  Phase 47 Source-First Distribution :done, p47, after p46, 10d
+  Phase 48 OSS Release Kit         :active, p48, after p47, 7d
   section Hardening
-  Phase 49 Desktop QA Gate         :p49, after p48, 10d
+  Phase 49 Desktop QA Gate         :active, p49, after p48, 10d
   Phase 50 De-Bloat + Simplify Gate :p50, after p49, 5d
 ```
 
 ## Schedule Model
 
-- Aggressive track (if TS rewrite parity is achieved in Phase 42.5): ~6-8 weeks to notarized beta.
-- Conservative track (if Python sidecar fallback is chosen): ~8-10 weeks to notarized beta.
-- Timeline includes risk buffer for packaging, signing, and first-run UX defects.
+- Aggressive track (Path A + source-first distribution): ~6-8 weeks to source-ready beta.
+- Conservative track (Path B fallback): ~8-10 weeks to source-ready beta.
+- Optional signed/notarized lane can be added later without blocking OSS launch.
+- Timeline includes risk buffer for packaging and first-run UX defects.
 - Final public release gate includes Phase 50 simplification pass before broad launch.
 
 ## Acceptance Criteria (Current)
@@ -331,8 +333,8 @@ gantt
 - Unsafe execution paths remain explicit opt-in
 
 ### Distribution
-- Signed + notarized macOS builds are reproducible in CI
-- Release artifacts and checksums are published with notes
+- Source desktop builds are reproducible from clean clone
+- Optional signed/notarized distribution lane is documented but not required for OSS usage
 
 ### OSS Readiness
 - Docs are accurate, minimal, and testable from clean checkout
@@ -343,7 +345,7 @@ gantt
 - Checkpoint A: after Phase 42 (runtime boundary complete)
 - Checkpoint B: after Phase 42.5 (runtime strategy decision complete)
 - Checkpoint C: after Phase 44 (pipeline integration validated)
-- Checkpoint D: after Phase 47 (first notarized install)
+- Checkpoint D: after Phase 47 (first clean-clone source desktop build)
 - Checkpoint E: after Phase 49 (desktop quality gate green)
 - Checkpoint F: after Phase 50 (de-bloat/simplification gate complete)
 

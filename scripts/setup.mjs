@@ -41,6 +41,21 @@ try {
   warnings++;
 }
 
+/* ── Copy .env.local.example → .env.local ────────────── */
+
+const envExample = join(root, ".env.local.example");
+const envTarget = join(root, ".env.local");
+
+if (existsSync(envTarget)) {
+  console.log(green("✓ .env.local already exists (not overwriting)"));
+} else if (existsSync(envExample)) {
+  copyFileSync(envExample, envTarget);
+  console.log(green("✓ Created .env.local from .env.local.example"));
+} else {
+  console.warn(yellow("⚠ .env.local.example not found — skipping"));
+  warnings++;
+}
+
 /* ── Copy settings.example.json → settings.json ─────── */
 
 const settingsExample = join(root, "settings.example.json");
@@ -53,7 +68,7 @@ if (existsSync(settingsTarget)) {
   console.log(green("✓ Created settings.json from settings.example.json"));
 }
 
-/* ── Prisma generate + migrate ───────────────────────── */
+/* ── Prisma generate + db push ───────────────────────── */
 
 console.log("\nSetting up database...");
 
@@ -66,10 +81,10 @@ try {
 }
 
 try {
-  execSync("npx prisma migrate dev", { cwd: root, stdio: "inherit" });
-  console.log(green("✓ Database migrated"));
+  execSync("npx prisma db push", { cwd: root, stdio: "inherit" });
+  console.log(green("✓ Database schema pushed"));
 } catch {
-  console.error(red("✗ Failed to run database migrations"));
+  console.error(red("✗ Failed to push database schema"));
   process.exit(1);
 }
 
