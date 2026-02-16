@@ -304,7 +304,7 @@ gantt
   section Product + Distribution
   Phase 46 First-Run Wizard        :done,   p46, after p45, 8d
   Phase 47 Source-First Distribution :done, p47, after p46, 10d
-  Phase 48 OSS Release Kit         :active, p48, after p47, 7d
+  Phase 48 OSS Release Kit         :done,   p48, after p47, 7d
   section Hardening
   Phase 49 Desktop QA Gate         :active, p49, after p48, 10d
   Phase 50 De-Bloat + Simplify Gate :p50, after p49, 5d
