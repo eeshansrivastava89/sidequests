@@ -5,6 +5,11 @@ import { config } from "../config";
 
 function runClaude(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Strip Claude Code session markers so the child process doesn't think it's nested
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.CLAUDECODE;
+    delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
+
     const child = spawn(
       "claude",
       [
@@ -13,7 +18,7 @@ function runClaude(prompt: string): Promise<string> {
         "--append-system-prompt", SYSTEM_PROMPT,
         ...(config.claudeCliModel ? ["--model", config.claudeCliModel] : []),
       ],
-      { stdio: ["pipe", "pipe", "pipe"] }
+      { stdio: ["pipe", "pipe", "pipe"], env: cleanEnv }
     );
 
     let stdout = "";
