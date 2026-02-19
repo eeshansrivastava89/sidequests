@@ -1,352 +1,210 @@
 # Projects Dashboard v2 - Implementation Plan
 
-This plan is the execution map from current local-web architecture to a standalone macOS desktop app that is open-source friendly and easy to onboard.
+This plan is the execution map from the current codebase to a web-first distribution model that runs through a single NPX command.
 
-## Status (2026-02-15)
+## Status (2026-02-19)
 
 - [Completed] Historical delivery (Phases 0-40): completed
-- [Completed] Test expansion delivered (unit + integration + pipeline checks)
-- [Completed] Phases 42-44: Runtime boundaries, TS pipeline rewrite, Electron shell, pipeline integration
-- [Completed] Phases 45-46: Secrets hardening + onboarding wizard
-- [Completed] Phases 47-48 baseline: source-first desktop distribution + OSS release kit
-- [Completed] Phase 49: Desktop QA gate — RC passes all acceptance criteria
-- [Completed] Phase 50: De-bloat/simplification gate — dead code removed, deps pruned, privacy gate passed
-- [Done] All phases 0-50 complete. Source-first desktop distribution ready.
+- [Completed] Runtime and pipeline foundation (Phases 41-44): completed
+- [Completed] Safety and onboarding baseline (Phases 45-46): completed
+- [Superseded] Desktop-first release track (legacy Phases 47-50): replaced by NPX/web pivot
+- [Completed] Direction lock + docs realignment (Phase 47W): all deliverables checked
+- [Active] Web/CLI distribution track (Phases 48W-50W): Phase 48W next
 
-```mermaid
-flowchart LR
-  A[Phases 0-40 Complete] --> B[Stabilize Docs + Runtime Boundaries]
-  B --> C[Desktop Packaging]
-  C --> D[Source-First Build Release]
-  D --> E[OSS Onboarding Excellence]
-  D --> F[Optional Signed Lane Later]
-```
+## Pivot Summary
 
-## Agent Team Strategy
+The repository now has TS-native scan/derive, stable API routes, and onboarding UX that do not require Electron-specific runtime behavior. The remaining work is to ship and support the product as:
 
-Use parallel streams with strict file ownership:
+1. web server runtime
+2. CLI launcher
+3. single command entrypoint (`npx ...`)
 
-| Stream | Ownership | Mission |
-|-------|-----------|---------|
-| Runtime/Core | `src/lib`, `src/app/api`, `pipeline`, `prisma` | preserve behavior while decoupling host assumptions |
-| Desktop Shell | `desktop/*` | app lifecycle, IPC, packaging, updates |
-| Product UX | `src/components`, `src/app/page.tsx` | first-run onboarding, diagnostics, setup experience |
-| Release/OSS | `.github/workflows`, root docs | source-build distribution UX, contributor-ready docs, optional signed lane docs |
+## Carry-Forward Assets (Keep)
 
-## Historical Log (Compressed)
+- Runtime boundary hardening (`APP_DATA_DIR`, settings/db path decoupling)
+- TS-native scan/derive pipeline and parity fixtures
+- Safety controls (`SANITIZE_PATHS`, `LLM_ALLOW_UNSAFE`)
+- First-run onboarding wizard and diagnostics checks
+- Setup bootstrap script and clean-clone validation flow
 
-### Phase Timeline Summary (Completed)
+## Deprecation Scope (Planned)
 
-| Phase Group | Scope | Outcome |
-|-------------|-------|---------|
-| 0-10 | Foundation + deterministic pipeline + core UI | local scanning app shipped with merge model |
-| 11-19 | Enhanced scan/derive/schema + compact list + pinning + optimizations | daily-driver UX and richer project signals |
-| 20-23 | activity memory + review-driven hardening | stronger reliability and UX polish |
-| 24-30 | deterministic UI alignment + drawer overhaul + delta model | clearer triage and state change visibility |
-| 31-34 | score re-architecture + traceability + attention model | hygiene/momentum split and explainability |
-| 35-40 | OSS readiness sweep | setup script, onboarding improvements, preflight checks, docs/governance hardening |
-| Test Phase 1-2 | unit/integration expansion | broad TS + Python + API + merge + pipeline coverage |
+- `desktop/` main-process shell and preload bridge
+- Desktop packaging lane (`electron-builder.yml`, entitlements path, DMG workflow assumptions)
+- Electron-specific smoke coverage and update plumbing
+- Electron dependencies (`electron`, `electron-builder`, `electron-updater`)
 
-### Historical Detail Reference
+## Web/NPX Roadmap
 
-Legacy per-phase detail is preserved in git history and prior revisions of this file. This document now prioritizes forward execution.
-
-## Current Baseline Snapshot
-
-```mermaid
-flowchart TD
-  UI[Dashboard UI] --> API[Next API Routes]
-  API --> PIPE[pipeline.ts]
-  PIPE --> PY[scan.py + derive.py]
-  PIPE --> DB[(SQLite/Prisma)]
-  API --> CFG[/api/settings + /api/preflight]
-```
-
-Baseline capabilities already present:
-- settings-first config model
-- preflight diagnostics route
-- SSE refresh with progress and deltas
-- deterministic scoring + merge priorities
-- optional LLM enrich with provider abstraction
-
-## Desktop + OSS Roadmap (New)
-
-## Phase 41 - Docs Baseline + Continuous Update Policy
+## Phase 47W - Direction Lock + Docs Realignment
 
 What:
-- Establish a minimum docs baseline for kickoff
-- Adopt continuous doc updates per phase (not a one-time blocking sweep)
+- Formally lock the distribution pivot to web/CLI NPX
+- Align architecture and plan docs to current runtime truth
 
 Deliverables:
-- [x] Core docs baseline aligned enough to start implementation safely
-- [x] "docs update required" checklist added to every phase checkpoint
+- [x] Mark legacy desktop phases as historical/superseded in plan docs
+- [x] Update architecture docs to TS-native scan/derive (remove Python-runtime wording)
+- [x] Document explicit security tradeoff: keychain storage (desktop) vs `.env.local` (web/CLI)
+- [x] Define NPX versioning policy (`@latest` default guidance + pinned-version guidance)
 
 Exit Criteria:
-- no critical setup blockers in docs
-- full final docs sweep deferred to Phase 48 (OSS Release Kit)
+- no conflicting "desktop is default" language in core internal docs
+- pivot decision is explicit and reviewable from docs alone
 
-## Phase 42 - Runtime Boundary Hardening
+## Phase 48W - CLI Launcher + NPX Bootstrap
 
 What:
-- Make all file/db/settings paths runtime-configurable for desktop host
-- Eliminate repository-root assumptions for persistent state
+- Provide a published CLI entrypoint that starts the app with one command
 
 How:
-- centralize path resolution in one runtime module
-- support app-data directory defaults
+- add `bin` entry and launcher command (`projects-dashboard`)
+- run prerequisite checks (Node, git)
+- bootstrap first-run state (env + settings + db)
+- start server on free port and open default browser
+- support clean shutdown via SIGINT/SIGTERM
 
 Deliverables:
-- [x] app runs with DB/settings in host app-data path
-- [x] scan pipeline still executes with same semantics
+- [ ] `bin/` CLI with start command path suitable for NPX execution
+- [ ] runtime-safe DB bootstrap strategy for NPX users (no hidden dev-only assumptions)
+- [ ] browser auto-open behavior with opt-out flag
+- [ ] command help and troubleshooting output for common failures
 
 Exit Criteria:
-- no writes required in repo root at runtime
+- user can run `npx <package>@latest` and reach dashboard in one session
+- first-run bootstrap succeeds on clean machine with documented prerequisites
 
-## Phase 42.5 - Pipeline Runtime Decision Gate (TS Rewrite vs Python Sidecar)
-
-What:
-- Decide the runtime strategy before desktop-shell integration hardens
-
-How:
-- Build a focused spike to estimate TypeScript rewrite parity for `scan.py` and `derive.py`
-- Compare against Python sidecar complexity for packaging/distribution
-
-Deliverables:
-- [x] Create parity fixture set for `scan.py` and `derive.py` behavior
-- [x] Define output-shape acceptance criteria (functional parity)
-- [x] Define performance thresholds and measurement method
-- [x] Produce decision memo selecting Path A (TypeScript-native) or Path B (Python sidecar fallback)
-
-Exit Criteria:
-- team-aligned decision with measurable criteria
-- downstream phases updated to reflect chosen path
-
-Decision: **Path A selected (TypeScript-native rewrite)** — approved CP-004 Review, 2026-02-14.
-
-Sequencing note: TS pipeline rewrite (Track A) runs in parallel with Phase 43 shell bootstrap (Track B). Integration gate: both tracks must complete before Phase 44 sign-off.
-
-## Phase 43 - Desktop Shell Bootstrap (Electron-first)
+## Phase 49W - QA/CI for Web + CLI Distribution
 
 What:
-- Add desktop shell with managed lifecycle for renderer + embedded app server
-
-How:
-- create `desktop/main` and `desktop/preload`
-- secure IPC for only required actions
-
-Deliverables:
-- [x] Create `desktop/main` app lifecycle bootstrap
-- [x] Create `desktop/preload` with minimal secure IPC surface
-- [x] Run dashboard UI + API from packaged shell locally
-- [x] Document startup/shutdown behavior and failure paths
-
-Exit Criteria:
-- user can run packaged app without terminal
-
-## Phase 44 - Pipeline Runtime Integration (TypeScript-native — Path A)
-
-What:
-- Integrate the TypeScript-native pipeline (selected in Phase 42.5) into the desktop app
-
-How:
-- Wire TS scan/derive functions into pipeline.ts (replacing Python subprocess calls)
-- Validate parity against fixtures and live baselines
-
-Deliverables:
-- [x] Integrate TS scan/derive into pipeline.ts refresh flow
-- [x] Ensure runtime works on clean macOS without Python installed
-- [x] Pass parity fixture tests against baseline outputs
-- [x] Validate integration with preflight and refresh flow
-
-Exit Criteria:
-- preflight is green for pipeline runtime on fresh machine
-- packaging path is stable for source-first distribution (signed lane optional)
-
-## Phase 45 - Secrets + Safety Hardening
-
-What:
-- move provider secrets to OS-secure storage via Electron `safeStorage` API
-- strip secrets from plaintext settings persistence
-- migrate existing plaintext secrets on first desktop launch
-
-How:
-- `desktop/secrets.ts` — encrypt/decrypt using `safeStorage`, migration from settings.json
-- Main process decrypts secrets and injects as env vars to forked server
-- IPC bridge for renderer to set/delete/check secrets
-- `writeSettings()` strips secret keys, API route skips persisting them
-
-Deliverables:
-- [x] Store provider secrets in OS-secure storage (`safeStorage` + `secrets.enc`)
-- [x] Ensure plaintext key leakage is removed from persisted settings
-- [x] IPC bridge for secret management (set/delete/has) from renderer
-- [x] Auto-migration of plaintext secrets from settings.json on desktop startup
-- [x] Add tests for secure read/write and migration behavior (11 new tests)
-
-Exit Criteria:
-- secret at-rest posture documented and verified
-
-## Phase 46 - First-Run Desktop Onboarding
-
-What:
-- guided setup wizard in desktop context
-
-Wizard steps:
-1. choose dev root
-2. run diagnostics
-3. select provider and test
-4. run first scan
-
-Deliverables:
-- [x] Implement guided setup flow (dev root -> diagnostics -> provider -> first scan)
-- [x] Persist setup completion state
-- [x] Provide actionable remediation for failed checks
-- [x] Verify first-run flow on clean environment
-
-Exit Criteria:
-- new user can complete setup without external docs
-
-## Phase 47 - Source-First Desktop Distribution (Default Path)
-
-What:
-- make desktop distribution usable without Apple Developer credentials
-
-How:
-- one-command source build path in docs/scripts
-- CI verification of build-from-source behavior
-- keep signed/notarized lane as optional future enhancement
-
-Deliverables:
-- [x] Document source-first desktop build path (`clone -> install -> setup -> build/run`)
-- [x] Ensure desktop app can be built locally without Apple credentials
-- [x] Gate release quality on tests + compile checks for source builds
-- [x] Keep optional signed/notarized workflow documented but non-blocking
-
-Exit Criteria:
-- first external user can build and run desktop app from source in one session
-
-## Phase 48 - OSS Release Kit
-
-What:
-- contributor and user launch readiness
-
-Deliverables:
-- [x] Finalize README for desktop and dev workflows
-- [x] Publish troubleshooting matrix and support boundaries
-- [x] Add issue templates + release checklist
-- [x] Run clean-clone onboarding validation
-
-Exit Criteria:
-- first external user can install and run successfully
-
-## Phase 49 - Quality Gate for Desktop
-
-What:
-- expand automated QA for packaged app behavior
+- replace desktop QA gates with web/CLI gates
 
 Coverage targets:
-- launch + onboarding
-- scan-only and enrich flows
-- settings persistence and migration
-- path sanitization correctness
-- failure-mode UX (missing provider, permission errors)
+- CLI launch and graceful termination
+- first-run bootstrap behavior
+- scan-only and enrich flows in web runtime
+- settings persistence and secret handling expectations
+- cross-platform smoke checks (macOS/Linux minimum)
 
 Deliverables:
-- [x] Add packaged-app smoke test suite in CI
-- [x] Validate launch/onboarding/scan/enrich/settings persistence flows
-- [x] Validate failure-mode UX (permissions/providers/runtime missing)
-- [x] Sign off release candidate against acceptance criteria
+- [ ] CI job for CLI launch smoke and API readiness checks
+- [ ] clean-clone validation for NPX invocation path
+- [ ] docs-checked troubleshooting matrix for CLI/web failures
+- [ ] release-candidate signoff table for web/CLI acceptance criteria
 
 Exit Criteria:
-- release candidate passes deterministic smoke suite
+- deterministic CLI/web smoke suite passes in CI
+- release candidate is signable without Electron-only checks
 
-## Phase 50 - De-Bloat + Simplification Gate (YAGNI/DRY)
+## Phase 50W - Electron Deprecation + Release Transition
 
 What:
-- run a final architecture hygiene pass to remove dead code, redundancy, and non-essential runtime/package artifacts before public release
+- finalize migration from desktop-first repo shape to web/CLI release shape
 
 How:
-- prune replaced/legacy paths now superseded by selected runtime architecture
-- consolidate duplicate logic and config where a single source of truth is possible
-- remove unused dependencies and verify no behavior regressions
+- remove or archive Electron runtime code
+- prune Electron dependencies and scripts
+- publish migration guidance for existing desktop users
+- run final privacy gate against web/CLI artifacts
 
 Deliverables:
-- [x] Remove dead code and stale fallback paths that are no longer used
-- [x] Eliminate duplicate logic/config that violates DRY where safe to unify
-- [x] Remove unused dependencies and scripts (with lockfile refresh)
-- [x] Trim packaged artifact contents to runtime-essential files only
-- [x] Add a privacy leak gate: verify no user-specific paths, local settings/db/env files, or secrets are tracked in git or bundled in release artifacts
-- [x] Document intentional duplication that remains (if any) with rationale
+- [ ] desktop runtime either removed from mainline or moved to archived branch/tag
+- [ ] package scripts and dependencies reflect web/CLI source of truth
+- [ ] migration notes published (desktop users -> web/CLI path)
+- [ ] final privacy/artifact gate passes for release bundle
 
 Exit Criteria:
-- no known dead code paths in active runtime
-- no high-value duplicate logic left without explicit rationale
-- packaged app footprint and runtime file set are intentionally minimal
+- main branch has no active Electron release dependency
+- OSS onboarding path is one-command NPX plus optional source dev workflow
 
-## Future Consideration (Not Scheduled): Tauri Evaluation
+## Prisma Bootstrap Strategy (Decision Gate)
 
-- Keep as an unscheduled architecture option after Electron production learnings.
-- Re-evaluate only if footprint/security constraints justify migration cost.
+NPX distribution must not assume dev-only tooling is available at runtime. The current `setup.mjs` calls `npx prisma generate` and `npx prisma db push`, which rely on `prisma` being installed (currently a devDependency).
+
+### Options
+
+| Option | How | Pros | Cons |
+|---|---|---|---|
+| **A. Ship pre-generated client + use `@prisma/client` migrations API** | Run `prisma generate` at build/publish time. At runtime, use `@prisma/client` programmatic API or raw SQL to ensure schema exists. | No Prisma CLI needed at runtime. Smallest published package. | Requires a runtime migration shim (one-time `CREATE TABLE IF NOT EXISTS` for 7 tables). |
+| **B. Move `prisma` to production dependencies** | Add `prisma` to `dependencies` (not just `devDependencies`). Keep current `npx prisma generate` + `npx prisma db push` flow. | Minimal code changes. Current setup.mjs works as-is. | Adds ~15MB to published package. `prisma generate` runs a binary download on first use. |
+| **C. Bundle Prisma engines in published package** | Use `prisma generate` at publish time and include the query engine binary in `files`. Ship without the CLI. | Pre-built, no network fetch at runtime. | Platform-specific engine binaries increase package size per target OS. |
+
+### Recommended Path
+
+**Option A** (ship pre-generated client + runtime schema check). Rationale:
+
+- The schema is stable (7 models, SQLite). A lightweight `CREATE TABLE IF NOT EXISTS` migration script is trivial and deterministic.
+- Eliminates Prisma CLI as a runtime dependency entirely.
+- Keeps the published package small and portable.
+- `prisma generate` runs once at publish/build time, producing the client in `node_modules/.prisma/client/` which gets bundled in the standalone output.
+
+Implementation deferred to Phase 48W.
+
+## Publish Strategy (Decision Gate)
+
+Before Phase 48W implementation closes:
+
+1. package naming strategy
+   - option A: unscoped package (`projects-dashboard`)
+   - option B: scoped package (`@org/projects-dashboard`)
+2. versioning guidance
+   - recommended install/run command: `npx <package>@latest`
+   - deterministic fallback for teams: `npx <package>@<version>`
+3. registry strategy
+   - default npmjs registry unless compliance requires alternate registry
+
+## Legacy Branch Strategy
+
+To keep rollback safety while simplifying mainline:
+
+- create and retain a desktop snapshot tag before deprecation cut
+- preserve Electron artifacts/history in git, not in active runtime path
+- document support policy (desktop lane frozen, web/CLI lane active)
 
 ## Visual Execution Map
 
 ```mermaid
-gantt
-  title Desktop + OSS Roadmap (Forward)
-  dateFormat  YYYY-MM-DD
-  section Foundation
-  Phase 41 Docs Baseline           :done,   p41, 2026-02-14, 4d
-  Phase 42 Runtime Boundaries      :done,   p42, after p41, 8d
-  Phase 42.5 Runtime Decision      :done,   p425, after p42, 5d
-  section Desktop Core
-  Phase 43 Shell Bootstrap         :done,   p43, after p425, 10d
-  Phase 44 Pipeline Integration    :done,   p44, after p43, 10d
-  Phase 45 Secrets/Safety          :done,   p45, after p44, 7d
-  section Product + Distribution
-  Phase 46 First-Run Wizard        :done,   p46, after p45, 8d
-  Phase 47 Source-First Distribution :done, p47, after p46, 10d
-  Phase 48 OSS Release Kit         :done,   p48, after p47, 7d
-  section Hardening
-  Phase 49 Desktop QA Gate         :done, p49, after p48, 10d
-  Phase 50 De-Bloat + Simplify Gate :done, p50, after p49, 5d
+flowchart LR
+  A[Phases 0-46 Completed] --> B[47W Direction Lock]
+  B --> C[48W CLI + NPX Bootstrap]
+  C --> D[49W Web/CLI QA Gate]
+  D --> E[50W Electron Deprecation]
+  E --> F[Web-First OSS Release]
 ```
 
 ## Schedule Model
 
-- Aggressive track (Path A + source-first distribution): ~6-8 weeks to source-ready beta.
-- Conservative track (Path B fallback): ~8-10 weeks to source-ready beta.
-- Optional signed/notarized lane can be added later without blocking OSS launch.
-- Timeline includes risk buffer for packaging and first-run UX defects.
-- Final public release gate includes Phase 50 simplification pass before broad launch.
+- Aggressive track: ~2-3 weeks for docs + CLI + smoke gating
+- Conservative track: ~4-5 weeks including migration hardening and cross-platform issues
+- Timeline risk drivers: NPX bootstrap details, publish naming availability, and CI matrix reliability
 
-## Acceptance Criteria (Current)
+## Acceptance Criteria (Current Pivot)
 
 ### Product
-- Dashboard remains functionally equivalent in desktop mode
-- Existing merge/scoring semantics unchanged unless explicitly versioned
+- dashboard behavior remains functionally equivalent to current API/UI semantics
+- merge/scoring semantics unchanged unless explicitly versioned
 
 ### Onboarding
-- New mac user can install app and complete first scan within one session
-- Diagnostics and remediation are visible in-product
+- first external user can launch with one NPX command and complete first scan in one session
+- diagnostics and remediation remain visible in product
 
 ### Security
-- Sensitive provider credentials stored securely
-- Unsafe execution paths remain explicit opt-in
+- secrets handling posture is explicitly documented for web/CLI mode
+- unsafe provider execution remains explicit opt-in
 
 ### Distribution
-- Source desktop builds are reproducible from clean clone
-- Optional signed/notarized distribution lane is documented but not required for OSS usage
+- NPX/web launch path is reproducible from clean clone and from published package
+- versioning/update semantics are explicit (`@latest` vs pinned)
 
 ### OSS Readiness
-- Docs are accurate, minimal, and testable from clean checkout
-- Contribution and issue flows are explicit and low-friction
+- docs are accurate, minimal, and testable from clean checkout
+- contribution flow is web/CLI aligned with no desktop-only blockers
 
 ## Checkpoint Reviews
 
-- Checkpoint A: after Phase 42 (runtime boundary complete)
-- Checkpoint B: after Phase 42.5 (runtime strategy decision complete)
-- Checkpoint C: after Phase 44 (pipeline integration validated)
-- Checkpoint D: after Phase 47 (first clean-clone source desktop build)
-- Checkpoint E: after Phase 49 (desktop quality gate green)
-- Checkpoint F: after Phase 50 (de-bloat/simplification gate complete)
+- Checkpoint A: after Phase 47W (direction lock + docs alignment)
+- Checkpoint B: after Phase 48W (CLI bootstrap working)
+- Checkpoint C: after Phase 49W (web/CLI quality gate green)
+- Checkpoint D: after Phase 50W (Electron deprecation finalized)
 
-At each checkpoint, run a user-path demo: `install/open/configure/scan/enrich` and capture regressions before advancing.
+At each checkpoint, run a user-path demo: `npx launch -> configure -> scan -> enrich` and capture regressions before advancing.
