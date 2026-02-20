@@ -12,7 +12,6 @@ vi.mock("@/lib/app-paths", () => {
     paths: {
       get dataDir() { return tmpDir; },
       get settingsPath() { return path.join(tmpDir, "settings.json"); },
-      get isDesktopMode() { return !!process.env.APP_DATA_DIR; },
       get dbPath() { return path.join(tmpDir, "dev.db"); },
       get dbUrl() { return `file:${path.join(tmpDir, "dev.db")}`; },
       get pipelineDir() { return path.join(tmpDir, "pipeline"); },
@@ -52,14 +51,6 @@ describe("settings API — secret handling", () => {
     const res = await GET();
     const data = await res.json();
     expect(data.openrouterApiKey).toBe("");
-  });
-
-  it("GET includes isDesktopMode flag", async () => {
-    delete process.env.APP_DATA_DIR;
-    const { GET } = await loadRoutes();
-    const res = await GET();
-    const data = await res.json();
-    expect(typeof data.isDesktopMode).toBe("boolean");
   });
 
   it("PUT does not persist openrouterApiKey to settings.json", async () => {

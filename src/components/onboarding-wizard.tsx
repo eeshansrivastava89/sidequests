@@ -86,22 +86,10 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const isDesktop = typeof window !== "undefined" && !!window.electron?.secrets;
-
   const handleSaveAndContinue = async () => {
     setSaving(true);
     try {
-      const { openrouterApiKey, ...nonSecretDraft } = draft;
-
-      // Handle secret keys
-      const keyChanged = openrouterApiKey !== config.openrouterApiKey;
-      if (isDesktop && keyChanged && openrouterApiKey !== "***") {
-        if (openrouterApiKey) {
-          await window.electron!.secrets.set("openrouterApiKey", openrouterApiKey);
-        } else {
-          await window.electron!.secrets.delete("openrouterApiKey");
-        }
-      }
+      const { openrouterApiKey: _openrouterApiKey, ...nonSecretDraft } = draft;
 
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -176,11 +164,6 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                 Projects Dashboard scans your dev directory and gives you a bird&apos;s-eye view of all your projects.
               </p>
-              {isDesktop && (
-                <p className="text-xs text-muted-foreground">
-                  Running as desktop app
-                </p>
-              )}
               <Button onClick={() => setStep(1)} className="mt-4">
                 Get Started
               </Button>
@@ -225,7 +208,6 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
                   <ProviderFields
                     draft={{ ...config, ...draft } as AppConfig}
                     set={setAsConfig}
-                    isDesktop={isDesktop}
                   />
                 </div>
               )}

@@ -1,17 +1,5 @@
 import path from "path";
-import os from "os";
 import fs from "fs";
-
-export function defaultDesktopDataDir(): string {
-  switch (process.platform) {
-    case "darwin":
-      return path.join(os.homedir(), "Library", "Application Support", "ProjectsDashboard");
-    case "win32":
-      return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "ProjectsDashboard");
-    default: // linux and others
-      return path.join(process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"), "ProjectsDashboard");
-  }
-}
 
 interface AppPaths {
   readonly dataDir: string;
@@ -19,7 +7,6 @@ interface AppPaths {
   readonly dbUrl: string;
   readonly settingsPath: string;
   readonly pipelineDir: string;
-  readonly isDesktopMode: boolean;
 }
 
 let cached: AppPaths | null = null;
@@ -28,10 +15,9 @@ function resolve(): AppPaths {
   if (cached) return cached;
 
   const appDataDir = process.env.APP_DATA_DIR;
-  const isDesktopMode = !!appDataDir;
   const dataDir = appDataDir ?? process.cwd();
 
-  if (isDesktopMode) {
+  if (appDataDir) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
@@ -47,13 +33,12 @@ function resolve(): AppPaths {
   // Settings
   const settingsPath = path.join(dataDir, "settings.json");
 
-  // Pipeline — fallback precedence:
-  //   1. PIPELINE_DIR env override (absolute)
-  //   2. <dataDir>/pipeline (desktop: APP_DATA_DIR/pipeline, dev: cwd/pipeline)
-  //   3. cwd/pipeline (desktop fallback when scripts haven't been copied to dataDir yet)
-  const pipelineDir = resolvePipelineDir(isDesktopMode, dataDir);
+  // Pipeline — PIPELINE_DIR env override, otherwise dataDir/pipeline
+  const pipelineDir = process.env.PIPELINE_DIR
+    ? path.resolve(process.env.PIPELINE_DIR)
+    : path.resolve(dataDir, "pipeline");
 
-  cached = { dataDir, dbPath, dbUrl, settingsPath, pipelineDir, isDesktopMode };
+  cached = { dataDir, dbPath, dbUrl, settingsPath, pipelineDir };
   return cached;
 }
 
@@ -63,36 +48,7 @@ export const paths: AppPaths = {
   get dbUrl() { return resolve().dbUrl; },
   get settingsPath() { return resolve().settingsPath; },
   get pipelineDir() { return resolve().pipelineDir; },
-  get isDesktopMode() { return resolve().isDesktopMode; },
 };
-
-// Pipeline dir resolution — legacy (Python scripts no longer used at runtime).
-// Kept for backward compatibility with tooling that may reference pipeline dir.
-// Never throws — returns best-effort path.
-function resolvePipelineDir(isDesktopMode: boolean, dataDir: string): string {
-  if (process.env.PIPELINE_DIR) {
-    return path.resolve(process.env.PIPELINE_DIR);
-  }
-
-  const dataDirPipeline = path.resolve(dataDir, "pipeline");
-
-  if (!isDesktopMode) {
-    return dataDirPipeline; // cwd/pipeline — same as before
-  }
-
-  // Desktop mode: prefer dataDir/pipeline if it exists, otherwise cwd/pipeline
-  if (fs.existsSync(dataDirPipeline)) {
-    return dataDirPipeline;
-  }
-
-  const cwdPipeline = path.resolve(process.cwd(), "pipeline");
-  if (fs.existsSync(cwdPipeline)) {
-    return cwdPipeline;
-  }
-
-  // Fallback to dataDir/pipeline — won't throw, caller can check existence if needed
-  return dataDirPipeline;
-}
 
 export function resetPaths(): void {
   cached = null;

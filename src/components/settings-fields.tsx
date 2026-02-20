@@ -59,11 +59,9 @@ export function SwitchRow({
 export function ProviderFields({
   draft,
   set,
-  isDesktop,
 }: {
   draft: AppConfig;
   set: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
-  isDesktop: boolean;
 }) {
   return (
     <>
@@ -95,17 +93,13 @@ export function ProviderFields({
 
       {draft.llmProvider === "openrouter" && (
         <>
-          <Field label="API Key" description={
-            isDesktop
-              ? "Stored securely in OS keychain"
-              : "Set OPENROUTER_API_KEY in .env.local"
-          }>
+          <Field label="API Key" description="Set OPENROUTER_API_KEY in .env.local">
             <Input
               type="password"
               value={draft.openrouterApiKey}
               onChange={(e) => set("openrouterApiKey", e.target.value)}
               placeholder="sk-or-..."
-              disabled={!isDesktop && draft.openrouterApiKey === "***"}
+              disabled={draft.openrouterApiKey === "***"}
             />
           </Field>
           <Field label="Model">

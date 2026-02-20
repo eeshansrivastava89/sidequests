@@ -7,8 +7,6 @@
 
 import { fork } from "node:child_process";
 import fs from "node:fs";
-import net from "node:net";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +14,7 @@ import { execSync } from "node:child_process";
 
 import { bootstrapDb } from "./bootstrap-db.mjs";
 import { openBrowser } from "./open-browser.mjs";
+import { resolveDataDir, findFreePort, waitForServer, parseArgs } from "./cli-helpers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkgPath = path.join(__dirname, "..", "package.json");
@@ -28,9 +27,9 @@ const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const bold = (s) => `\x1b[1m${s}\x1b[0m`;
 
 // ── Parse args ─────────────────────────────────────────
-const args = process.argv.slice(2);
+const parsed = parseArgs(process.argv.slice(2));
 
-if (args.includes("--help") || args.includes("-h")) {
+if (parsed.help) {
   console.log(`
 ${bold("Projects Dashboard")} v${pkg.version}
 
@@ -45,14 +44,13 @@ Options:
   process.exit(0);
 }
 
-if (args.includes("--version") || args.includes("-v")) {
+if (parsed.version) {
   console.log(pkg.version);
   process.exit(0);
 }
 
-const noOpen = args.includes("--no-open");
-const portIdx = args.indexOf("--port");
-const requestedPort = portIdx !== -1 ? Number(args[portIdx + 1]) : null;
+const noOpen = parsed.noOpen;
+const requestedPort = parsed.port;
 
 // ── Check Node version ─────────────────────────────────
 const [major, minor] = process.versions.node.split(".").map(Number);
@@ -69,17 +67,6 @@ try {
 }
 
 // ── Resolve data directory ─────────────────────────────
-function resolveDataDir() {
-  switch (process.platform) {
-    case "darwin":
-      return path.join(os.homedir(), "Library", "Application Support", "ProjectsDashboard");
-    case "win32":
-      return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "ProjectsDashboard");
-    default:
-      return path.join(process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"), "ProjectsDashboard");
-  }
-}
-
 const dataDir = resolveDataDir();
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -102,29 +89,6 @@ await bootstrapDb(dbPath);
 console.log(green("Database ready."));
 
 // ── Find free port ─────────────────────────────────────
-function findFreePort(preferred) {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.listen(preferred ?? 0, "127.0.0.1", () => {
-      const addr = srv.address();
-      if (addr && typeof addr === "object") {
-        const port = addr.port;
-        srv.close(() => resolve(port));
-      } else {
-        reject(new Error("Could not determine port"));
-      }
-    });
-    srv.on("error", (err) => {
-      if (preferred && err.code === "EADDRINUSE") {
-        // Fall back to random port
-        findFreePort(null).then(resolve, reject);
-      } else {
-        reject(err);
-      }
-    });
-  });
-}
-
 const port = await findFreePort(requestedPort);
 
 // ── Start Next.js standalone server ────────────────────
@@ -152,28 +116,6 @@ serverProcess.stderr?.on("data", (chunk) => {
 });
 
 // ── Wait for server readiness ──────────────────────────
-function waitForServer(url, timeoutMs = 30_000) {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      if (Date.now() - start > timeoutMs) {
-        reject(new Error(`Server did not start within ${timeoutMs}ms`));
-        return;
-      }
-      const req = http.get(url, (res) => {
-        if (res.statusCode && res.statusCode < 500) {
-          resolve();
-        } else {
-          setTimeout(check, 200);
-        }
-      });
-      req.on("error", () => setTimeout(check, 200));
-      req.end();
-    };
-    check();
-  });
-}
-
 const serverUrl = `http://127.0.0.1:${port}`;
 
 try {

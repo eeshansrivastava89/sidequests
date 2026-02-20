@@ -47,8 +47,6 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const isDesktop = typeof window !== "undefined" && !!window.electron?.secrets;
-
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -57,18 +55,7 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
       const keyChanged = openrouterApiKey !== config.openrouterApiKey;
 
       if (keyChanged && openrouterApiKey !== "***") {
-        if (isDesktop) {
-          // Desktop: persist via encrypted IPC
-          if (openrouterApiKey) {
-            await window.electron!.secrets.set("openrouterApiKey", openrouterApiKey);
-          } else {
-            await window.electron!.secrets.delete("openrouterApiKey");
-          }
-          toast.info("API key saved securely. Restart app for changes to take effect.");
-        } else {
-          // Non-desktop: env vars only — warn user
-          toast.warning("API key cannot be saved in web mode. Set OPENROUTER_API_KEY in .env.local instead.");
-        }
+        toast.warning("API key cannot be saved via UI. Set OPENROUTER_API_KEY in .env.local instead.");
       }
 
       // Save non-secret settings via API
@@ -148,7 +135,7 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
                   onCheckedChange={(v) => set("featureO1", v)}
                 />
 
-                <ProviderFields draft={draft} set={set} isDesktop={isDesktop} />
+                <ProviderFields draft={draft} set={set} />
 
                 <Field label="Concurrency" description="Parallel LLM tasks (1-10)">
                   <Input

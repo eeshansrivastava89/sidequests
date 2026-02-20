@@ -11,7 +11,6 @@ vi.mock("@/lib/app-paths", () => {
     paths: {
       get dataDir() { return tmpDir; },
       get settingsPath() { return path.join(tmpDir, "settings.json"); },
-      get isDesktopMode() { return !!process.env.APP_DATA_DIR; },
       get dbPath() { return path.join(tmpDir, "dev.db"); },
       get dbUrl() { return `file:${path.join(tmpDir, "dev.db")}`; },
       get pipelineDir() { return path.join(tmpDir, "pipeline"); },

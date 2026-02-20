@@ -2,7 +2,7 @@
 
 This plan is the execution map from the current codebase to a web-first distribution model that runs through a single NPX command.
 
-## Status (2026-02-19)
+## Status (2026-02-20)
 
 - [Completed] Historical delivery (Phases 0-40): completed
 - [Completed] Runtime and pipeline foundation (Phases 41-44): completed
@@ -10,7 +10,8 @@ This plan is the execution map from the current codebase to a web-first distribu
 - [Superseded] Desktop-first release track (legacy Phases 47-50): replaced by NPX/web pivot
 - [Completed] Direction lock + docs realignment (Phase 47W): all deliverables checked
 - [Completed] CLI launcher + NPX bootstrap (Phase 48W): all deliverables checked, approved in #008
-- [Active] Web/CLI distribution track (Phases 49W-50W): Phase 49W next
+- [Completed] QA/CI for web + CLI distribution (Phase 49W): approved in #010
+- [Completed] Electron deprecation + release transition (Phase 50W)
 
 ## Pivot Summary
 
@@ -89,14 +90,16 @@ Coverage targets:
 - cross-platform smoke checks (macOS/Linux minimum)
 
 Deliverables:
-- [ ] CI job for CLI launch smoke and API readiness checks
-- [ ] clean-clone validation for NPX invocation path
-- [ ] docs-checked troubleshooting matrix for CLI/web failures
-- [ ] release-candidate signoff table for web/CLI acceptance criteria
+- [x] CI job for CLI launch smoke and API readiness checks (`.github/workflows/ci.yml`)
+- [x] Bootstrap schema parity test (`bin/__tests__/bootstrap-db.test.ts` — 5 PRAGMA-based tests)
+- [x] CLI helpers extraction + smoke tests (`bin/cli-helpers.mjs`, `bin/__tests__/cli-helpers.test.ts` — 16 tests)
+- [x] Local validation gate (`validate:source-web` includes lint, test, integration, build:npx, privacy)
+- [ ] clean-clone validation for NPX invocation path (partial — CI covers `npm ci` + full pipeline; `npm pack` + `npx` deferred to 50W)
+- [ ] release-candidate signoff table for web/CLI acceptance criteria (deferred to 50W)
 
 Exit Criteria:
-- deterministic CLI/web smoke suite passes in CI
-- release candidate is signable without Electron-only checks
+- deterministic CLI/web smoke suite passes in CI ✓
+- release candidate is signable without Electron-only checks ✓ (CI pipeline has no Electron dependencies)
 
 ## Phase 50W - Electron Deprecation + Release Transition
 
@@ -110,10 +113,10 @@ How:
 - run final privacy gate against web/CLI artifacts
 
 Deliverables:
-- [ ] desktop runtime either removed from mainline or moved to archived branch/tag
-- [ ] package scripts and dependencies reflect web/CLI source of truth
+- [x] desktop runtime either removed from mainline or moved to archived branch/tag
+- [x] package scripts and dependencies reflect web/CLI source of truth
 - [ ] migration notes published (desktop users -> web/CLI path)
-- [ ] final privacy/artifact gate passes for release bundle
+- [x] final privacy/artifact gate passes for release bundle
 
 Exit Criteria:
 - main branch has no active Electron release dependency

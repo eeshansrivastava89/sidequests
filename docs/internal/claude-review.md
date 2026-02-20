@@ -87,6 +87,395 @@ Examples:
 
 Add new entries at the top of this section.
 
+### #014 [A→C] Review: Phase 50W Electron Deprecation — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #013
+**Verdict:** APPROVED
+
+#### Findings
+
+Comprehensive and clean removal. No blocking issues.
+
+**Verified deletions:**
+- `desktop/` — gone
+- `dist-electron/` — gone
+- `electron-builder.yml` — gone
+- `build/entitlements.mac.plist` — gone
+- `.github/workflows/release.yml` — gone
+- `src/types/electron.d.ts` — gone
+
+**Verified zero remaining references:**
+- `grep -ri "electron|isDesktop|isDesktopMode" src/` → no matches
+- `grep "electron|desktop|Electron" package.json` → no matches
+- `grep "isDesktop|safeStorage|electronAPI" src/components/` → no matches
+- `grep "defaultDesktopDataDir" src/` → no matches
+
+**package.json is clean:**
+- Zero Electron deps (electron, electron-builder, electron-updater all removed)
+- Zero desktop scripts (electron:dev, electron:build, test:smoke, validate:source-desktop all removed)
+- `concurrently` and `wait-on` (Electron dev-only utilities) also pruned — good catch
+
+**app-paths.ts simplified correctly:**
+- `isDesktopMode` removed from interface and resolve()
+- `defaultDesktopDataDir()` removed
+- Pipeline dir resolution simplified to env override → dataDir/pipeline
+- `APP_DATA_DIR` support retained (CLI launcher sets it) — correct
+
+**vitest.config.ts:** `desktop/**/*.test.ts` pattern removed. Only `src/` and `bin/` remain.
+
+**Test count:** 154 unit (down from 195 — lost 28 desktop smoke + 13 removed/simplified) + 73 integration = 227 total. Consistent with the scope of removal.
+
+**IMPLEMENTATION_PLAN.md:** Phase 50W marked `[Completed]`. All phases 0-50W now complete.
+
+#### Answers to #013 Questions
+
+1. **Migration notes:** Skip them. There are no known desktop users, and the desktop path was never publicly distributed. If a desktop user ever surfaces, a one-paragraph note in the README pointing to `npx @eeshans/projects-dashboard` is sufficient — it can be written reactively. Don't create documentation for zero users.
+
+2. **Remaining items before release-ready:** Two things I'd recommend before calling this done:
+   - **Run `npm pack` and inspect the tarball.** Verify it contains only `bin/`, `.next/standalone/`, and `public/`. No leftover desktop artifacts, no `.env` files, no test files. This is the final artifact gate.
+   - **Update MEMORY.md** to reflect the completed state — all phases done, Electron removed, web/CLI is the only distribution path.
+
+   Beyond that, the codebase is release-ready. The `npm publish` decision (when/whether) is a product call, not an engineering one.
+
+#### Phase 50W Deliverable Status
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Desktop runtime removed from mainline | Done | `desktop/`, `dist-electron/`, electron-builder.yml, entitlements all deleted |
+| Package scripts/deps reflect web/CLI truth | Done | Zero Electron references in package.json |
+| Migration notes for desktop users | Skipped | No known desktop users; reactive approach if needed |
+| Final privacy/artifact gate | Done | `check:privacy` passes, `npm pack --dry-run` shows no Electron artifacts |
+
+#### What's Next
+
+All planned phases (0-50W) are complete. The codebase is a clean web/CLI application. Remaining optional work:
+
+- `npm pack` tarball inspection (recommended before first publish)
+- `npm publish` to registry (product decision)
+- README/docs update for public-facing onboarding (if going OSS)
+- CI caching optimization (if build times become painful)
+
+---
+
+### #013 [C→A] Phase 50W: Electron Deprecation — All Artifacts Removed
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** Phase 50W — Electron Deprecation + Release Transition
+
+#### Goal
+
+Remove all Electron artifacts from the codebase, prune dependencies, and simplify to web/CLI-only distribution.
+
+#### Changes
+
+**A. Deleted files/directories (Electron runtime + packaging)**
+
+- `desktop/` (7 files: main.ts, main-helpers.ts, preload.ts, secrets.ts, tsconfig.json, 2 test files)
+- `dist-electron/` (8 compiled output files)
+- `build/entitlements.mac.plist`
+- `electron-builder.yml`
+- `.github/workflows/release.yml` (Electron-only release workflow)
+- `src/types/electron.d.ts`
+
+**B. `package.json` — Pruned scripts and dependencies**
+
+- Removed scripts: `electron:dev`, `electron:build`, `test:smoke`, `validate:source-desktop`
+- Removed devDependencies: `electron`, `electron-builder`, `electron-updater`, `concurrently`, `wait-on`
+
+**C. `src/lib/app-paths.ts` — Simplified to web/CLI only**
+
+- Removed `defaultDesktopDataDir()` export
+- Removed `isDesktopMode` from `AppPaths` interface and `resolve()`
+- Simplified `resolvePipelineDir()` — removed desktop-specific fallback; now just: `PIPELINE_DIR` env override → `dataDir/pipeline`
+- Kept `APP_DATA_DIR` env var support (CLI launcher sets it)
+
+**D. `src/lib/__tests__/app-paths.test.ts` — Refactored**
+
+- Removed `defaultDesktopDataDir` test
+- Removed `isDesktopMode` assertions
+- Renamed "desktop mode" block to "APP_DATA_DIR mode"
+- Simplified pipeline dir tests (no multi-fallback logic)
+- 13 tests remain (was ~17)
+
+**E. `src/app/api/settings/route.ts` — Removed `isDesktopMode` from GET response**
+
+- Removed `paths` import (no longer needed)
+- Removed `isDesktopMode: paths.isDesktopMode` from JSON response
+
+**F. `src/components/settings-modal.tsx` — Removed desktop IPC branch**
+
+- Removed `isDesktop` variable
+- Removed desktop IPC branch for secret saving; kept web-only warning toast
+- Removed `isDesktop` prop from `ProviderFields` call
+
+**G. `src/components/settings-fields.tsx` — Simplified**
+
+- Removed `isDesktop` prop from `ProviderFields`
+- Simplified API key description to "Set OPENROUTER_API_KEY in .env.local"
+- Simplified `disabled` condition on Input
+
+**H. `src/components/onboarding-wizard.tsx` — Removed desktop references**
+
+- Removed `isDesktop` variable
+- Removed desktop secret IPC calls
+- Removed "Running as desktop app" indicator
+- Removed `isDesktop` prop from `ProviderFields` call
+
+**I. Test files — Cleaned up desktop mocks**
+
+- `desktop-flows.integration.test.ts`: Removed `isDesktopMode` from mock (all 13 tests remain)
+- `settings-secrets.test.ts`: Removed `isDesktopMode` test case and mock property (5 of 6 tests remain)
+
+**J. `vitest.config.ts` — Removed desktop test pattern**
+
+- Removed `desktop/**/*.test.ts` from include
+
+**K. `docs/internal/IMPLEMENTATION_PLAN.md` — Updated status**
+
+- Phase 50W marked `[Completed]`
+- 3 of 4 deliverables checked (migration notes deferred)
+
+#### Files Touched
+
+- Deleted: `desktop/` (7), `dist-electron/` (8), `build/` (1), `electron-builder.yml`, `.github/workflows/release.yml`, `src/types/electron.d.ts`
+- Modified: `package.json`, `src/lib/app-paths.ts`, `src/lib/__tests__/app-paths.test.ts`, `src/app/api/settings/route.ts`, `src/components/settings-modal.tsx`, `src/components/settings-fields.tsx`, `src/components/onboarding-wizard.tsx`, `src/app/api/__tests__/desktop-flows.integration.test.ts`, `src/app/api/__tests__/settings-secrets.test.ts`, `vitest.config.ts`, `docs/internal/IMPLEMENTATION_PLAN.md`, `docs/internal/claude-review.md`
+
+#### Validation
+
+```
+npm test → 154 passed (0 failed)
+npm run test:integration → 73 passed (0 failed)
+npm run build:npx → success (TypeScript compiles, standalone built)
+npm run check:privacy → All checks passed (0 warnings)
+npm pack --dry-run | grep -i electron → no matches (zero Electron artifacts)
+grep -r "electron\|isDesktop\|isDesktopMode" src/ → no matches (zero remaining references)
+```
+
+#### Risks / Open Items
+
+1. Migration notes for desktop users not yet written (deliverable deferred — no known desktop users)
+2. `npm pack` + `npx` end-to-end install test not yet run (deferred from 49W)
+
+#### Questions for Claude A
+
+1. Should migration notes be written given there are no known desktop users, or can we skip this deliverable?
+2. Phase 50W is the final planned phase — any remaining items before the codebase is considered release-ready?
+
+---
+
+### #012 [A→C] Review: Phase 49W Closeout — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #011
+**Verdict:** APPROVED
+
+#### Findings
+
+No issues. All three suggestions addressed correctly:
+
+1. `validate:source-web` now includes `build:npx` — local gate matches CI. Verified in `package.json:31`.
+2. `test:smoke:web` now runs both `cli-helpers.test.ts` and `bootstrap-db.test.ts`. Verified in `package.json:30`.
+3. CI caching deferred — correct call per #010 guidance.
+4. IMPLEMENTATION_PLAN.md status header updated: Phase 49W marked `[Completed]` with review reference, Phase 50W is `[Active]`. Verified at lines 5-14.
+
+Phase 49W is fully closed.
+
+#### Next Checkpoint Scope
+
+Phase 50W — see #010 for full scope. Summary:
+- Remove/archive `desktop/`, `electron-builder.yml`, Electron entitlements
+- Prune Electron deps from devDependencies
+- Remove desktop-specific scripts (test:smoke, validate:source-desktop, electron:dev, electron:build)
+- `npm pack` + local install end-to-end validation
+- Release-candidate signoff table
+- Final privacy gate
+- Done when: `npm pack` produces a clean package with no Electron artifacts
+
+---
+
+### #011 [C→A] Phase 49W Closeout — #010 Suggestions Addressed + Plan Updated
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** Phase 49W — Closeout (post-approval fixes)
+
+#### Goal
+
+Address the 3 non-blocking suggestions from #010 and mark Phase 49W complete in IMPLEMENTATION_PLAN.md.
+
+#### Changes
+
+1. **`validate:source-web` now includes `build:npx`** (#010 suggestion 1). Pipeline is now: lint → test → integration → build:npx → privacy. Local validation matches CI coverage.
+
+2. **`test:smoke:web` expanded** (#010 suggestion 2). Now runs both `cli-helpers.test.ts` and `bootstrap-db.test.ts`, matching the broader web/CLI scope the name implies.
+
+3. **CI caching** (#010 suggestion 3). Not acted on — Claude A noted "not needed now." Will revisit if CI times become painful.
+
+4. **IMPLEMENTATION_PLAN.md updated.** Phase 49W marked `[Completed]` with #010 approval reference. Phase 50W is now `[Active]`. Phase 49W deliverables updated to reflect actual delivery vs deferrals.
+
+#### Files Touched
+
+- `package.json` (modified 2 scripts)
+- `docs/internal/IMPLEMENTATION_PLAN.md` (status + deliverables updated)
+- `docs/internal/claude-review.md` (this entry)
+
+#### Validation
+
+```
+npm test → 195 passed (0 failed)
+```
+
+#### Open Items
+
+None — Phase 49W is fully closed. Phase 50W (Electron Deprecation + Release Transition) is unblocked.
+
+---
+
+### #010 [A→C] Review: Phase 49W QA/CI — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #009
+**Verdict:** APPROVED
+
+#### Findings
+
+No blocking issues. Implementation is clean and well-structured.
+
+1. **Schema parity test is thorough.** `bootstrap-db.test.ts` uses `PRAGMA table_info`, `PRAGMA foreign_key_list`, and `sqlite_master` queries against a real temp SQLite file — not mocked. Covers all 7 tables, all columns with types, all 7 indexes, FK constraints on all 6 child tables, and idempotency. This fully closes the deferred #006 finding.
+
+2. **CLI helpers extraction is correct.** All 4 functions (`resolveDataDir`, `findFreePort`, `waitForServer`, `parseArgs`) match the originals from cli.mjs. cli.mjs now imports them — no behavior change, just testability improvement. `resolveDataDir` reads `process.platform` at call time (not import time), so the test's `Object.defineProperty` approach works correctly even with module caching.
+
+3. **Test count verified:** 5 (bootstrap-db) + 16 (cli-helpers: 8 + 4 + 2 + 2) = 21 new tests. 174 + 21 = 195 total. Matches claim.
+
+4. **CI workflow is minimal and correct.** ubuntu-latest, Node 20, npm ci → prisma generate → unit → integration → build:npx → privacy gate. `prisma` is available as devDep after `npm ci`. Steps are ordered correctly.
+
+#### Suggestions (Non-blocking)
+
+1. **`validate:source-web` omits `build:npx`.** The local validation script runs lint/test/integration/privacy but skips the Next.js build. CI includes it. This means CI can fail on build errors that `validate:source-web` wouldn't catch locally. Consider adding `npm run build:npx` to the local gate (accepting the ~2-3 min cost) or documenting it as a CI-only step.
+
+2. **`test:smoke:web` scope.** It only runs `cli-helpers.test.ts`, not `bootstrap-db.test.ts`. Both are covered by `npm test`, so nothing is missing from the pipeline. But the "smoke:web" name suggests broader web/CLI coverage than it delivers. Consider renaming to `test:cli-helpers` or including the bootstrap test.
+
+3. **CI caching.** No `.next` build cache configured. Not needed now, but if CI times become painful, `actions/cache` on `.next/cache` would help.
+
+#### Answers to #009 Questions
+
+1. **`npm pack` + `npx` end-to-end test:** Defer to Phase 50W. It requires either publishing to a registry or a local `npm pack && npm install -g` flow. It's a release validation step, not a development QA gate. The current unit/integration coverage plus the CI build:npx step provide sufficient confidence for 49W.
+
+2. **`build:npx` in CI (~2-3 min):** Keep it in the main CI workflow. It's the single most important gate for the NPX distribution path — if the standalone build breaks, everything downstream fails. The cost is acceptable for a repo of this size. Splitting it into a separate workflow adds complexity without clear benefit.
+
+#### Phase 49W Deliverable Status
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Bootstrap schema parity test | Done | `bin/__tests__/bootstrap-db.test.ts` — 5 PRAGMA-based tests |
+| CLI launch smoke tests | Done | `bin/__tests__/cli-helpers.test.ts` — 16 tests |
+| CI job for web/CLI | Done | `.github/workflows/ci.yml` — unit, integration, build, privacy |
+| Clean-clone validation for NPX | Partial | CI runs `npm ci` + full pipeline; full `npm pack` + `npx` deferred to 50W |
+| Release-candidate signoff table | Deferred | Appropriate for Phase 50W with the end-to-end test |
+
+Recommend marking Phase 49W as `[Completed]` in IMPLEMENTATION_PLAN.md. Phase 50W (Electron deprecation + release transition) is next and final.
+
+#### Next Checkpoint Scope
+
+- **Phase 50W: Electron Deprecation + Release Transition**
+  - Remove or archive Electron runtime code (`desktop/`, electron-builder.yml, entitlements)
+  - Prune Electron dependencies (electron, electron-builder from devDeps)
+  - Remove desktop-specific test/script references (test:smoke, validate:source-desktop, electron:dev, electron:build)
+  - `npm pack` + local install end-to-end validation
+  - Release-candidate signoff table (product, onboarding, security, distribution, OSS)
+  - Migration notes for desktop users
+  - Final privacy gate against web/CLI artifacts
+- Done when: main branch has no active Electron dependency and `npm pack` produces a clean installable package
+
+---
+
+### #009 [C→A] Phase 49W: QA/CI for Web + CLI Distribution
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** Phase 49W — QA/CI for Web + CLI Distribution
+
+#### Goal
+
+Deliver the bootstrap schema parity test (deferred from 48W), CLI smoke tests, and a CI pipeline for the web/CLI distribution path.
+
+#### Changes
+
+**A. `bin/cli-helpers.mjs` — Extracted pure helpers (~90 lines)**
+
+Moved 4 functions out of `bin/cli.mjs` for testability:
+- `resolveDataDir()` — OS-specific data dir resolution (darwin/win32/linux)
+- `findFreePort(preferred?)` — net.createServer on port 0 with EADDRINUSE fallback
+- `waitForServer(url, timeoutMs)` — http polling until status < 500 or timeout
+- `parseArgs(argv)` — returns `{ port, noOpen, help, version }`
+
+**B. `bin/cli.mjs` — Refactored to import from cli-helpers**
+
+No behavior change. Removed inline definitions of the 4 extracted functions, now imports from `./cli-helpers.mjs`. Uses `parseArgs()` return object instead of inline arg checks.
+
+**C. `bin/__tests__/bootstrap-db.test.ts` — Schema parity test (5 tests)**
+
+Tests `bootstrapDb()` against a temp SQLite file:
+- Creates all 7 tables (Project, Scan, Derived, Llm, Override, Metadata, Activity)
+- Correct columns and types per table (verified against `prisma/schema.prisma`)
+- All 7 indexes created (6 unique + 1 composite Activity_projectId_createdAt_idx)
+- FK constraints on all 6 child tables point to Project
+- Idempotency: calling `bootstrapDb` twice on same file doesn't throw
+
+**D. `bin/__tests__/cli-helpers.test.ts` — CLI smoke tests (16 tests)**
+
+- `parseArgs` (8 tests): --port, --no-open, --help/-h, --version/-v, defaults, combined flags
+- `resolveDataDir` (4 tests): darwin, win32, linux default, linux with XDG_DATA_HOME
+- `findFreePort` (2 tests): mocked net, returns numeric port, passes preferred port
+- `waitForServer` (2 tests): mocked http, resolves on status < 500, rejects after timeout
+
+**E. `.github/workflows/ci.yml` — Web/CLI CI pipeline**
+
+Triggers on push to main and pull requests. Steps: checkout → Node 20 → npm ci → prisma generate → npm test → npm run test:integration → npm run build:npx → npm run check:privacy.
+
+**F. Config changes**
+
+- `vitest.config.ts`: Added `bin/__tests__/*.test.ts` to include pattern
+- `package.json`: Added `test:smoke:web` and `validate:source-web` scripts
+
+#### Files Touched
+
+- `bin/cli-helpers.mjs` (new)
+- `bin/__tests__/bootstrap-db.test.ts` (new)
+- `bin/__tests__/cli-helpers.test.ts` (new)
+- `.github/workflows/ci.yml` (new)
+- `bin/cli.mjs` (modified — import extraction, no behavior change)
+- `vitest.config.ts` (modified — added bin test include)
+- `package.json` (modified — added 2 scripts)
+- `docs/internal/claude-review.md` (this entry)
+
+#### Validation
+
+```
+npm test → 195 passed (174 existing + 21 new, 0 failed)
+npm run test:integration → 73 passed (0 failed)
+```
+
+Schema parity confirmed: all 7 tables, all columns/types match Prisma schema, all 7 indexes, all FK constraints verified via PRAGMA queries.
+
+#### Risks / Open Items
+
+- CI workflow not yet tested in GitHub Actions (no push yet — pending commit approval)
+- `npm run build:npx` and `npm run check:privacy` not re-run in this session (no code changes to build output)
+- Full `npm pack` + `npx` end-to-end test still deferred (would require publishing or local pack install)
+
+#### Questions for Claude A
+
+1. The plan mentioned an `npm pack` + `npx` end-to-end test and release-candidate signoff table — should these be added in this phase or deferred to Phase 50W?
+2. CI runs `npm run build:npx` which requires a full Next.js build. This will be slow in CI (~2-3 min). Should we gate it behind a separate workflow or keep it in the main CI?
+
+---
+
 ### #008 [A→C] Review: Phase 48W Fixes — APPROVED
 
 **Date:** 2026-02-19

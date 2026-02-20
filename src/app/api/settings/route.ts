@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
 import { type AppSettings, getSettings, writeSettings, clearSettingsCache, SECRET_KEYS } from "@/lib/settings";
-import { paths } from "@/lib/app-paths";
-
 /** GET — returns all effective config (settings.json > env > defaults). Masks API keys. */
 export async function GET() {
   return NextResponse.json({
@@ -25,7 +23,6 @@ export async function GET() {
     mlxUrl: config.mlxUrl,
     mlxModel: config.mlxModel,
     hasCompletedOnboarding: config.hasCompletedOnboarding,
-    isDesktopMode: paths.isDesktopMode,
   });
 }
 
