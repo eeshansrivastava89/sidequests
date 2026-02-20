@@ -89,7 +89,8 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   const handleSaveAndContinue = async () => {
     setSaving(true);
     try {
-      const { openrouterApiKey: _openrouterApiKey, ...nonSecretDraft } = draft;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { openrouterApiKey, ...nonSecretDraft } = draft;
 
       const res = await fetch("/api/settings", {
         method: "PUT",

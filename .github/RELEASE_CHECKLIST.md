@@ -1,34 +1,35 @@
-# Release Checklist (Source-First Default)
+# Release Checklist
 
 ## Pre-Release
 
 - [ ] All tests pass: `npm test` and `npm run test:integration`
-- [ ] TypeScript compiles: `npx tsc --noEmit` and `npx tsc -p desktop/tsconfig.json`
+- [ ] TypeScript compiles: `npx tsc --noEmit`
 - [ ] Lint passes: `npm run lint`
 - [ ] Version bumped in `package.json`
 - [ ] CHANGELOG updated (if maintained)
 
 ## Build Verification
 
-- [ ] `npm run build` succeeds
-- [ ] `npm run electron:build -- --dir` produces app bundle
-- [ ] App launches from packaged build
+- [ ] `npm run build:npx` succeeds
+- [ ] `npm pack --dry-run` shows only `bin/*.mjs`, `.next/standalone/`, `public/`
+- [ ] `npx @eeshans/projects-dashboard --no-open` starts server and `/api/preflight` returns 200
 - [ ] Onboarding wizard works on fresh config
 - [ ] Scan completes successfully
 - [ ] Settings persist across restart
 
+## Privacy Gate
+
+- [ ] `npm run check:privacy` passes
+- [ ] No `.env` files in `npm pack` output
+- [ ] No test files in `npm pack` output
+
 ## Release
 
 - [ ] Create and push git tag: `git tag v<version> && git push origin v<version>`
-- [ ] Source-first release notes published (build/run commands verified)
-- [ ] GitHub Actions `release.yml` workflow completes (if using prebuilt artifacts)
-- [ ] Optional: DMG artifact is signed and notarized (only when maintainer credentials are configured)
-- [ ] Optional: GitHub Release includes desktop artifacts (`.dmg/.zip/.yml`)
+- [ ] `npm publish` (or `npm publish --access public` for first publish)
+- [ ] Verify: `npx @eeshans/projects-dashboard@<version>` launches correctly
 
 ## Post-Release
 
-- [ ] Clean-clone validation: clone -> install -> setup -> desktop run works
+- [ ] Clean-machine validation: `npx @eeshans/projects-dashboard` on fresh environment
 - [ ] Smoke test: configure > scan > enrich flow works
-- [ ] Optional signed lane: Download DMG and verify install on clean macOS
-- [ ] Optional signed lane: Gatekeeper accepts app without manual bypass
-- [ ] Optional signed lane: Auto-update delivers to previous version (if applicable)

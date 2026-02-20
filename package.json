@@ -23,7 +23,6 @@
     "setup": "node scripts/setup.mjs",
     "build:npx": "next build && cp -r .next/static .next/standalone/.next/static && rm -rf .next/standalone/public && cp -r public .next/standalone/public && rm -f .next/standalone/.env .next/standalone/.env.local && chmod +x bin/cli.mjs",
     "check:privacy": "node scripts/privacy-gate.mjs",
-    "check:privacy:full": "node scripts/privacy-gate.mjs --check-artifact",
     "test:smoke:web": "vitest run bin/__tests__/cli-helpers.test.ts bin/__tests__/bootstrap-db.test.ts",
     "validate:source-web": "npm run lint && npm test && npm run test:integration && npm run build:npx && npm run check:privacy"
   },

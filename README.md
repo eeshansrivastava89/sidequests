@@ -4,27 +4,34 @@ A local-first developer tool that scans your dev directory and gives you a bird'
 
 Runs entirely on your machine. No cloud services, no telemetry.
 
-## Install
+## Quick Start
 
-### Recommended: Build From Source (macOS)
+```bash
+npx @eeshans/projects-dashboard
+```
+
+**Prerequisites:** Node.js >= 20.9, git
+
+On first launch, the onboarding wizard walks you through configuration.
+
+### CLI Options
+
+```
+--port <n>    Use a specific port (default: auto-detect free port)
+--no-open     Don't open browser automatically
+--help        Show help
+--version     Show version
+```
+
+### Development
 
 ```bash
 git clone https://github.com/eeshans/projects-dashboard.git
 cd projects-dashboard
 npm install
 npm run setup    # creates DB, copies default settings
-npm run electron:dev   # desktop app in dev shell
-# or:
-npm run electron:build # local packaged app build
+npm run dev      # start Next.js dev server at localhost:3000
 ```
-
-**Prerequisites:** Node.js >= 20.9, git
-
-On first launch, the setup wizard walks you through configuration.
-
-### Optional: Prebuilt DMG (When Published)
-
-Some maintainers may publish `.dmg` artifacts in [Releases](https://github.com/eeshans/projects-dashboard/releases). Signed/notarized distribution depends on maintainer Apple credentials and is not required to run from source.
 
 ## How It Works
 
@@ -45,8 +52,6 @@ All data stays in a local SQLite database. The pipeline is TypeScript-native (no
 - Dark mode
 - SSE-based live refresh progress
 - Optional LLM enrichment (Claude CLI, OpenRouter, Ollama, MLX, Codex CLI)
-- Desktop app with encrypted secret storage
-- Optional auto-updates when using published release channel
 - First-run onboarding wizard
 
 ## Configuration
@@ -68,7 +73,7 @@ Environment variables (`.env.local`) can override settings. The Settings UI take
 | Provider | Value | Requirements |
 |---|---|---|
 | Claude CLI | `claude-cli` | `claude` CLI installed and authenticated |
-| OpenRouter | `openrouter` | API key (set in Settings), optional model override |
+| OpenRouter | `openrouter` | API key (`OPENROUTER_API_KEY` in `.env.local`), optional model override |
 | Ollama | `ollama` | Ollama running locally, optional URL/model |
 | MLX | `mlx` | `mlx-lm-server` running, optional URL/model |
 | Codex CLI | `codex-cli` | `codex` CLI installed, requires **Allow Unsafe** enabled |
@@ -112,9 +117,8 @@ src/app/            Next.js App Router pages and API routes
 src/components/     React components (shadcn/ui)
 src/hooks/          Custom React hooks
 src/lib/            Utilities, config, database, pipeline, LLM providers
-desktop/            Electron main process + preload
+bin/                CLI launcher and bootstrap scripts
 prisma/             Database schema
-build/              Electron build resources
 ```
 
 ## Scripts
@@ -126,8 +130,7 @@ build/              Electron build resources
 | `npm test` | Run unit tests (vitest) |
 | `npm run test:integration` | Run integration tests |
 | `npm run setup` | First-time setup (prisma, config) |
-| `npm run electron:dev` | Run Electron in dev mode |
-| `npm run electron:build` | Build packaged Electron app |
+| `npm run build:npx` | Build standalone for NPX distribution |
 
 ## Troubleshooting
 
@@ -137,8 +140,6 @@ build/              Electron build resources
 | Database errors on first run | Run `npm run setup` or delete `dev.db` and restart |
 | Scan finds 0 projects | Check Dev Root points to a directory containing git repos |
 | LLM enrichment fails | Check provider config in Settings; ensure API key is set |
-| Desktop app won't open (macOS) | Right-click > Open on first launch |
-| Auto-update not working | Requires install from GitHub Releases (not from source) |
 | Settings not persisting | Check write permissions to app data directory |
 
 ## API

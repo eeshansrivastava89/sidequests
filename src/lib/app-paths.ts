@@ -14,6 +14,7 @@ let cached: AppPaths | null = null;
 function resolve(): AppPaths {
   if (cached) return cached;
 
+  // Set by CLI launcher (bin/cli.mjs) to isolate runtime data. Defaults to cwd in dev mode.
   const appDataDir = process.env.APP_DATA_DIR;
   const dataDir = appDataDir ?? process.cwd();
 

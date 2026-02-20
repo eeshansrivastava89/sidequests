@@ -56,9 +56,7 @@ export async function PUT(req: Request) {
       if (key in body && typeof body[key] === "string") {
         // Skip masked placeholders
         if (key === "openrouterApiKey" && body[key] === "***") continue;
-        // Secret keys: never persist to settings.json.
-        // Desktop: renderer handles via IPC (secrets:set) before calling this route.
-        // Web/dev: secrets come from .env.local only.
+        // Secret keys: never persist to settings.json — come from .env.local only.
         if ((SECRET_KEYS as string[]).includes(key)) {
           if (body[key] && body[key] !== "***") {
             secretsSkipped.push(key);

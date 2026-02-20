@@ -16,14 +16,6 @@ Thank you for your interest in contributing! This guide will help you get starte
    ```
 4. Open http://localhost:3000 — the onboarding wizard will guide you through initial configuration.
 
-### Electron Dev Mode
-
-```bash
-npm run electron:dev
-```
-
-This compiles the Electron TypeScript, starts Next.js dev server, and launches Electron.
-
 ## Development Workflow
 
 1. Create a branch from `main`
@@ -35,12 +27,12 @@ This compiles the Electron TypeScript, starts Next.js dev server, and launches E
 ## Testing
 
 ```bash
-npm test                    # 146 unit tests
-npm run test:integration    # 60 integration tests
+npm test                    # 154 unit tests
+npm run test:integration    # 73 integration tests
 npm run test:watch          # watch mode
 ```
 
-Tests use Vitest. Unit tests are in `src/**/__tests__/`. Integration tests use `vitest.integration.config.ts`.
+Tests use Vitest. Unit tests are in `src/**/__tests__/` and `bin/__tests__/`. Integration tests use `vitest.integration.config.ts`.
 
 ## Code Style
 
@@ -57,9 +49,8 @@ src/app/            Next.js App Router pages and API routes
 src/components/     React components (shadcn/ui based)
 src/hooks/          Custom React hooks
 src/lib/            Utilities, config, database, pipeline, LLM providers
-desktop/            Electron main process, preload, secrets
+bin/                CLI launcher and bootstrap scripts
 prisma/             Database schema
-build/              Electron build resources (entitlements)
 ```
 
 ## Key Architecture
@@ -67,7 +58,7 @@ build/              Electron build resources (entitlements)
 - **Pipeline:** TypeScript-native scan + derive (no Python dependency)
 - **Database:** Prisma 7 + SQLite with LibSQL adapter
 - **Merge model:** Override > Metadata > Derived > LLM > Scan
-- **Desktop:** Electron wraps Next.js standalone server; secrets use `safeStorage`
+- **Distribution:** Web/CLI via NPX (`npx @eeshans/projects-dashboard`)
 - **Config:** Settings UI > settings.json > env vars > defaults
 
 ## Reporting Bugs
@@ -75,7 +66,7 @@ build/              Electron build resources (entitlements)
 Open an issue with:
 - Steps to reproduce
 - Expected vs actual behavior
-- Node.js version, OS, and whether using desktop app or dev mode
+- Node.js version and OS
 
 ## Suggesting Features
 
