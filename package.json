@@ -1,8 +1,14 @@
 {
-  "name": "projects-dashboard",
+  "name": "@eeshans/projects-dashboard",
   "version": "0.1.0",
-  "private": true,
-  "main": "dist-electron/main.js",
+  "bin": {
+    "projects-dashboard": "./bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    ".next/standalone/",
+    "public/"
+  ],
   "engines": {
     "node": ">=20.9.0"
   },
@@ -18,6 +24,7 @@
     "setup": "node scripts/setup.mjs",
     "electron:dev": "tsc -p desktop/tsconfig.json && concurrently \"next dev\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "next build && cp -r .next/static .next/standalone/.next/static && tsc -p desktop/tsconfig.json && electron-builder",
+    "build:npx": "next build && cp -r .next/static .next/standalone/.next/static && rm -rf .next/standalone/public && cp -r public .next/standalone/public && rm -f .next/standalone/.env .next/standalone/.env.local && chmod +x bin/cli.mjs",
     "check:privacy": "node scripts/privacy-gate.mjs",
     "check:privacy:full": "node scripts/privacy-gate.mjs --check-artifact",
     "validate:source-desktop": "npm run lint && npm test && npm run test:integration && npm run test:smoke && npx tsc -p desktop/tsconfig.json && npm run electron:build -- --dir && npm run check:privacy:full"
@@ -33,7 +40,6 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron-updater": "^6.7.3",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "radix-ui": "^1.4.3",
@@ -50,6 +56,7 @@
     "concurrently": "^9.0.0",
     "electron": "^35.0.0",
     "electron-builder": "^25.0.0",
+    "electron-updater": "^6.7.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "prisma": "^7.3.0",

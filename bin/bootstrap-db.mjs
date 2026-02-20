@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+
+/**
+ * Runtime DB schema bootstrap using raw SQL.
+ * Uses @libsql/client to run CREATE TABLE IF NOT EXISTS for all 7 Prisma models.
+ * Idempotent — safe to run every launch.
+ */
+
+import { createClient } from "@libsql/client";
+
+const SCHEMA_SQL = [
+  // 1. Project — no FK deps
+  `CREATE TABLE IF NOT EXISTS "Project" (
+    "id"            TEXT NOT NULL PRIMARY KEY,
+    "name"          TEXT NOT NULL,
+    "pathHash"      TEXT NOT NULL,
+    "pathDisplay"   TEXT NOT NULL,
+    "pinned"        INTEGER NOT NULL DEFAULT 0,
+    "lastTouchedAt" TEXT,
+    "createdAt"     TEXT NOT NULL DEFAULT (datetime('now')),
+    "updatedAt"     TEXT NOT NULL DEFAULT (datetime('now')),
+    "prunedAt"      TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Project_pathHash_key" ON "Project"("pathHash")`,
+
+  // 2. Scan
+  `CREATE TABLE IF NOT EXISTS "Scan" (
+    "id"          TEXT NOT NULL PRIMARY KEY,
+    "projectId"   TEXT NOT NULL,
+    "rawJson"     TEXT NOT NULL,
+    "rawJsonHash" TEXT,
+    "scannedAt"   TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "Scan_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Scan_projectId_key" ON "Scan"("projectId")`,
+
+  // 3. Derived
+  `CREATE TABLE IF NOT EXISTS "Derived" (
+    "id"                 TEXT NOT NULL PRIMARY KEY,
+    "projectId"          TEXT NOT NULL,
+    "statusAuto"         TEXT NOT NULL,
+    "healthScoreAuto"    INTEGER NOT NULL,
+    "hygieneScoreAuto"   INTEGER NOT NULL DEFAULT 0,
+    "momentumScoreAuto"  INTEGER NOT NULL DEFAULT 0,
+    "scoreBreakdownJson" TEXT NOT NULL DEFAULT '{}',
+    "derivedJson"        TEXT NOT NULL,
+    "isDirty"            INTEGER NOT NULL DEFAULT 0,
+    "ahead"              INTEGER NOT NULL DEFAULT 0,
+    "behind"             INTEGER NOT NULL DEFAULT 0,
+    "framework"          TEXT,
+    "branchName"         TEXT,
+    "lastCommitDate"     TEXT,
+    "locEstimate"        INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT "Derived_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Derived_projectId_key" ON "Derived"("projectId")`,
+
+  // 4. Llm
+  `CREATE TABLE IF NOT EXISTS "Llm" (
+    "id"                     TEXT NOT NULL PRIMARY KEY,
+    "projectId"              TEXT NOT NULL,
+    "purpose"                TEXT,
+    "tagsJson"               TEXT,
+    "notableFeaturesJson"    TEXT,
+    "recommendationsJson"    TEXT,
+    "pitch"                  TEXT,
+    "aiInsightJson"          TEXT,
+    "aiInsightGeneratedAt"   TEXT,
+    "generatedAt"            TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "Llm_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Llm_projectId_key" ON "Llm"("projectId")`,
+
+  // 5. Override
+  `CREATE TABLE IF NOT EXISTS "Override" (
+    "id"              TEXT NOT NULL PRIMARY KEY,
+    "projectId"       TEXT NOT NULL,
+    "statusOverride"  TEXT,
+    "purposeOverride" TEXT,
+    "tagsOverride"    TEXT,
+    "notesOverride"   TEXT,
+    "updatedAt"       TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "Override_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Override_projectId_key" ON "Override"("projectId")`,
+
+  // 6. Metadata
+  `CREATE TABLE IF NOT EXISTS "Metadata" (
+    "id"             TEXT NOT NULL PRIMARY KEY,
+    "projectId"      TEXT NOT NULL,
+    "goal"           TEXT,
+    "audience"       TEXT,
+    "successMetrics" TEXT,
+    "nextAction"     TEXT,
+    "publishTarget"  TEXT,
+    "evidenceJson"   TEXT,
+    "outcomesJson"   TEXT,
+    CONSTRAINT "Metadata_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Metadata_projectId_key" ON "Metadata"("projectId")`,
+
+  // 7. Activity
+  `CREATE TABLE IF NOT EXISTS "Activity" (
+    "id"          TEXT NOT NULL PRIMARY KEY,
+    "projectId"   TEXT NOT NULL,
+    "type"        TEXT NOT NULL,
+    "payloadJson" TEXT,
+    "createdAt"   TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "Activity_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Activity_projectId_createdAt_idx" ON "Activity"("projectId", "createdAt")`,
+];
+
+/**
+ * Bootstrap the database schema at the given path.
+ * @param {string} dbPath — absolute path to the SQLite file
+ */
+export async function bootstrapDb(dbPath) {
+  const client = createClient({ url: `file:${dbPath}` });
+
+  for (const sql of SCHEMA_SQL) {
+    await client.execute(sql);
+  }
+
+  client.close();
+}

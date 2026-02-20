@@ -9,7 +9,8 @@ This plan is the execution map from the current codebase to a web-first distribu
 - [Completed] Safety and onboarding baseline (Phases 45-46): completed
 - [Superseded] Desktop-first release track (legacy Phases 47-50): replaced by NPX/web pivot
 - [Completed] Direction lock + docs realignment (Phase 47W): all deliverables checked
-- [Active] Web/CLI distribution track (Phases 48W-50W): Phase 48W next
+- [Completed] CLI launcher + NPX bootstrap (Phase 48W): all deliverables checked, approved in #008
+- [Active] Web/CLI distribution track (Phases 49W-50W): Phase 49W next
 
 ## Pivot Summary
 
@@ -65,10 +66,11 @@ How:
 - support clean shutdown via SIGINT/SIGTERM
 
 Deliverables:
-- [ ] `bin/` CLI with start command path suitable for NPX execution
-- [ ] runtime-safe DB bootstrap strategy for NPX users (no hidden dev-only assumptions)
-- [ ] browser auto-open behavior with opt-out flag
-- [ ] command help and troubleshooting output for common failures
+- [x] `bin/` CLI with start command path suitable for NPX execution
+- [x] runtime-safe DB bootstrap strategy for NPX users (no hidden dev-only assumptions)
+- [x] browser auto-open behavior with opt-out flag
+- [x] command help and troubleshooting output for common failures
+- [x] package naming decided (`@eeshans/projects-dashboard`)
 
 Exit Criteria:
 - user can run `npx <package>@latest` and reach dashboard in one session
@@ -138,7 +140,7 @@ NPX distribution must not assume dev-only tooling is available at runtime. The c
 - Keeps the published package small and portable.
 - `prisma generate` runs once at publish/build time, producing the client in `node_modules/.prisma/client/` which gets bundled in the standalone output.
 
-Implementation deferred to Phase 48W.
+Implemented in Phase 48W (`bin/bootstrap-db.mjs` — `CREATE TABLE IF NOT EXISTS` for all 7 models using `@libsql/client`).
 
 ## Publish Strategy (Decision Gate)
 

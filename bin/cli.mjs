@@ -1,0 +1,211 @@
+#!/usr/bin/env node
+
+/**
+ * CLI entry point for Projects Dashboard.
+ * Usage: npx @eeshans/projects-dashboard [--port <n>] [--no-open] [--help] [--version]
+ */
+
+import { fork } from "node:child_process";
+import fs from "node:fs";
+import net from "node:net";
+import http from "node:http";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
+
+import { bootstrapDb } from "./bootstrap-db.mjs";
+import { openBrowser } from "./open-browser.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkgPath = path.join(__dirname, "..", "package.json");
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+
+// ── Color helpers ──────────────────────────────────────
+const green = (s) => `\x1b[32m${s}\x1b[0m`;
+const yellow = (s) => `\x1b[33m${s}\x1b[0m`;
+const red = (s) => `\x1b[31m${s}\x1b[0m`;
+const bold = (s) => `\x1b[1m${s}\x1b[0m`;
+
+// ── Parse args ─────────────────────────────────────────
+const args = process.argv.slice(2);
+
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`
+${bold("Projects Dashboard")} v${pkg.version}
+
+Usage: projects-dashboard [options]
+
+Options:
+  --port <n>   Use a specific port (default: auto)
+  --no-open    Don't open the browser automatically
+  --help       Show this help message
+  --version    Show version number
+`);
+  process.exit(0);
+}
+
+if (args.includes("--version") || args.includes("-v")) {
+  console.log(pkg.version);
+  process.exit(0);
+}
+
+const noOpen = args.includes("--no-open");
+const portIdx = args.indexOf("--port");
+const requestedPort = portIdx !== -1 ? Number(args[portIdx + 1]) : null;
+
+// ── Check Node version ─────────────────────────────────
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 20 || (major === 20 && minor < 9)) {
+  console.error(red(`Node >= 20.9.0 required (found ${process.versions.node})`));
+  process.exit(1);
+}
+
+// ── Check git ──────────────────────────────────────────
+try {
+  execSync("git --version", { stdio: "ignore" });
+} catch {
+  console.warn(yellow("Warning: git not found — project scanning requires git"));
+}
+
+// ── Resolve data directory ─────────────────────────────
+function resolveDataDir() {
+  switch (process.platform) {
+    case "darwin":
+      return path.join(os.homedir(), "Library", "Application Support", "ProjectsDashboard");
+    case "win32":
+      return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "ProjectsDashboard");
+    default:
+      return path.join(process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"), "ProjectsDashboard");
+  }
+}
+
+const dataDir = resolveDataDir();
+fs.mkdirSync(dataDir, { recursive: true });
+
+// ── Copy default settings if missing ───────────────────
+const settingsPath = path.join(dataDir, "settings.json");
+if (!fs.existsSync(settingsPath)) {
+  const defaults = {
+    devRoot: path.join(os.homedir(), "dev"),
+    theme: "dark",
+    llmProvider: "none",
+  };
+  fs.writeFileSync(settingsPath, JSON.stringify(defaults, null, 2));
+  console.log(green("Created default settings.json"));
+}
+
+// ── Bootstrap database ─────────────────────────────────
+const dbPath = path.join(dataDir, "dev.db");
+console.log("Initializing database...");
+await bootstrapDb(dbPath);
+console.log(green("Database ready."));
+
+// ── Find free port ─────────────────────────────────────
+function findFreePort(preferred) {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(preferred ?? 0, "127.0.0.1", () => {
+      const addr = srv.address();
+      if (addr && typeof addr === "object") {
+        const port = addr.port;
+        srv.close(() => resolve(port));
+      } else {
+        reject(new Error("Could not determine port"));
+      }
+    });
+    srv.on("error", (err) => {
+      if (preferred && err.code === "EADDRINUSE") {
+        // Fall back to random port
+        findFreePort(null).then(resolve, reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
+const port = await findFreePort(requestedPort);
+
+// ── Start Next.js standalone server ────────────────────
+const serverPath = path.join(__dirname, "..", ".next", "standalone", "server.js");
+if (!fs.existsSync(serverPath)) {
+  console.error(red("Standalone server not found. Run `npm run build:npx` first."));
+  process.exit(1);
+}
+
+const serverProcess = fork(serverPath, [], {
+  env: {
+    ...process.env,
+    PORT: String(port),
+    HOSTNAME: "127.0.0.1",
+    APP_DATA_DIR: dataDir,
+    DATABASE_URL: `file:${dbPath}`,
+    NODE_ENV: "production",
+  },
+  stdio: "pipe",
+});
+
+// Forward server stderr (for debugging)
+serverProcess.stderr?.on("data", (chunk) => {
+  process.stderr.write(chunk);
+});
+
+// ── Wait for server readiness ──────────────────────────
+function waitForServer(url, timeoutMs = 30_000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error(`Server did not start within ${timeoutMs}ms`));
+        return;
+      }
+      const req = http.get(url, (res) => {
+        if (res.statusCode && res.statusCode < 500) {
+          resolve();
+        } else {
+          setTimeout(check, 200);
+        }
+      });
+      req.on("error", () => setTimeout(check, 200));
+      req.end();
+    };
+    check();
+  });
+}
+
+const serverUrl = `http://127.0.0.1:${port}`;
+
+try {
+  await waitForServer(`${serverUrl}/api/preflight`);
+} catch (err) {
+  console.error(red(err.message));
+  serverProcess.kill();
+  process.exit(1);
+}
+
+console.log(`\n${bold("Projects Dashboard")} is running at ${green(serverUrl)}\n`);
+
+if (!noOpen) {
+  openBrowser(serverUrl);
+}
+
+// ── Graceful shutdown ──────────────────────────────────
+function shutdown() {
+  console.log("\nShutting down...");
+  serverProcess.kill("SIGTERM");
+  setTimeout(() => {
+    serverProcess.kill("SIGKILL");
+    process.exit(1);
+  }, 5000);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+serverProcess.on("exit", (code) => {
+  if (code !== null && code !== 0) {
+    console.error(red(`Server exited with code ${code}`));
+  }
+  process.exit(code ?? 0);
+});
