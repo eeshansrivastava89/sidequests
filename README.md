@@ -1,162 +1,124 @@
+<div align="center">
+
 # sidequests
 
-A local-first developer tool that scans your dev directory and gives you a bird's-eye view of all your projects. Tracks health scores, git status, activity, and optionally enriches metadata with LLMs.
+**Track all your side projects — health, status, and AI summaries — completely hands-off.**
 
-Runs entirely on your machine. No cloud services, no telemetry.
+[![CI](https://github.com/eeshansrivastava89/sidequests/actions/workflows/ci.yml/badge.svg)](https://github.com/eeshansrivastava89/sidequests/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/@eeshans/sidequests)](https://www.npmjs.com/package/@eeshans/sidequests)
+[![license](https://img.shields.io/github/license/eeshansrivastava89/sidequests)](LICENSE)
+[![node](https://img.shields.io/node/v/@eeshans/sidequests)](package.json)
 
-## Quick Start
+</div>
+
+<br>
+
+<p align="center">
+  <img src="docs/sidequest-home.png" alt="Sidequests dashboard" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/sidequest-modal.png" alt="Project detail drawer" width="500">
+</p>
+
+<br>
+
+## Get started
 
 ```bash
 npx @eeshans/sidequests
 ```
 
-**Prerequisites:** Node.js >= 20.9, git
+That's it. No install, no config files, no accounts. The onboarding wizard handles the rest.
 
-On first launch, the onboarding wizard walks you through configuration.
+**Requirements:** Node.js 20.9+ and git.
 
-### CLI Options
+## What it does
+
+Sidequests scans your dev directory, discovers every git repo, and builds a dashboard with:
+
+- **Health scores** — hygiene (README, tests, CI, linter) + momentum (commit recency, clean tree, pushed up)
+- **Status tracking** — active, paused, stale, or archived based on commit history
+- **Git status at a glance** — dirty files, unpushed commits, current branch
+- **AI enrichment** — optional LLM-powered summaries, tags, and recommendations
+
+Everything runs locally. Your code never leaves your machine.
+
+## Features
+
+| | |
+|---|---|
+| **Scan & Score** | Auto-discovers repos, computes health/hygiene/momentum scores |
+| **Smart Status** | Classifies projects as active, paused, stale, or archived |
+| **Git Aware** | Dirty state, ahead/behind, branch tracking |
+| **LLM Enrichment** | Generate summaries and recommendations with 5 providers |
+| **Live Refresh** | SSE-based streaming progress as projects are scanned |
+| **Pin & Override** | Pin favorites, manually override any metadata |
+| **Dark Mode** | Automatic or manual theme switching |
+| **Onboarding Wizard** | First-run setup that walks you through configuration |
+
+## LLM providers
+
+AI enrichment is optional — enable it in Settings and pick a provider:
+
+| Provider | What you need |
+|---|---|
+| **Claude CLI** | [Claude CLI](https://docs.anthropic.com/en/docs/claude-cli) installed and authenticated |
+| **Codex CLI** | [Codex CLI](https://github.com/openai/codex) installed, "Allow Unsafe" enabled |
+| **OpenRouter** | API key |
+| **Ollama** | Ollama running locally |
+| **MLX** | mlx-lm-server running locally |
+
+## CLI options
 
 ```
---port <n>    Use a specific port (default: auto-detect free port)
---no-open     Don't open browser automatically
+npx @eeshans/sidequests [options]
+
+--port <n>    Use a specific port (default: auto)
+--no-open     Don't open the browser
 --help        Show help
 --version     Show version
 ```
 
-### Development
-
-```bash
-git clone https://github.com/eeshans/sidequests.git
-cd sidequests
-npm install
-npm run setup    # creates DB, copies default settings
-npm run dev      # start Next.js dev server at localhost:3000
-```
-
-## How It Works
-
-1. **Scan** — walks your dev root, discovers git repos, extracts metadata (languages, frameworks, dependencies, CI config, LOC, git status)
-2. **Derive** — computes health, hygiene, and momentum scores; assigns status (active/paused/stale/archived); generates tags
-3. **Enrich** (optional) — uses an LLM provider to generate project summaries, purposes, and recommendations
-4. **Dashboard** — displays everything in a filterable, sortable grid with project detail drawers
-
-All data stays in a local SQLite database. The pipeline is TypeScript-native (no Python required).
-
-## Features
-
-- Health scoring with hygiene + momentum breakdown
-- Status classification (active, paused, stale, archived, needs-attention)
-- Git status tracking (dirty, ahead/behind, branch)
-- Language and framework detection
-- Pin and override project metadata
-- Dark mode
-- SSE-based live refresh progress
-- Optional LLM enrichment (Claude CLI, OpenRouter, Ollama, MLX, Codex CLI)
-- First-run onboarding wizard
-
-## Configuration
-
-Settings are managed in-app (Settings modal or onboarding wizard). Key options:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Dev Root | `~/dev` | Root directory to scan |
-| Exclude Dirs | `node_modules,.venv,...` | Directories to skip |
-| Enable LLM | `false` | Show AI enrichment button |
-| LLM Provider | `claude-cli` | Which LLM backend to use |
-| Sanitize Paths | `true` | Hide absolute paths (OSS mode) |
-
-Environment variables (`.env.local`) can override settings. The Settings UI takes precedence.
-
-### LLM Providers
-
-| Provider | Value | Requirements |
-|---|---|---|
-| Claude CLI | `claude-cli` | `claude` CLI installed and authenticated |
-| OpenRouter | `openrouter` | API key (`OPENROUTER_API_KEY` in `.env.local`), optional model override |
-| Ollama | `ollama` | Ollama running locally, optional URL/model |
-| MLX | `mlx` | `mlx-lm-server` running, optional URL/model |
-| Codex CLI | `codex-cli` | `codex` CLI installed, requires **Allow Unsafe** enabled |
-
-## Architecture
-
-```
-~/dev projects
-    |
-scan.ts  -->  derive.ts  -->  pipeline.ts  -->  Prisma/SQLite  -->  merge.ts  -->  API  -->  UI
-```
-
-### Merge Priority (highest wins)
-
-1. **Override** — manual edits via UI
-2. **Metadata** — workflow fields (goal, audience, next action)
-3. **Derived** — deterministic status and health
-4. **LLM** — generated purpose, tags, recommendations
-5. **Scan** — raw data
-
-### Status Rules
-
-| Status | Condition |
-|---|---|
-| `active` | Last commit within 14 days |
-| `paused` | Last commit 15-60 days ago |
-| `stale` | Last commit 61-180 days ago |
-| `archived` | No commits in 180+ days or no git repo |
-
-### Health Score
-
-Health = `round(0.65 * hygiene + 0.35 * momentum)` where:
-
-- **Hygiene** (0-100): README, tests, CI/CD, remote, TODOs, deployment, linter, license, lockfile
-- **Momentum** (0-100): commit recency, clean working tree, pushed up, low stale branches
-
-## Project Structure
-
-```
-src/app/            Next.js App Router pages and API routes
-src/components/     React components (shadcn/ui)
-src/hooks/          Custom React hooks
-src/lib/            Utilities, config, database, pipeline, LLM providers
-bin/                CLI launcher and bootstrap scripts
-prisma/             Database schema
-```
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Next.js dev server |
-| `npm run build` | Production build |
-| `npm test` | Run unit tests (vitest) |
-| `npm run test:integration` | Run integration tests |
-| `npm run setup` | First-time setup (prisma, config) |
-| `npm run build:npx` | Build standalone for NPX distribution |
-
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| "git not found" in preflight | Install git: `brew install git` |
-| Database errors on first run | Run `npm run setup` or delete `dev.db` and restart |
-| Scan finds 0 projects | Check Dev Root points to a directory containing git repos |
-| LLM enrichment fails | Check provider config in Settings; ensure API key is set |
-| Settings not persisting | Check write permissions to app data directory |
+| Problem | Fix |
+|---|---|
+| "git not found" in preflight | Install git — `brew install git` or [git-scm.com](https://git-scm.com) |
+| Scan finds 0 projects | Make sure Dev Root points to a folder containing git repos |
+| LLM enrichment fails | Check provider config in Settings, make sure API key or CLI is set up |
+| Database errors | Delete `~/.sidequests/dev.db` and restart |
 
-## API
-
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/projects` | GET | All projects (merged view) |
-| `/api/projects/:id/override` | PATCH | Set manual overrides |
-| `/api/projects/:id/pin` | PATCH | Toggle pinned state |
-| `/api/projects/:id/touch` | POST | Record quick action |
-| `/api/refresh/stream` | GET | SSE streaming refresh |
-| `/api/settings` | GET/PUT | Read or update settings |
-| `/api/preflight` | GET | System diagnostics |
+---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+```bash
+git clone https://github.com/eeshansrivastava89/sidequests.git
+cd sidequests
+npm install
+npm run setup    # creates DB + default settings
+npm run dev      # http://localhost:3000
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
+
+### Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Dev server |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:integration` | Integration tests |
+| `npm run build:npx` | Build standalone bundle |
+
+### Architecture
+
+```
+~/dev repos ➜ scan ➜ derive ➜ pipeline ➜ SQLite ➜ API ➜ dashboard
+```
+
+Built with Next.js 16, Prisma 7 + SQLite, React 19, shadcn/ui, and Tailwind CSS.
 
 ## License
 
