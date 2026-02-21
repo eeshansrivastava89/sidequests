@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Resolve the OS-specific data directory for Projects Dashboard.
+ * Resolve the OS-specific data directory for Sidequests.
  * @returns {string}
  */
 export function resolveDataDir() {

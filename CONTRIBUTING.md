@@ -58,7 +58,7 @@ prisma/             Database schema
 - **Pipeline:** TypeScript-native scan + derive (no Python dependency)
 - **Database:** Prisma 7 + SQLite with LibSQL adapter
 - **Merge model:** Override > Metadata > Derived > LLM > Scan
-- **Distribution:** Web/CLI via NPX (`npx sidequests`)
+- **Distribution:** Web/CLI via NPX (`npx @eeshans/sidequests`)
 - **Config:** Settings UI > settings.json > env vars > defaults
 
 ## Reporting Bugs

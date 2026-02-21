@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -9,10 +10,22 @@ export const PROVIDERS = ["claude-cli", "openrouter", "ollama", "mlx", "codex-cl
 
 export const CLAUDE_CLI_MODELS = [
   { value: "", label: "Default" },
-  { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
   { value: "claude-opus-4-6", label: "Opus 4.6" },
+  { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
   { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
 ] as const;
+
+export const CODEX_CLI_MODELS = [
+  { value: "", label: "Default" },
+  { value: "o3", label: "o3" },
+  { value: "o4-mini", label: "o4-mini" },
+  { value: "gpt-4.1", label: "GPT-4.1" },
+] as const;
+
+const CUSTOM_SENTINEL = "__custom__";
+
+const selectClass =
+  "h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring";
 
 export function Field({
   label,
@@ -56,6 +69,54 @@ export function SwitchRow({
   );
 }
 
+function ModelSelect({
+  value,
+  onChange,
+  models,
+  description,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  models: ReadonlyArray<{ value: string; label: string }>;
+  description?: string;
+}) {
+  const isCurated = models.some((m) => m.value === value);
+  const [customMode, setCustomMode] = useState(value !== "" && !isCurated);
+  const showCustomInput = customMode || (value !== "" && !isCurated);
+
+  return (
+    <Field label="Model" description={description}>
+      <select
+        value={showCustomInput ? CUSTOM_SENTINEL : value}
+        onChange={(e) => {
+          if (e.target.value === CUSTOM_SENTINEL) {
+            setCustomMode(true);
+            onChange("");
+          } else {
+            setCustomMode(false);
+            onChange(e.target.value);
+          }
+        }}
+        className={selectClass}
+      >
+        {models.map((m) => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+        <option value={CUSTOM_SENTINEL}>Custom...</option>
+      </select>
+      {showCustomInput && (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Enter model ID"
+          className="mt-1.5"
+          autoFocus
+        />
+      )}
+    </Field>
+  );
+}
+
 export function ProviderFields({
   draft,
   set,
@@ -69,7 +130,7 @@ export function ProviderFields({
         <select
           value={draft.llmProvider}
           onChange={(e) => set("llmProvider", e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className={selectClass}
         >
           {PROVIDERS.map((p) => (
             <option key={p} value={p}>{p}</option>
@@ -78,17 +139,11 @@ export function ProviderFields({
       </Field>
 
       {draft.llmProvider === "claude-cli" && (
-        <Field label="Model" description="Claude CLI model override">
-          <select
-            value={draft.claudeCliModel}
-            onChange={(e) => set("claudeCliModel", e.target.value)}
-            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          >
-            {CLAUDE_CLI_MODELS.map((m) => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
-          </select>
-        </Field>
+        <ModelSelect
+          value={draft.claudeCliModel}
+          onChange={(v) => set("claudeCliModel", v)}
+          models={CLAUDE_CLI_MODELS}
+        />
       )}
 
       {draft.llmProvider === "openrouter" && (
@@ -151,9 +206,11 @@ export function ProviderFields({
       )}
 
       {draft.llmProvider === "codex-cli" && (
-        <p className="text-sm text-muted-foreground">
-          No additional settings needed for codex-cli.
-        </p>
+        <ModelSelect
+          value={draft.codexCliModel}
+          onChange={(v) => set("codexCliModel", v)}
+          models={CODEX_CLI_MODELS}
+        />
       )}
     </>
   );

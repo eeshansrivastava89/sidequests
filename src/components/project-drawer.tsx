@@ -13,6 +13,7 @@ import {
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
 import { healthColor, copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { ProjectDelta } from "@/hooks/use-refresh-deltas";
 
@@ -323,7 +324,14 @@ export function ProjectDrawer({
             <div className="flex items-center gap-2 flex-wrap">
               <StatusSelect
                 value={project.status}
-                onSave={(v) => onUpdateOverride(project.id, { statusOverride: v })}
+                onSave={(v) => {
+                  onUpdateOverride(project.id, { statusOverride: v })
+                    .then((d) => {
+                      if ((d as { ok?: boolean })?.ok) toast.success(`Status → ${v}`);
+                      else toast.error("Failed to update status");
+                    })
+                    .catch(() => toast.error("Failed to update status"));
+                }}
               />
               <div className="flex items-center gap-1.5" title={`Hygiene ${project.hygieneScore} / Momentum ${project.momentumScore}`}>
                 <span className={cn("text-sm font-bold tabular-nums", healthColor(project.hygieneScore))}>
@@ -415,17 +423,20 @@ export function ProjectDrawer({
             if (!attention.needsAttention) return null;
             return (
               <div className={cn(
-                "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+                "rounded-md px-3 py-2 text-sm space-y-1",
                 attention.severity === "high" ? "bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-900" :
                 attention.severity === "med" ? "bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900" :
                 "bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800"
               )}>
                 <span className="text-xs font-medium">Needs Attention</span>
-                <span className="text-xs text-muted-foreground">&mdash;</span>
-                <span className="text-xs">{attention.reasons[0].label}</span>
-                {attention.reasons.length > 1 && (
-                  <span className="text-[10px] text-muted-foreground">+{attention.reasons.length - 1} more</span>
-                )}
+                <ul className="space-y-0.5">
+                  {attention.reasons.map((r) => (
+                    <li key={r.label} className="flex items-start gap-1.5 text-xs">
+                      <span className="text-muted-foreground mt-px">&bull;</span>
+                      <span>{r.label}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             );
           })()}

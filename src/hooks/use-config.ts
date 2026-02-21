@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 export interface AppConfig {
-  featureLlm: boolean;
   sanitizePaths: boolean;
   devRoot: string;
   excludeDirs: string;
@@ -13,6 +12,7 @@ export interface AppConfig {
   llmAllowUnsafe: boolean;
   llmDebug: boolean;
   claudeCliModel: string;
+  codexCliModel: string;
   openrouterApiKey: string;
   openrouterModel: string;
   ollamaUrl: string;
@@ -23,7 +23,6 @@ export interface AppConfig {
 }
 
 const DEFAULT: AppConfig = {
-  featureLlm: false,
   sanitizePaths: true,
   devRoot: "~/dev",
   excludeDirs: "",
@@ -33,6 +32,7 @@ const DEFAULT: AppConfig = {
   llmAllowUnsafe: false,
   llmDebug: false,
   claudeCliModel: "",
+  codexCliModel: "",
   openrouterApiKey: "",
   openrouterModel: "",
   ollamaUrl: "",

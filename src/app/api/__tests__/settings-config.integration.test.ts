@@ -22,7 +22,6 @@ vi.mock("@/lib/app-paths", () => {
 const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
-  featureLlm: false,
   sanitizePaths: false,
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
@@ -75,7 +74,7 @@ beforeEach(() => {
   fs.mkdirSync(tmpDir, { recursive: true });
   // Reset config to defaults
   mockConfig.sanitizePaths = false;
-  mockConfig.featureLlm = false;
+  mockConfig.llmProvider = "none";
   mockConfig.hasCompletedOnboarding = false;
 });
 
@@ -94,7 +93,6 @@ describe("settings persistence round-trip", () => {
     const payload = {
       devRoot: "~/projects",
       llmProvider: "ollama",
-      featureLlm: true,
       llmConcurrency: 5,
     };
     const putRes = await settingsPUT(makePutRequest(payload));
@@ -104,7 +102,6 @@ describe("settings persistence round-trip", () => {
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
     expect(onDisk.devRoot).toBe("~/projects");
     expect(onDisk.llmProvider).toBe("ollama");
-    expect(onDisk.featureLlm).toBe(true);
     expect(onDisk.llmConcurrency).toBe(5);
   });
 
@@ -156,7 +153,7 @@ describe("settings migration safety", () => {
   it("handles empty settings.json gracefully", async () => {
     fs.writeFileSync(path.join(tmpDir, "settings.json"), "");
 
-    const putRes = await settingsPUT(makePutRequest({ featureLlm: true }));
+    const putRes = await settingsPUT(makePutRequest({ llmProvider: "claude-cli" }));
     const data = await putRes.json();
     expect(data.ok).toBe(true);
   });
@@ -178,7 +175,7 @@ describe("onboarding completion flow", () => {
   });
 
   it("preflight includes git check for onboarding", async () => {
-    mockConfig.featureLlm = false;
+    mockConfig.llmProvider = "none";
     const res = await preflightGET();
     const body = await res.json();
 
@@ -191,7 +188,6 @@ describe("onboarding completion flow", () => {
 
 describe("failure: invalid provider", () => {
   it("unknown provider produces no provider-specific check (only git)", async () => {
-    mockConfig.featureLlm = true;
     mockConfig.llmProvider = "nonexistent-provider";
 
     const res = await preflightGET();
@@ -204,7 +200,6 @@ describe("failure: invalid provider", () => {
   });
 
   it("known provider with missing binary fails the check", async () => {
-    mockConfig.featureLlm = true;
     mockConfig.llmProvider = "claude-cli";
 
     const res = await preflightGET();

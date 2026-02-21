@@ -32,16 +32,19 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
     if (open) setDraft(config);
   }, [open, config]);
 
-  // Fetch preflight checks when modal opens
-  useEffect(() => {
-    if (!open) return;
+  const fetchPreflight = useCallback(() => {
     setPreflightLoading(true);
     fetch("/api/preflight")
       .then((res) => res.json())
       .then((data) => setPreflight(data.checks))
       .catch(() => setPreflight(null))
       .finally(() => setPreflightLoading(false));
-  }, [open]);
+  }, []);
+
+  // Fetch preflight checks when modal opens
+  useEffect(() => {
+    if (open) fetchPreflight();
+  }, [open, fetchPreflight]);
 
   const set = useCallback(<K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -113,62 +116,58 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
             />
           </section>
 
-          {/* ── AI Enrichment ── */}
+          {/* ── LLM Provider ── */}
           <section className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              AI Enrichment
+              LLM Provider
             </h3>
 
+            <ProviderFields draft={draft} set={set} />
+
+            <Field label="Concurrency" description="Parallel LLM tasks (1-10)">
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={draft.llmConcurrency}
+                onChange={(e) => set("llmConcurrency", Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+              />
+            </Field>
+
             <SwitchRow
-              label="Enable LLM"
-              description="Show Enrich button in toolbar"
-              checked={draft.featureLlm}
-              onCheckedChange={(v) => set("featureLlm", v)}
+              label="Overwrite Metadata"
+              description="Force overwrite existing metadata on enrich"
+              checked={draft.llmOverwriteMetadata}
+              onCheckedChange={(v) => set("llmOverwriteMetadata", v)}
             />
 
-            {draft.featureLlm && (
-              <>
-                <ProviderFields draft={draft} set={set} />
+            <SwitchRow
+              label="Allow Unsafe"
+              description="Enable agentic providers (codex-cli)"
+              checked={draft.llmAllowUnsafe}
+              onCheckedChange={(v) => set("llmAllowUnsafe", v)}
+            />
 
-                <Field label="Concurrency" description="Parallel LLM tasks (1-10)">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={draft.llmConcurrency}
-                    onChange={(e) => set("llmConcurrency", Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                  />
-                </Field>
-
-                <SwitchRow
-                  label="Overwrite Metadata"
-                  description="Force overwrite existing metadata on enrich"
-                  checked={draft.llmOverwriteMetadata}
-                  onCheckedChange={(v) => set("llmOverwriteMetadata", v)}
-                />
-
-                <SwitchRow
-                  label="Allow Unsafe"
-                  description="Enable agentic providers (codex-cli)"
-                  checked={draft.llmAllowUnsafe}
-                  onCheckedChange={(v) => set("llmAllowUnsafe", v)}
-                />
-
-                <SwitchRow
-                  label="Debug Mode"
-                  description="Log raw LLM output to console"
-                  checked={draft.llmDebug}
-                  onCheckedChange={(v) => set("llmDebug", v)}
-                />
-              </>
-            )}
+            <SwitchRow
+              label="Debug Mode"
+              description="Log raw LLM output to console"
+              checked={draft.llmDebug}
+              onCheckedChange={(v) => set("llmDebug", v)}
+            />
           </section>
 
           {/* ── System Status ── */}
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              System Status
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                System Status
+              </h3>
+              {!preflightLoading && (
+                <Button size="sm" variant="ghost" onClick={fetchPreflight} className="h-6 text-xs">
+                  Re-check
+                </Button>
+              )}
+            </div>
             {preflightLoading ? (
               <p className="text-sm text-muted-foreground">Checking...</p>
             ) : preflight ? (

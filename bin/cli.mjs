@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * CLI entry point for Projects Dashboard.
- * Usage: npx sidequests [--port <n>] [--no-open] [--help] [--version]
+ * CLI entry point for Sidequests.
+ * Usage: npx @eeshans/sidequests [--port <n>] [--no-open] [--help] [--version]
  */
 
 import { fork } from "node:child_process";
@@ -31,7 +31,7 @@ const parsed = parseArgs(process.argv.slice(2));
 
 if (parsed.help) {
   console.log(`
-${bold("Projects Dashboard")} v${pkg.version}
+${bold("Sidequests")} v${pkg.version}
 
 Usage: sidequests [options]
 
@@ -126,7 +126,7 @@ try {
   process.exit(1);
 }
 
-console.log(`\n${bold("Projects Dashboard")} is running at ${green(serverUrl)}\n`);
+console.log(`\n${bold("Sidequests")} is running at ${green(serverUrl)}\n`);
 
 if (!noOpen) {
   openBrowser(serverUrl);

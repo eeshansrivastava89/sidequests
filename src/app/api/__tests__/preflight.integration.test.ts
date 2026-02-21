@@ -3,9 +3,8 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
-  featureLlm: false,
   sanitizePaths: false,
-  llmProvider: "claude-cli",
+  llmProvider: "none",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
   llmConcurrency: 3,
@@ -46,8 +45,8 @@ describe("GET /api/preflight — Path A (TS-native)", () => {
     expect(names).toContain("git");
   });
 
-  it("includes only git when LLM is disabled", async () => {
-    mockConfig.featureLlm = false;
+  it("includes only git when llmProvider is none", async () => {
+    mockConfig.llmProvider = "none";
     const res = await preflightGET();
     const body = await res.json();
 
@@ -55,8 +54,7 @@ describe("GET /api/preflight — Path A (TS-native)", () => {
     expect(body.checks[0].name).toBe("git");
   });
 
-  it("includes provider check when LLM is enabled", async () => {
-    mockConfig.featureLlm = true;
+  it("includes provider check when llmProvider is configured", async () => {
     mockConfig.llmProvider = "claude-cli";
     const res = await preflightGET();
     const body = await res.json();

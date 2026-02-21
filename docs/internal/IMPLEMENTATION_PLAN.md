@@ -12,6 +12,9 @@ This plan is the execution map from the current codebase to a web-first distribu
 - [Completed] CLI launcher + NPX bootstrap (Phase 48W): all deliverables checked, approved in #008
 - [Completed] QA/CI for web + CLI distribution (Phase 49W): approved in #010
 - [Completed] Electron deprecation + release transition (Phase 50W)
+- [Completed] Prisma 7 hashed client packaging fix (#023-#026)
+- [Completed] FEATURE_LLM deprecation (#027-#028): LLM enrichment always-on, gated by provider config
+- [Completed] Pre-publish polish (Phase 51W): toast system, attention UX, package rename, error handling
 
 ## Pivot Summary
 
@@ -71,7 +74,7 @@ Deliverables:
 - [x] runtime-safe DB bootstrap strategy for NPX users (no hidden dev-only assumptions)
 - [x] browser auto-open behavior with opt-out flag
 - [x] command help and troubleshooting output for common failures
-- [x] package naming decided (`@eeshans/projects-dashboard`)
+- [x] package naming decided (`@eeshans/sidequests`)
 
 Exit Criteria:
 - user can run `npx <package>@latest` and reach dashboard in one session
@@ -122,6 +125,29 @@ Exit Criteria:
 - main branch has no active Electron release dependency
 - OSS onboarding path is one-command NPX plus optional source dev workflow
 
+## Phase 51W - Pre-Publish Polish
+
+What:
+- Final UX and packaging fixes before first `npm publish` of `@eeshans/sidequests`
+
+Deliverables:
+- [x] Prisma 7 hashed client packaging fix (#023-#026)
+- [x] @libsql/client hashed package + transitive deps fix (#024-#026)
+- [x] Packaging smoke test (build → pack → install → start → preflight + DB endpoint)
+- [x] FEATURE_LLM toggle removed (#027-#028) — LLM enrichment always-on, gated by provider
+- [x] "Enrich with AI" button opens Settings when no provider configured
+- [x] Toast notification system — Sonner, scan/enrich completion, status override (#030)
+- [x] Attention reasons fully expanded in project drawer (#030)
+- [x] Package name updated to `@eeshans/sidequests` across all refs (#030)
+- [x] Scan error messages wrapped in user-friendly text with collapsible details (#030)
+- [x] Preflight "Re-check" button in settings modal (#030)
+- [x] Provider-specific help hints in preflight results (#030)
+
+Exit Criteria:
+- `npm pack` + install in clean dir + `npx @eeshans/sidequests` → dashboard loads, scan works, enrich button guides to config
+- All user actions have visible feedback (toast or inline)
+- 0 silent failures in the happy path
+
 ## Prisma Bootstrap Strategy (Decision Gate)
 
 NPX distribution must not assume dev-only tooling is available at runtime. The current `setup.mjs` calls `npx prisma generate` and `npx prisma db push`, which rely on `prisma` being installed (currently a devDependency).
@@ -145,18 +171,13 @@ NPX distribution must not assume dev-only tooling is available at runtime. The c
 
 Implemented in Phase 48W (`bin/bootstrap-db.mjs` — `CREATE TABLE IF NOT EXISTS` for all 7 models using `@libsql/client`).
 
-## Publish Strategy (Decision Gate)
+## Publish Strategy (Decided)
 
-Before Phase 48W implementation closes:
-
-1. package naming strategy
-   - option A: unscoped package (`projects-dashboard`)
-   - option B: scoped package (`@org/projects-dashboard`)
-2. versioning guidance
-   - recommended install/run command: `npx <package>@latest`
-   - deterministic fallback for teams: `npx <package>@<version>`
-3. registry strategy
-   - default npmjs registry unless compliance requires alternate registry
+- **Package name:** `@eeshans/sidequests`
+- **Binary name:** `sidequests`
+- **Install/run:** `npx @eeshans/sidequests` (or `npx @eeshans/sidequests@latest`)
+- **Registry:** npmjs (default)
+- **Versioning:** semver, starting at `0.1.0`
 
 ## Legacy Branch Strategy
 
@@ -174,7 +195,8 @@ flowchart LR
   B --> C[48W CLI + NPX Bootstrap]
   C --> D[49W Web/CLI QA Gate]
   D --> E[50W Electron Deprecation]
-  E --> F[Web-First OSS Release]
+  E --> F[51W Pre-Publish Polish]
+  F --> G[npm publish @eeshans/sidequests]
 ```
 
 ## Schedule Model
@@ -207,9 +229,10 @@ flowchart LR
 
 ## Checkpoint Reviews
 
-- Checkpoint A: after Phase 47W (direction lock + docs alignment)
-- Checkpoint B: after Phase 48W (CLI bootstrap working)
-- Checkpoint C: after Phase 49W (web/CLI quality gate green)
-- Checkpoint D: after Phase 50W (Electron deprecation finalized)
+- Checkpoint A: after Phase 47W (direction lock + docs alignment) ✓
+- Checkpoint B: after Phase 48W (CLI bootstrap working) ✓
+- Checkpoint C: after Phase 49W (web/CLI quality gate green) ✓
+- Checkpoint D: after Phase 50W (Electron deprecation finalized) ✓
+- Checkpoint E: after Phase 51W (pre-publish polish + manual browser test)
 
-At each checkpoint, run a user-path demo: `npx launch -> configure -> scan -> enrich` and capture regressions before advancing.
+At each checkpoint, run a user-path demo: `npx @eeshans/sidequests -> configure -> scan -> enrich` and capture regressions before advancing.

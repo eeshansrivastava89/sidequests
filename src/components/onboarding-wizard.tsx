@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppConfig } from "@/hooks/use-config";
 import type { RefreshState, RefreshMode } from "@/hooks/use-refresh";
-import { Field, SwitchRow, ProviderFields } from "@/components/settings-fields";
+import { Field, ProviderFields } from "@/components/settings-fields";
 import { toast } from "sonner";
 
 interface PreflightCheck {
@@ -26,12 +26,22 @@ interface Props {
 
 const STEPS = ["Welcome", "Configure", "Diagnostics", "First Scan"] as const;
 
+function friendlyError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("enoent") || lower.includes("no such file") || lower.includes("does not exist"))
+    return "Dev root directory does not exist. Check the path in Settings.";
+  if (lower.includes("eacces") || lower.includes("permission denied"))
+    return "Permission denied. Check that you have read access to the dev root.";
+  if (lower.includes("no projects") || lower.includes("0 projects"))
+    return "No projects found. Make sure your dev root contains git repositories.";
+  return "Scan failed. See details below.";
+}
+
 export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartScan, scanState }: Props) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState({
     devRoot: config.devRoot || "~/dev",
-    excludeDirs: config.excludeDirs || "_projects_dashboard,node_modules,.venv,__pycache__,.git",
-    featureLlm: config.featureLlm,
+    excludeDirs: config.excludeDirs || "node_modules,.venv,__pycache__,.git",
     llmProvider: config.llmProvider,
     openrouterApiKey: config.openrouterApiKey,
     openrouterModel: config.openrouterModel,
@@ -59,8 +69,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
     if (open) {
       setDraft({
         devRoot: config.devRoot || "~/dev",
-        excludeDirs: config.excludeDirs || "_projects_dashboard,node_modules,.venv,__pycache__,.git",
-        featureLlm: config.featureLlm,
+        excludeDirs: config.excludeDirs || "node_modules,.venv,__pycache__,.git",
         llmProvider: config.llmProvider,
         openrouterApiKey: config.openrouterApiKey,
         openrouterModel: config.openrouterModel,
@@ -141,7 +150,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg" aria-describedby="onboarding-wizard-description">
         <p id="onboarding-wizard-description" className="sr-only">
-          Setup wizard to configure your Projects Dashboard
+          Setup wizard to configure Sidequests
         </p>
         {/* Stepper */}
         <div className="flex items-center justify-center gap-2 pt-2 pb-4">
@@ -167,9 +176,9 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
           {/* Step 1: Welcome */}
           {step === 0 && (
             <div className="text-center space-y-4 py-4">
-              <h2 className="text-xl font-semibold">Welcome to Projects Dashboard</h2>
+              <h2 className="text-xl font-semibold">Welcome to Sidequests</h2>
               <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                Projects Dashboard scans your dev directory and gives you a bird&apos;s-eye view of all your projects.
+                Sidequests scans your dev directory and gives you a bird&apos;s-eye view of all your projects.
               </p>
               <Button onClick={() => setStep(1)} className="mt-4">
                 Get Started
@@ -202,22 +211,15 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
               </Field>
 
               <div className="pt-2 border-t border-border">
-                <SwitchRow
-                  label="Enable AI Enrichment"
-                  description="Use LLMs to generate project summaries and metadata"
-                  checked={draft.featureLlm}
-                  onCheckedChange={(v) => set("featureLlm", v)}
-                />
-              </div>
-
-              {draft.featureLlm && (
+                <h3 className="text-sm font-medium mb-2">LLM Provider</h3>
+                <p className="text-xs text-muted-foreground mb-3">Configure an LLM provider to generate project summaries and metadata</p>
                 <div className="space-y-4 pl-1">
                   <ProviderFields
                     draft={{ ...config, ...draft } as AppConfig}
                     set={setAsConfig}
                   />
                 </div>
-              )}
+              </div>
 
               <div className="flex justify-between pt-2">
                 <Button variant="ghost" onClick={() => setStep(0)}>Back</Button>
@@ -334,10 +336,14 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
 
               {scanError && (
                 <div className="space-y-3 py-2">
-                  <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3">
+                  <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 space-y-2">
                     <p className="text-sm font-medium text-red-700 dark:text-red-400">
-                      {scanState.error}
+                      {friendlyError(scanState.error!)}
                     </p>
+                    <details className="text-xs text-muted-foreground">
+                      <summary className="cursor-pointer hover:text-foreground transition-colors">Details</summary>
+                      <pre className="mt-1 whitespace-pre-wrap break-all">{scanState.error}</pre>
+                    </details>
                   </div>
                   <div className="flex justify-center gap-2">
                     <Button variant="outline" onClick={handleComplete}>

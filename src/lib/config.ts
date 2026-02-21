@@ -33,11 +33,8 @@ export const config = {
     return expandHome(settingStr("devRoot", "DEV_ROOT", "~/dev"));
   },
   get excludeDirs(): string[] {
-    const raw = settingStr("excludeDirs", "EXCLUDE_DIRS", "_projects_dashboard,node_modules,.venv,__pycache__,.git");
+    const raw = settingStr("excludeDirs", "EXCLUDE_DIRS", "node_modules,.venv,__pycache__,.git");
     return raw.split(",").map((s) => s.trim());
-  },
-  get featureLlm(): boolean {
-    return settingBool("featureLlm", "FEATURE_LLM", false);
   },
   get llmProvider(): string {
     return settingStr("llmProvider", "LLM_PROVIDER", "claude-cli");
@@ -52,6 +49,11 @@ export const config = {
     const s = getSettings().claudeCliModel;
     if (s) return s;
     return process.env.CLAUDE_CLI_MODEL || undefined;
+  },
+  get codexCliModel(): string | undefined {
+    const s = getSettings().codexCliModel;
+    if (s) return s;
+    return process.env.CODEX_CLI_MODEL || undefined;
   },
   get llmDebug(): boolean {
     return settingBool("llmDebug", "LLM_DEBUG", false);

@@ -5,7 +5,6 @@ import { SCAN_FIXTURE, DERIVE_FIXTURE, LLM_ENRICHMENT_FIXTURE } from "@/lib/__te
 const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
-  featureLlm: false,
   sanitizePaths: false,
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
@@ -36,7 +35,7 @@ vi.mock("@/lib/pipeline-native/derive", () => ({
 
 vi.mock("@/lib/llm", () => ({
   getLlmProvider: () => {
-    if (!mockConfig.featureLlm) return null;
+    if (!mockConfig.llmProvider || mockConfig.llmProvider === "none") return null;
     return {
       name: "test-provider",
       enrich: async () => LLM_ENRICHMENT_FIXTURE,
@@ -56,7 +55,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  mockConfig.featureLlm = false;
+  mockConfig.llmProvider = "none";
   mockPipeline.scanResult = SCAN_FIXTURE;
   mockPipeline.deriveResult = DERIVE_FIXTURE;
   await cleanDb(db);
@@ -92,8 +91,8 @@ describe("POST /api/refresh", () => {
     expect(scans).toHaveLength(3);
   });
 
-  it("no Llm records when featureLlm=false", async () => {
-    mockConfig.featureLlm = false;
+  it("no Llm records when llmProvider=none", async () => {
+    mockConfig.llmProvider = "none";
     await refreshPOST();
 
     const llms = await db.llm.findMany();

@@ -21,14 +21,13 @@ const unsafeProviders: Record<string, LlmProvider> = {
 };
 
 /**
- * Returns the active LLM provider, or null if LLM is disabled.
+ * Returns the active LLM provider, or null if provider is "none" or unconfigured.
  * Provider is selected by LLM_PROVIDER env var (default: claude-cli).
  * Unsafe providers (codex-cli) require LLM_ALLOW_UNSAFE=true.
  */
 export function getLlmProvider(): LlmProvider | null {
-  if (!config.featureLlm) return null;
-
   const name = config.llmProvider;
+  if (!name || name === "none") return null;
 
   // Check unsafe providers first
   const unsafe = unsafeProviders[name];

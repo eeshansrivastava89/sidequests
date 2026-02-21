@@ -7,13 +7,13 @@ export async function GET() {
     devRoot: config.devRoot,
     excludeDirs: config.excludeDirs.join(", "),
     sanitizePaths: config.sanitizePaths,
-    featureLlm: config.featureLlm,
     llmProvider: config.llmProvider,
     llmConcurrency: config.llmConcurrency,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
     llmAllowUnsafe: config.llmAllowUnsafe,
     llmDebug: config.llmDebug,
     claudeCliModel: config.claudeCliModel ?? "",
+    codexCliModel: config.codexCliModel ?? "",
     // Mask secret: show "***" if present (via env var), empty string if not
     openrouterApiKey: config.openrouterApiKey ? "***" : "",
     openrouterModel: config.openrouterModel,
@@ -26,12 +26,12 @@ export async function GET() {
 }
 
 const BOOL_KEYS: (keyof AppSettings)[] = [
-  "sanitizePaths", "featureLlm",
+  "sanitizePaths",
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
   "hasCompletedOnboarding",
 ];
 const STR_KEYS: (keyof AppSettings)[] = [
-  "devRoot", "excludeDirs", "llmProvider", "claudeCliModel",
+  "devRoot", "excludeDirs", "llmProvider", "claudeCliModel", "codexCliModel",
   "openrouterApiKey", "openrouterModel",
   "ollamaUrl", "ollamaModel", "mlxUrl", "mlxModel",
 ];

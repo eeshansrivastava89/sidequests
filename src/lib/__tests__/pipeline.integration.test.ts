@@ -14,7 +14,6 @@ import type { PipelineEvent } from "@/lib/pipeline";
 const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
-  featureLlm: false,
   sanitizePaths: false,
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
@@ -48,7 +47,7 @@ const mockEnrich = vi.fn().mockResolvedValue(LLM_ENRICHMENT_FIXTURE);
 
 vi.mock("@/lib/llm", () => ({
   getLlmProvider: () => {
-    if (!mockConfig.featureLlm) return null;
+    if (!mockConfig.llmProvider || mockConfig.llmProvider === "none") return null;
     return { name: "test-provider", enrich: mockEnrich };
   },
 }));
@@ -66,7 +65,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  mockConfig.featureLlm = false;
+  mockConfig.llmProvider = "none";
   mockConfig.llmOverwriteMetadata = false;
   mockPipeline.scanResult = SCAN_FIXTURE;
   mockPipeline.deriveResult = DERIVE_FIXTURE;
@@ -97,7 +96,7 @@ describe("pipeline integration — store phase", () => {
   });
 
   it("full pipeline happy path (LLM enabled): creates all 7 models", async () => {
-    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
     const result = await runRefreshPipeline();
 
     expect(result.projectCount).toBe(3);
@@ -191,7 +190,7 @@ describe("pipeline integration — soft-prune", () => {
 
 describe("pipeline integration — LLM enrichment", () => {
   it("success creates Llm + Metadata records", async () => {
-    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
     await runRefreshPipeline();
 
     const llm = await db.llm.findFirst();
@@ -205,7 +204,7 @@ describe("pipeline integration — LLM enrichment", () => {
   });
 
   it("failure for one project doesn't block others", async () => {
-    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
     let callCount = 0;
     mockEnrich.mockImplementation(async () => {
       callCount++;
@@ -222,7 +221,7 @@ describe("pipeline integration — LLM enrichment", () => {
   });
 
   it("respects llmOverwriteMetadata=false (preserves existing non-empty fields)", async () => {
-    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
     mockConfig.llmOverwriteMetadata = false;
 
     // First run seeds metadata from LLM
@@ -240,7 +239,7 @@ describe("pipeline integration — LLM enrichment", () => {
   });
 
   it("respects llmOverwriteMetadata=true (overwrites)", async () => {
-    mockConfig.featureLlm = true;
+    mockConfig.llmProvider = "claude-cli";
     mockConfig.llmOverwriteMetadata = false;
 
     // First run

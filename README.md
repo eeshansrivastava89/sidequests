@@ -7,7 +7,7 @@ Runs entirely on your machine. No cloud services, no telemetry.
 ## Quick Start
 
 ```bash
-npx sidequests
+npx @eeshans/sidequests
 ```
 
 **Prerequisites:** Node.js >= 20.9, git
@@ -26,8 +26,8 @@ On first launch, the onboarding wizard walks you through configuration.
 ### Development
 
 ```bash
-git clone https://github.com/eeshans/projects-dashboard.git
-cd projects-dashboard
+git clone https://github.com/eeshans/sidequests.git
+cd sidequests
 npm install
 npm run setup    # creates DB, copies default settings
 npm run dev      # start Next.js dev server at localhost:3000

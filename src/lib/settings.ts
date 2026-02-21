@@ -6,13 +6,13 @@ export interface AppSettings {
   devRoot?: string;
   excludeDirs?: string;
   sanitizePaths?: boolean;
-  featureLlm?: boolean;
   llmProvider?: string;
   llmConcurrency?: number;
   llmOverwriteMetadata?: boolean;
   llmAllowUnsafe?: boolean;
   llmDebug?: boolean;
   claudeCliModel?: string;
+  codexCliModel?: string;
   openrouterApiKey?: string;
   openrouterModel?: string;
   ollamaUrl?: string;

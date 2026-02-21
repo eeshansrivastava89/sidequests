@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { buildPrompt, parseEnrichment } from "./prompt";
+import { config } from "../config";
 
 const execFileAsync = promisify(execFile);
 
@@ -17,7 +18,12 @@ export const codexCliProvider: LlmProvider = {
 
     const { stdout } = await execFileAsync(
       "codex",
-      ["exec", "--full-auto", prompt],
+      [
+        "exec",
+        "--full-auto",
+        ...(config.codexCliModel ? ["--model", config.codexCliModel] : []),
+        prompt,
+      ],
       { timeout: 120_000, maxBuffer: 1024 * 1024 }
     );
 

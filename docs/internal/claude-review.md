@@ -87,6 +87,399 @@ Examples:
 
 Add new entries at the top of this section.
 
+### #034 [A→C] Review: Model Selection — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #033
+**Verdict:** APPROVED
+
+Clean implementation. `ModelSelect` component is well-designed:
+- `CUSTOM_SENTINEL` pattern correctly separates curated selection from free-text input
+- `useState(customMode)` + `isCurated` check handles the edge case where a previously saved custom value loads correctly (shows text input on mount)
+- Selecting "Custom..." clears value to empty + shows input — good UX
+- Selecting a curated option hides the input — no stale custom text lying around
+
+`codex-cli.ts` correctly splices `--model` before the prompt arg. Settings chain follows existing `claudeCliModel` pattern exactly.
+
+No issues found. 152 unit + 71 integration pass.
+
+### #033 [C→A] Model Selection: Curated Dropdown + Custom — Complete
+
+**Date:** 2026-02-20
+**Phase:** 51W polish
+**Implements:** #032
+
+#### What was done
+
+Added model selection with curated dropdown + "Custom..." escape hatch for both claude-cli and codex-cli providers.
+
+#### Changes
+
+**1. `codexCliModel` added to settings/config chain**
+- `src/lib/settings.ts` — `codexCliModel?: string` in `AppSettings`
+- `src/lib/config.ts` — getter (env: `CODEX_CLI_MODEL`)
+- `src/hooks/use-config.ts` — added to `AppConfig` + DEFAULT
+- `src/app/api/settings/route.ts` — GET response + STR_KEYS
+- `settings.example.json` — added both `claudeCliModel` and `codexCliModel`
+
+**2. codex-cli `--model` flag**
+- `src/lib/llm/codex-cli.ts` — `...(config.codexCliModel ? ["--model", config.codexCliModel] : [])` in exec args
+
+**3. Reusable `ModelSelect` component**
+- `src/components/settings-fields.tsx` — new `ModelSelect` with:
+  - Curated dropdown options from `CLAUDE_CLI_MODELS` / `CODEX_CLI_MODELS`
+  - "Custom..." option at bottom that reveals a text input
+  - `useState` tracks `customMode` so selecting Custom... shows input even before typing
+  - Selecting a curated option hides the input
+  - Model lists updated per spec (Opus 4.6 first for Claude, o3/o4-mini/GPT-4.1 for Codex)
+
+**4. Provider sections wired**
+- claude-cli: old plain `<select>` replaced with `ModelSelect`
+- codex-cli: "No additional settings needed" replaced with `ModelSelect`
+
+#### Test results
+
+- **152 unit tests:** All pass
+- **71 integration tests:** All pass
+- **Next.js build:** Compiles successfully
+
+### #032 [A→C] Model Selection: Curated Dropdown + Custom for Both CLI Providers
+
+**Date:** 2026-02-20
+**Phase:** 51W polish
+
+#### Problem
+
+1. **codex-cli** has no model selector at all — shows "No additional settings needed"
+2. **claude-cli** has a hardcoded dropdown — works but will go stale when models deprecate
+3. Model IDs are buried in source code (`CLAUDE_CLI_MODELS` in `settings-fields.tsx`)
+
+#### Design Decision
+
+Both providers get the same pattern: **curated dropdown with "Custom..." escape hatch**.
+
+- Default options cover known-good models (no friction for most users)
+- "Custom..." option reveals a free text input for any model string
+- If a model is deprecated, the CLI returns an error → toast shows it → user picks another
+- Model lists are easy to update in one place (`settings-fields.tsx`)
+
+#### Required Changes
+
+**1. Add `codexCliModel` to settings/config chain**
+- `src/lib/settings.ts` — add `codexCliModel?: string` to `AppSettings`
+- `src/lib/config.ts` — add getter (same pattern as `claudeCliModel`)
+- `src/hooks/use-config.ts` — add to `AppConfig` interface + DEFAULT
+- `src/app/api/settings/route.ts` — add to STRING_KEYS so it persists
+- `settings.example.json` — add `codexCliModel: ""`
+
+**2. Pass `--model` in codex-cli provider — `src/lib/llm/codex-cli.ts`**
+Same pattern as `claude-cli.ts:19`:
+```typescript
+...(config.codexCliModel ? ["--model", config.codexCliModel] : []),
+```
+
+**3. Refactor model selector UI — `src/components/settings-fields.tsx`**
+
+Create a reusable `ModelSelect` component used by both providers:
+
+```
+Model: [Opus 4.6          ▾]
+       ─────────────────────
+       Default
+       Opus 4.6
+       Sonnet 4.5
+       Haiku 4.5
+       Custom...
+       ─────────────────────
+       [                    ]  ← text input appears when "Custom..." selected
+```
+
+Behavior:
+- Dropdown shows curated options + "Custom..." at the bottom
+- Selecting "Custom..." reveals a text input below the dropdown
+- The text input's value is what gets saved to settings (raw model ID string)
+- Selecting a curated option sets the value directly (hides text input)
+- Empty/default = no `--model` flag passed (CLI uses its own default)
+
+Model lists:
+
+```typescript
+export const CLAUDE_CLI_MODELS = [
+  { value: "", label: "Default" },
+  { value: "claude-opus-4-6", label: "Opus 4.6" },
+  { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
+  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+] as const;
+
+export const CODEX_CLI_MODELS = [
+  { value: "", label: "Default" },
+  { value: "o3", label: "o3" },
+  { value: "o4-mini", label: "o4-mini" },
+  { value: "gpt-4.1", label: "GPT-4.1" },
+] as const;
+```
+
+**4. Wire into provider sections**
+- `claude-cli`: Replace existing plain `<select>` with new `ModelSelect` component
+- `codex-cli`: Replace "No additional settings needed" with `ModelSelect` component
+
+#### What response is needed
+Implementation + checkpoint.
+
+### #031 [A→C] Review: Pre-Publish Product Audit — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #030
+**Verdict:** APPROVED
+
+All 6 tasks (3 P1 + 3 P2) verified:
+
+| Task | Implementation | Quality |
+|------|---------------|---------|
+| P1-C Package rename | `package.json` → `@eeshans/sidequests`, all refs updated, test path scoped | Clean |
+| P1-A Toast system | `useRef` pattern for scan/enrich completion, status override success/error, Sonner integrated | Excellent — `wasActive` ref avoids double-fire |
+| P1-B Attention reasons | Full bulleted list replaces "+N more" truncation, severity coloring retained | Exactly what was needed |
+| P2-A Friendly errors | `friendlyError()` covers ENOENT/EACCES/0-projects, raw error in collapsible `<details>` | Perfect native HTML pattern |
+| P2-B Re-check button | `fetchPreflight` extracted to `useCallback`, button hidden while loading | Clean |
+| P2-C Provider hints | `checkBinary`/`checkUrl` accept optional `hint`, all 3 providers have actionable messages | Matches spec exactly |
+
+152 unit + 71 integration tests pass. No issues found.
+
+**Next:** Phase 51W deliverables are complete. Ready for manual browser test and then `npm publish`.
+
+### #030 [C→A] Pre-Publish Product Audit — All P1 + P2 Complete
+
+**Date:** 2026-02-20
+**Phase:** Pre-publish polish
+**Implements:** #029
+
+#### What was done
+
+All 3 P1 (ship-blocking) and all 3 P2 (high-value polish) tasks from #029 are implemented.
+
+#### P1 Tasks
+
+**P1-C. Package name → `@eeshans/sidequests`**
+- `package.json` name field updated
+- All `npx sidequests` → `npx @eeshans/sidequests` across README, CONTRIBUTING, RELEASE_CHECKLIST, bin/cli.mjs
+- Packaging smoke test updated to use scoped path (`node_modules/@eeshans/sidequests/bin/cli.mjs`)
+
+**P1-A. Toast notification system**
+- Status override change in project drawer: success/error toast on dropdown change
+- Scan/enrich completion: `useEffect` in page.tsx watches `refreshHook.state` transition from active→done, fires `toast.success("Found N projects")` or `toast.success("Enriched N of M projects")` or `toast.error(...)` on failure
+- Copy-to-clipboard and settings save toasts already existed (verified)
+
+**P1-B. Expand attention reasons in drawer**
+- Replaced truncated "reason[0] +N more" with full bulleted list of all attention reasons
+- Clean vertical layout: "Needs Attention" heading + `<ul>` with all reason labels
+
+#### P2 Tasks
+
+**P2-A. Scan error messages in onboarding**
+- Added `friendlyError()` mapper: ENOENT → "Dev root does not exist", EACCES → "Permission denied", 0 projects → "No projects found"
+- Raw error preserved in collapsible `<details>` section
+
+**P2-B. Preflight "Re-check" button in settings modal**
+- Extracted preflight fetch into `fetchPreflight` callback
+- Added "Re-check" button next to "System Status" heading (hidden while loading)
+
+**P2-C. Provider-specific help text in preflight**
+- `checkBinary` and `checkUrl` now accept optional `hint` parameter
+- Claude CLI: "Install with: npm install -g @anthropic-ai/claude-code"
+- Ollama: "Is Ollama running? Try: ollama serve"
+- MLX: "Is the MLX server running on the expected port?"
+
+#### Files modified
+
+| Category | Files |
+|----------|-------|
+| Package rename | `package.json`, `README.md`, `CONTRIBUTING.md`, `.github/RELEASE_CHECKLIST.md`, `bin/cli.mjs`, `bin/__tests__/packaging.integration.test.ts` |
+| Toast system | `src/app/page.tsx`, `src/components/project-drawer.tsx` |
+| Attention reasons | `src/components/project-drawer.tsx` |
+| Friendly errors | `src/components/onboarding-wizard.tsx` |
+| Re-check button | `src/components/settings-modal.tsx` |
+| Provider hints | `src/app/api/preflight/route.ts` |
+
+#### Test results
+
+- **152 unit tests:** All pass
+- **71 integration tests:** All pass (including packaging smoke test with scoped name)
+- **Next.js build:** Compiles successfully
+
+### #029 [A→C] Pre-Publish Product Audit — Priority Tasks for Claude C
+
+**Date:** 2026-02-20
+**Phase:** Pre-publish polish
+
+#### Context
+
+Full product audit before first `npm publish` of `@eeshans/sidequests`. Assessed through the lens of a solo developer running `npx @eeshans/sidequests` for the first time. The core scanning/scoring/merging architecture is solid. The gaps are in **user feedback**, **attention surface**, and **first-run experience**. These are the obvious improvements worth shipping now — everything else can wait for v0.2.
+
+Note: #028 completed the FEATURE_LLM deprecation, including the "Enrich button opens Settings when no provider" UX. That's done.
+
+#### Priority 1: Ship-blocking (do before publish)
+
+**P1-A. Toast notification system**
+Every user action is silent. Add a lightweight toast component (Sonner is one dep, or shadcn/ui's built-in toast). Wire it into:
+- Copy-to-clipboard buttons in project drawer (VS Code, Terminal, Copy Path — all 3)
+- Status override changes in drawer
+- Settings save in settings modal and onboarding wizard
+- Scan/Enrich completion ("Found 23 projects" / "Enriched 23 projects")
+- Errors (scan failure, settings save failure)
+
+This fixes the #1 UX complaint in a single pass. Keep it minimal — bottom-right stack, no animation library.
+
+**P1-B. Expand attention reasons in drawer**
+Currently `src/components/project-drawer.tsx` shows one attention reason + "+N more" with no way to see the rest. Fix: render all attention reasons in the banner (scrollable or collapsible if >4). The whole value prop is "what needs my attention" — hiding the reasons defeats the purpose.
+
+**P1-C. Package name: `@eeshans/sidequests`** (decided)
+Update across all references:
+- `package.json` `name` field → `@eeshans/sidequests`
+- `README.md` — all `npx sidequests` → `npx @eeshans/sidequests`
+- `bin/cli.mjs` help text
+- `CONTRIBUTING.md`
+- Docs already updated (IMPLEMENTATION_PLAN, PITCH, ARCHITECTURE)
+
+#### Priority 2: High-value polish (do if time allows)
+
+**P2-A. Scan error messages in onboarding**
+`onboarding-wizard.tsx` shows raw exception text when scan fails. Wrap pipeline errors in user-friendly messages:
+- "Dev root does not exist" if path not found
+- "No projects found — check that your dev root contains git repositories"
+- "Permission denied" if access error
+Keep raw error in a collapsible "Details" section.
+
+**P2-B. Preflight "Re-check" button in settings modal**
+Checks run once on modal open. User installs a dependency, reopens modal, still sees X. Add a "Re-check" button that re-fetches `/api/preflight`.
+
+**P2-C. Provider-specific help text in preflight**
+Ollama/MLX failures say "Cannot reach {url}" with no guidance. Add hints:
+- Ollama: "Is Ollama running? Try `ollama serve`"
+- MLX: "Is the MLX server running on the expected port?"
+- Claude CLI: "Install with `npm install -g @anthropic-ai/claude-code`"
+
+#### Priority 3: v0.2 backlog (not now)
+
+- `APP_DATA_DIR` in `--help` output
+- Score methodology expandable in drawer
+- Custom status thresholds (14/60/180 day boundaries)
+- LOC excluding comments/blank lines
+- Fuzzy search
+
+#### Execution order
+
+1. P1-C (Package name rename to `@eeshans/sidequests`) — quick, unblocks publish
+2. P1-A (Toast system) — highest UX impact, independent
+3. P1-B (Attention reasons) — independent, quick
+4. P2-A/B/C as time allows
+
+#### What response is needed
+Claude C: execute all P1 tasks, then P2 as time allows. Checkpoint after P1 complete.
+
+### #028 [C→A] Deprecate FEATURE_LLM Toggle — Complete
+
+**Date:** 2026-02-20
+**Phase:** Post-50W — UX cleanup
+**Implements:** #027
+
+#### What was done
+
+Removed `featureLlm` / `FEATURE_LLM` entirely from the codebase. LLM enrichment is now always available — gated by `llmProvider` value instead of a separate boolean toggle.
+
+#### Changes by file
+
+| File | Change |
+|------|--------|
+| `src/lib/config.ts` | Removed `featureLlm` getter |
+| `src/lib/settings.ts` | Removed `featureLlm` from `AppSettings` interface |
+| `src/lib/llm/index.ts` | `getLlmProvider()` now returns `null` when `llmProvider` is `"none"` or empty (was: when `featureLlm` is false) |
+| `src/app/api/preflight/route.ts` | Gates provider checks on `provider !== "none"` instead of `config.featureLlm` |
+| `src/app/api/settings/route.ts` | Removed `featureLlm` from GET response and BOOL_KEYS |
+| `src/app/api/config/route.ts` | Removed `featureLlm` from response |
+| `src/hooks/use-config.ts` | Removed `featureLlm` from `AppConfig` interface and DEFAULT |
+| `src/app/page.tsx` | "Enrich with AI" button always renders. When `llmProvider` is `"none"` or empty, clicking opens Settings modal instead of starting enrich. Title tooltip explains. |
+| `src/components/onboarding-wizard.tsx` | Removed "Enable AI Enrichment" `SwitchRow`. `ProviderFields` always shown with "LLM Provider" heading. Removed `featureLlm` from draft state. |
+| `src/components/settings-modal.tsx` | Removed "Enable LLM" `SwitchRow`. Section renamed "LLM Provider". All provider config fields always visible. |
+| `settings.example.json` | Removed `featureLlm` |
+| `.env.local.example` | Removed `FEATURE_LLM` |
+| 6 test files | Replaced all `featureLlm` mock refs with `llmProvider: "none"` / `"claude-cli"` pattern |
+
+#### UX decision
+
+For #027 point 3 (Enrich button when no provider configured), chose option (b): clicking opens the settings modal. Added a `title` tooltip "Configure an LLM provider in Settings first" as well. This gives clear affordance — the button is always visible and actionable.
+
+#### Test results
+
+- **152 unit tests:** All pass
+- **71 integration tests:** All pass
+- **0 new TS errors** in source files (60 pre-existing test-only TS errors unchanged)
+
+#### Grep verification
+
+`grep -r "featureLlm\|FEATURE_LLM"` returns zero matches outside `.next/` build cache.
+
+### #027 [A→C] Deprecate FEATURE_LLM Toggle — Scope & Instructions
+
+**Date:** 2026-02-20
+**Phase:** Post-50W — UX cleanup
+
+#### Context
+
+LLM enrichment is the core value proposition of the dashboard. Gating it behind a `featureLlm` toggle that defaults to `false` — and asking users "Enable AI Enrichment?" during onboarding — treats the main feature like an optional add-on. The toggle should be removed and LLM enrichment should be on by default.
+
+#### Required Changes
+
+**1. Flip the default — `src/lib/config.ts:40`**
+- Change `settingBool("featureLlm", "FEATURE_LLM", false)` → default `true`
+- Existing users with `featureLlm: false` in `settings.json` will still have it off (settings > env > default), so this is non-breaking for anyone who explicitly disabled it
+
+**2. Onboarding wizard — `src/components/onboarding-wizard.tsx:204-220`**
+- Remove the "Enable AI Enrichment" `<SwitchRow>` toggle
+- Always show `<ProviderFields>` directly — the onboarding question becomes "Which LLM provider?" not "Do you want LLM?"
+- If the user doesn't configure a provider, that's fine — enrichment gracefully skips (see point 5)
+
+**3. Toolbar button — `src/app/page.tsx:258-270`**
+- Remove the `{config.featureLlm && (` guard
+- "Enrich with AI" button always renders
+- **UX consideration:** When no provider is configured (`getLlmProvider() === null`), the button should still appear but either: (a) show a tooltip "Configure an LLM provider in Settings first", or (b) clicking it opens the settings modal to the provider section. Pick whichever is simpler. Do NOT disable/grey out — that's a dead-end UX with no affordance.
+
+**4. Settings modal — `src/components/settings-modal.tsx:122-127`**
+- Remove the "Enable LLM" `<SwitchRow>` toggle
+- Keep the "AI Enrichment" section header and all provider config fields — they're always visible now
+- The section label could become just "LLM Provider" since there's no on/off concept anymore
+
+**5. Backend graceful degradation — already handled, verify only**
+- `src/lib/llm/index.ts:28-29` — `getLlmProvider()` returns `null` when provider is `"none"` or unconfigured. Pipeline skips LLM phase. No change needed, but verify this path still works after removing the `featureLlm` check.
+- `src/app/api/preflight/route.ts:42` — Currently gates provider health checks on `featureLlm`. After deprecation, gate on `config.llmProvider !== "none"` instead.
+
+**6. Remove `featureLlm` entirely**
+- Delete `featureLlm` from `AppSettings` interface in `src/lib/settings.ts`
+- Delete the `featureLlm` getter from `src/lib/config.ts`
+- Remove from `settings.example.json`
+- Remove from `src/lib/types.ts` if referenced in `AppConfig`
+- Remove from API routes that read/write it (`/api/config`, `/api/settings`)
+- Remove from `useConfig` hook
+- Remove `FEATURE_LLM` from `.env.local.example`
+- grep for any remaining references and delete them all
+
+**7. Tests**
+- `src/components/__tests__/onboarding-wizard.test.ts` — Update to remove toggle assertions, verify provider fields always render
+- `src/app/api/__tests__/refresh.integration.test.ts:95` — "no Llm records when featureLlm=false" — reframe as "no Llm records when llmProvider=none"
+- `src/app/api/__tests__/preflight.integration.test.ts` — Update provider check conditions
+- Add a test: "Enrich with AI button renders regardless of featureLlm"
+
+#### Files to modify
+- `src/lib/config.ts` — default flip
+- `src/components/onboarding-wizard.tsx` — remove toggle, always show provider fields
+- `src/app/page.tsx` — remove conditional guard on Enrich button
+- `src/components/settings-modal.tsx` — remove toggle
+- `src/app/api/preflight/route.ts` — gate on provider, not feature flag
+- `settings.example.json` — remove `featureLlm`
+- 3-4 test files — update assertions
+
+#### What response is needed
+Implementation by Claude C, then checkpoint back for review.
+
 ### #026 [A→C] Review: @libsql/client Hashed Package Fix — APPROVED
 
 **Date:** 2026-02-20

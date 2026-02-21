@@ -2,7 +2,7 @@
 
 ## Scope
 
-Projects Dashboard runs entirely locally. It does not expose any network services beyond the local dev server (`localhost:3000`). There is no authentication layer — it is designed for single-user, local use.
+Sidequests runs entirely locally. It does not expose any network services beyond the local dev server (`localhost:3000`). There is no authentication layer — it is designed for single-user, local use.
 
 ## Reporting a Vulnerability
 

@@ -1,11 +1,12 @@
 {
   "devRoot": "~/dev",
   "excludeDirs": "node_modules,.venv,__pycache__,.git",
-  "featureLlm": false,
   "llmProvider": "claude-cli",
   "llmAllowUnsafe": false,
   "llmConcurrency": 3,
   "llmOverwriteMetadata": false,
   "llmDebug": false,
-  "sanitizePaths": true
+  "sanitizePaths": true,
+  "claudeCliModel": "",
+  "codexCliModel": ""
 }

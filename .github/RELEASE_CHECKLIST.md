@@ -12,7 +12,7 @@
 
 - [ ] `npm run build:npx` succeeds
 - [ ] `npm pack --dry-run` shows only `bin/*.mjs`, `.next/standalone/`, `public/`
-- [ ] `npx sidequests --no-open` starts server and `/api/preflight` returns 200
+- [ ] `npx @eeshans/sidequests --no-open` starts server and `/api/preflight` returns 200
 - [ ] Onboarding wizard works on fresh config
 - [ ] Scan completes successfully
 - [ ] Settings persist across restart
@@ -27,9 +27,9 @@
 
 - [ ] Create and push git tag: `git tag v<version> && git push origin v<version>`
 - [ ] `npm publish` (or `npm publish --access public` for first publish)
-- [ ] Verify: `npx sidequests@<version>` launches correctly
+- [ ] Verify: `npx @eeshans/sidequests@<version>` launches correctly
 
 ## Post-Release
 
-- [ ] Clean-machine validation: `npx sidequests` on fresh environment
+- [ ] Clean-machine validation: `npx @eeshans/sidequests` on fresh environment
 - [ ] Smoke test: configure > scan > enrich flow works

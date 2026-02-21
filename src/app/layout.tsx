@@ -20,7 +20,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Projects Dashboard",
+  title: "Sidequests",
   description: "Local developer portfolio dashboard",
 };
 

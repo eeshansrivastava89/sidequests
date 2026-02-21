@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Bootstrap script for Projects Dashboard.
+ * Bootstrap script for Sidequests.
  * Checks prerequisites, copies default config, and sets up the database.
  *
  * Usage: npm run setup

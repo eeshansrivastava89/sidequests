@@ -110,7 +110,7 @@ describe("packaging smoke test", () => {
       const port = await getFreePort();
       const cliPath = path.join(
         installDir,
-        "node_modules/sidequests/bin/cli.mjs",
+        "node_modules/@eeshans/sidequests/bin/cli.mjs",
       );
       expect(fs.existsSync(cliPath)).toBe(true);
 

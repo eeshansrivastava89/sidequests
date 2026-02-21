@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock AppConfig for testing
 const DEFAULT_CONFIG = {
-  featureLlm: false,
   sanitizePaths: true,
   devRoot: "~/dev",
   excludeDirs: "",
@@ -86,7 +85,6 @@ describe("OnboardingWizard logic", () => {
     const body = {
       devRoot: "~/projects",
       excludeDirs: "node_modules,.git",
-      featureLlm: false,
       llmProvider: "claude-cli",
       openrouterModel: "",
       ollamaUrl: "",
