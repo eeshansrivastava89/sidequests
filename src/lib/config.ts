@@ -39,9 +39,6 @@ export const config = {
   get featureLlm(): boolean {
     return settingBool("featureLlm", "FEATURE_LLM", false);
   },
-  get featureO1(): boolean {
-    return settingBool("featureO1", "FEATURE_O1", false);
-  },
   get llmProvider(): string {
     return settingStr("llmProvider", "LLM_PROVIDER", "claude-cli");
   },

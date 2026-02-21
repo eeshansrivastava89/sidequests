@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 
 export interface AppConfig {
   featureLlm: boolean;
-  featureO1: boolean;
   sanitizePaths: boolean;
   devRoot: string;
   excludeDirs: string;
@@ -25,7 +24,6 @@ export interface AppConfig {
 
 const DEFAULT: AppConfig = {
   featureLlm: false,
-  featureO1: false,
   sanitizePaths: true,
   devRoot: "~/dev",
   excludeDirs: "",

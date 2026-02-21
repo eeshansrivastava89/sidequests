@@ -7,7 +7,6 @@ export interface AppSettings {
   excludeDirs?: string;
   sanitizePaths?: boolean;
   featureLlm?: boolean;
-  featureO1?: boolean;
   llmProvider?: string;
   llmConcurrency?: number;
   llmOverwriteMetadata?: boolean;

@@ -18,14 +18,12 @@ export interface LlmEnrichment {
   recommendations: string[];
   pitch?: string;
   takeaways?: Record<string, string>;
-  // Optional metadata fields (populated when FEATURE_O1=true)
+  // Optional metadata fields
   goal?: string;
   audience?: string;
   successMetrics?: string;
   nextAction?: string;
   publishTarget?: string;
-  evidence?: Record<string, unknown>;
-  outcomes?: Record<string, unknown>;
   aiInsight?: AiInsight;
 }
 

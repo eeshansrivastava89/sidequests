@@ -1,8 +1,8 @@
 {
-  "name": "@eeshans/projects-dashboard",
+  "name": "sidequests",
   "version": "0.1.0",
   "bin": {
-    "projects-dashboard": "./bin/cli.mjs"
+    "sidequests": "./bin/cli.mjs"
   },
   "files": [
     "bin/*.mjs",
@@ -21,7 +21,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "setup": "node scripts/setup.mjs",
-    "build:npx": "next build && cp -r .next/static .next/standalone/.next/static && rm -rf .next/standalone/public && cp -r public .next/standalone/public && rm -f .next/standalone/.env .next/standalone/.env.local && chmod +x bin/cli.mjs",
+    "build:npx": "next build && cp -r .next/static .next/standalone/.next/static && rm -rf .next/standalone/public && cp -r public .next/standalone/public && cp -rL .next/node_modules/* .next/standalone/node_modules/ && cp -r node_modules/@libsql/core/. .next/standalone/node_modules/@libsql/core/ && cp -r node_modules/@libsql/hrana-client/. .next/standalone/node_modules/@libsql/hrana-client/ && cp -r node_modules/@libsql/darwin-arm64/. .next/standalone/node_modules/@libsql/darwin-arm64/ && cp -r node_modules/libsql/. .next/standalone/node_modules/libsql/ && cp -r node_modules/cross-fetch .next/standalone/node_modules/cross-fetch && rm -f .next/standalone/.env .next/standalone/.env.local && chmod +x bin/cli.mjs",
     "check:privacy": "node scripts/privacy-gate.mjs",
     "test:smoke:web": "vitest run bin/__tests__/cli-helpers.test.ts bin/__tests__/bootstrap-db.test.ts",
     "validate:source-web": "npm run lint && npm test && npm run test:integration && npm run build:npx && npm run check:privacy"

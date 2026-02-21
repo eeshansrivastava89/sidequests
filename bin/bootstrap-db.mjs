@@ -93,8 +93,6 @@ const SCHEMA_SQL = [
     "successMetrics" TEXT,
     "nextAction"     TEXT,
     "publishTarget"  TEXT,
-    "evidenceJson"   TEXT,
-    "outcomesJson"   TEXT,
     CONSTRAINT "Metadata_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Metadata_projectId_key" ON "Metadata"("projectId")`,

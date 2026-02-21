@@ -83,8 +83,6 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     successMetrics: "TEXT",
     nextAction: "TEXT",
     publishTarget: "TEXT",
-    evidenceJson: "TEXT",
-    outcomesJson: "TEXT",
   },
   Activity: {
     id: "TEXT",

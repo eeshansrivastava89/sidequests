@@ -168,8 +168,6 @@ export const LLM_ENRICHMENT_FIXTURE: LlmEnrichment = {
   successMetrics: "100 daily active users",
   nextAction: "Write documentation",
   publishTarget: "npm",
-  evidence: { commits: 100, testCoverage: 0 },
-  outcomes: { users: 0, stars: 0 },
   aiInsight: {
     score: 78,
     confidence: "high",
@@ -232,8 +230,6 @@ interface SeedOverrides {
     successMetrics?: string | null;
     nextAction?: string | null;
     publishTarget?: string | null;
-    evidenceJson?: string | null;
-    outcomesJson?: string | null;
   } | false;
 }
 
@@ -323,8 +319,6 @@ export async function seedProject(
         successMetrics: overrides.metadata.successMetrics ?? null,
         nextAction: overrides.metadata.nextAction ?? null,
         publishTarget: overrides.metadata.publishTarget ?? null,
-        evidenceJson: overrides.metadata.evidenceJson ?? null,
-        outcomesJson: overrides.metadata.outcomesJson ?? null,
       },
     });
   }

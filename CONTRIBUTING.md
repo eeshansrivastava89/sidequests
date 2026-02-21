@@ -1,4 +1,4 @@
-# Contributing to Projects Dashboard
+# Contributing to sidequests
 
 Thank you for your interest in contributing! This guide will help you get started.
 
@@ -58,7 +58,7 @@ prisma/             Database schema
 - **Pipeline:** TypeScript-native scan + derive (no Python dependency)
 - **Database:** Prisma 7 + SQLite with LibSQL adapter
 - **Merge model:** Override > Metadata > Derived > LLM > Scan
-- **Distribution:** Web/CLI via NPX (`npx @eeshans/projects-dashboard`)
+- **Distribution:** Web/CLI via NPX (`npx sidequests`)
 - **Config:** Settings UI > settings.json > env vars > defaults
 
 ## Reporting Bugs

@@ -88,8 +88,6 @@ model Metadata {
   successMetrics String?
   nextAction     String?
   publishTarget  String?
-  evidenceJson   String? // JSON object for O-1 evidence
-  outcomesJson   String? // JSON object for O-1 outcomes
 }
 
 model Activity {

@@ -67,8 +67,6 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     successMetrics: null,
     nextAction: null,
     publishTarget: null,
-    evidence: null,
-    outcomes: null,
     aiInsight: null,
     lastScanned: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

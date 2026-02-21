@@ -238,7 +238,6 @@ interface ProjectDrawerProps {
   onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
-  featureO1?: boolean;
   sanitizePaths?: boolean;
   delta?: ProjectDelta | null;
 }
@@ -252,7 +251,6 @@ export function ProjectDrawer({
   onUpdateOverride,
   onTogglePin,
   onTouch,
-  featureO1,
   sanitizePaths,
   delta,
 }: ProjectDrawerProps) {
@@ -695,38 +693,6 @@ export function ProjectDrawer({
             )}
           </CollapsibleSection>
 
-          {/* ── Section 5: O-1 Evidence ── */}
-          {featureO1 && (
-            <CollapsibleSection title="O-1 Evidence" source={{ type: "llm", timestamp: project.llmGeneratedAt }} highlight={delta?.newlyEnriched} defaultOpen={false}>
-              <div className="space-y-3">
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Evidence</span>
-                  {project.evidence && Object.keys(project.evidence).length > 0 ? (
-                    <div className="rounded-md bg-muted p-2.5 mt-1">
-                      <StructuredData data={project.evidence} />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic mt-0.5">
-                      No evidence data.
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Outcomes</span>
-                  {project.outcomes && Object.keys(project.outcomes).length > 0 ? (
-                    <div className="rounded-md bg-muted p-2.5 mt-1">
-                      <StructuredData data={project.outcomes} />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic mt-0.5">
-                      No outcomes data.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CollapsibleSection>
-          )}
 
         </div>
       </DialogContent>

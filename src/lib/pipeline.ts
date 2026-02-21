@@ -294,7 +294,7 @@ export async function runRefreshPipeline(
 
           // Upsert metadata if LLM returned any metadata fields
           const hasMetadata = enrichment.goal || enrichment.audience || enrichment.successMetrics ||
-            enrichment.nextAction || enrichment.publishTarget || enrichment.evidence || enrichment.outcomes;
+            enrichment.nextAction || enrichment.publishTarget;
 
           if (hasMetadata) {
             const llmMeta: Record<string, string | undefined> = {
@@ -303,8 +303,6 @@ export async function runRefreshPipeline(
               successMetrics: enrichment.successMetrics,
               nextAction: enrichment.nextAction,
               publishTarget: enrichment.publishTarget,
-              evidenceJson: enrichment.evidence ? JSON.stringify(enrichment.evidence) : undefined,
-              outcomesJson: enrichment.outcomes ? JSON.stringify(enrichment.outcomes) : undefined,
             };
 
             if (config.llmOverwriteMetadata) {

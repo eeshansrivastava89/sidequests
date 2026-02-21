@@ -4,7 +4,6 @@ import { parseJson, parseAiInsightJson, sanitizePath } from "@/lib/merge";
 vi.mock("@/lib/config", () => ({
   config: {
     sanitizePaths: true,
-    featureO1: false,
   },
 }));
 

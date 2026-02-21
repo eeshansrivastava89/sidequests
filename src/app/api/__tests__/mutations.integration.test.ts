@@ -5,7 +5,6 @@ import { seedProject } from "@/lib/__tests__/helpers/fixtures";
 
 const mockConfig = vi.hoisted(() => ({
   sanitizePaths: false,
-  featureO1: false,
 }));
 
 vi.mock("@/lib/config", () => ({ config: mockConfig }));
@@ -166,19 +165,6 @@ describe("PATCH /api/projects/[id]/metadata", () => {
 
     const activity = await db.activity.findFirst({ where: { projectId: id, type: "metadata" } });
     expect(activity).not.toBeNull();
-  });
-
-  it("JSON coercion — evidenceJson as object", async () => {
-    const id = await seedProject(db, { pathHash: "h-md2" });
-
-    const res = await metadataPATCH(
-      jsonReq(`/api/projects/${id}/metadata`, { evidenceJson: { commits: 50 } }),
-      { params: Promise.resolve({ id }) },
-    );
-    const body = await res.json();
-
-    expect(body.ok).toBe(true);
-    expect(body.metadata.evidenceJson).toBe(JSON.stringify({ commits: 50 }));
   });
 
   it("400 on empty body", async () => {

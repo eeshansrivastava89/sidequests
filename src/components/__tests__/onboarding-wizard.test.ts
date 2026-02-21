@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock AppConfig for testing
 const DEFAULT_CONFIG = {
   featureLlm: false,
-  featureO1: false,
   sanitizePaths: true,
   devRoot: "~/dev",
   excludeDirs: "",

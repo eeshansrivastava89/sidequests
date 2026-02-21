@@ -480,7 +480,6 @@ export default function DashboardPage() {
         onUpdateOverride={updateOverride}
         onTogglePin={handleTogglePin}
         onTouch={handleTouch}
-        featureO1={config.featureO1}
         sanitizePaths={config.sanitizePaths}
         delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
       />

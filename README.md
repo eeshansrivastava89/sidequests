@@ -1,4 +1,4 @@
-# Projects Dashboard
+# sidequests
 
 A local-first developer tool that scans your dev directory and gives you a bird's-eye view of all your projects. Tracks health scores, git status, activity, and optionally enriches metadata with LLMs.
 
@@ -7,7 +7,7 @@ Runs entirely on your machine. No cloud services, no telemetry.
 ## Quick Start
 
 ```bash
-npx @eeshans/projects-dashboard
+npx sidequests
 ```
 
 **Prerequisites:** Node.js >= 20.9, git

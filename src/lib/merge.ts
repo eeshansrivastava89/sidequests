@@ -57,11 +57,7 @@ export interface MergedProject {
   nextAction: string | null;
   publishTarget: string | null;
 
-  // O-1 evidence (gated)
-  evidence: Record<string, unknown> | null;
-  outcomes: Record<string, unknown> | null;
-
-  // AI structured insight (gated behind featureO1)
+  // AI structured insight
   aiInsight: AiInsight | null;
 
   // New Phase 29 fields
@@ -168,8 +164,6 @@ export type ProjectWithRelations = Project & {
     successMetrics: string | null;
     nextAction: string | null;
     publishTarget: string | null;
-    evidenceJson: string | null;
-    outcomesJson: string | null;
   } | null;
 };
 
@@ -251,8 +245,6 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     nextAction: metadata?.nextAction ?? null,
     publishTarget: metadata?.publishTarget ?? null,
 
-    evidence: config.featureO1 ? parseJson(metadata?.evidenceJson, null) : null,
-    outcomes: config.featureO1 ? parseJson(metadata?.outcomesJson, null) : null,
     aiInsight: parseAiInsightJson(llm?.aiInsightJson),
 
     pitch: llm?.pitch ?? null,

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { withErrorHandler, findProject, notFound, coercePatchBody } from "@/lib/api-helpers";
 
 const FIELD_SPEC = {
-  jsonFields: new Set(["evidenceJson", "outcomesJson"]),
+  jsonFields: new Set<string>(),
   stringFields: new Set(["goal", "audience", "successMetrics", "nextAction", "publishTarget"]),
 };
 

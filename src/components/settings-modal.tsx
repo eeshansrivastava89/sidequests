@@ -128,13 +128,6 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
             {draft.featureLlm && (
               <>
-                <SwitchRow
-                  label="Enable O-1 Fields"
-                  description="Extended metadata in project drawer"
-                  checked={draft.featureO1}
-                  onCheckedChange={(v) => set("featureO1", v)}
-                />
-
                 <ProviderFields draft={draft} set={set} />
 
                 <Field label="Concurrency" description="Parallel LLM tasks (1-10)">

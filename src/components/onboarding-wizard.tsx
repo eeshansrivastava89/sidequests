@@ -46,7 +46,15 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [scanStarted, setScanStarted] = useState(false);
 
-  // Sync draft when config changes or wizard opens
+  // Reset wizard state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setStep(0);
+      setScanStarted(false);
+    }
+  }, [open]);
+
+  // Sync draft from config (on open or when config updates)
   useEffect(() => {
     if (open) {
       setDraft({
@@ -62,8 +70,6 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
         mlxModel: config.mlxModel,
         claudeCliModel: config.claudeCliModel,
       });
-      setStep(0);
-      setScanStarted(false);
     }
   }, [open, config]);
 

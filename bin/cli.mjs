@@ -2,7 +2,7 @@
 
 /**
  * CLI entry point for Projects Dashboard.
- * Usage: npx @eeshans/projects-dashboard [--port <n>] [--no-open] [--help] [--version]
+ * Usage: npx sidequests [--port <n>] [--no-open] [--help] [--version]
  */
 
 import { fork } from "node:child_process";
@@ -33,7 +33,7 @@ if (parsed.help) {
   console.log(`
 ${bold("Projects Dashboard")} v${pkg.version}
 
-Usage: projects-dashboard [options]
+Usage: sidequests [options]
 
 Options:
   --port <n>   Use a specific port (default: auto)

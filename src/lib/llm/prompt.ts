@@ -34,16 +34,12 @@ function sanitizeScan(scan: Record<string, unknown>): Record<string, unknown> {
 }
 
 export function buildPrompt(input: LlmInput): string {
-  const metadataFields = config.featureO1
-    ? `,
+  const metadataFields = `,
   "goal": "1 sentence project goal",
   "audience": "who this project is for",
   "successMetrics": "how success is measured",
   "nextAction": "single most important next step",
-  "publishTarget": "where this should be published/deployed",
-  "evidence": { "skills": ["demonstrated skills"], "complexity": "low|medium|high", "impact": "description of impact" },
-  "outcomes": { "status": "description of current outcome", "learnings": ["key learnings"] }`
-    : "";
+  "publishTarget": "where this should be published/deployed"`;
 
   const aiInsightField = `,
   "aiInsight": {
@@ -115,9 +111,6 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   if (typeof obj?.nextAction === "string") base.nextAction = obj.nextAction;
   if (typeof obj?.publishTarget === "string") base.publishTarget = obj.publishTarget;
   if (typeof obj?.pitch === "string") base.pitch = obj.pitch;
-  if (obj?.evidence && typeof obj.evidence === "object") base.evidence = obj.evidence as Record<string, unknown>;
-  if (obj?.outcomes && typeof obj.outcomes === "object") base.outcomes = obj.outcomes as Record<string, unknown>;
-
   // Extract and validate aiInsight with runtime type checks
   const insight = parseAiInsight(obj?.aiInsight);
   if (insight) base.aiInsight = insight;

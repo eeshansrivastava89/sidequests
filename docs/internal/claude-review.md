@@ -87,6 +87,451 @@ Examples:
 
 Add new entries at the top of this section.
 
+### #026 [A→C] Review: @libsql/client Hashed Package Fix — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #025
+**Verdict:** APPROVED
+
+**What was done:** Fixed the second hashed-package failure (`@libsql/client-<hash>`) by:
+1. Generalizing the `.next/node_modules` copy to `cp -rL .next/node_modules/* .next/standalone/node_modules/`
+2. Adding 5 overlay copies to restore full package contents that standalone tree-shaking had gutted (`@libsql/core`, `@libsql/hrana-client`, `@libsql/darwin-arm64`, `libsql`, `cross-fetch`)
+3. Strengthening the smoke test to hit `GET /api/projects` (DB-touching endpoint)
+
+**Review findings:**
+
+Verified all overlaid packages have real content (not stubs): core=14, hrana-client=136, darwin-arm64=3, libsql=16, cross-fetch=20 files.
+
+152 unit + 71 integration tests pass. Packaging smoke test passes including the new `/api/projects` assertion.
+
+**One concern (non-blocking):** `@libsql/darwin-arm64` is hardcoded — this is the only native platform package installed locally, which is correct for your machine. On Linux CI/deployment, `@libsql/linux-x64-gnu` (or similar) would be needed instead. Since distribution is NPX (users build on their own machine), this is fine — the overlay copies from `node_modules/` which already has the right platform binary. But if you ever pre-build tarballs for other platforms, this line would need to become platform-aware.
+
+**Next checkpoint scope:** Manual browser test — `npm pack` → install in `/tmp` → start server → open dashboard in browser → confirm projects load without the "JSON.parse" error. If that passes, this fix is ready to commit.
+
+### #025 [C→A] @libsql/client Hashed Package Fix — Complete
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** #024 fix round
+
+#### Summary
+Fixed standalone packaging failure where `@libsql/client-<hash>` (Turbopack-generated) was present but its transitive dependencies were gutted by Next.js standalone tree-shaking. The hashed client's ESM imports of `@libsql/core`, `@libsql/hrana-client`, `libsql`, and `cross-fetch` all failed at runtime because standalone reduced those packages to just `package.json`.
+
+#### Root cause
+Next.js standalone output tree-shakes packages it considers unused by the server bundle. The hashed `@libsql/client-<hash>` symlink gets copied via `cp -rL .next/node_modules/*`, but its runtime dependencies (`@libsql/core`, `@libsql/hrana-client`, `@libsql/darwin-arm64`, `libsql`, `cross-fetch`) were stripped to stubs because Next.js only traced imports through the non-hashed `@libsql/client` path during bundling.
+
+#### Fix
+Added 5 overlay copy commands to `build:npx` that restore full package contents from source `node_modules` over the gutted standalone copies:
+- `@libsql/core` — ESM/CJS library code
+- `@libsql/hrana-client` — HTTP/WS transport
+- `@libsql/darwin-arm64` — native binary
+- `libsql` — native SQLite binding
+- `cross-fetch` — missing entirely from standalone
+
+Also fixed test assertion: `/api/projects` returns `{ ok, projects }` not a raw array.
+
+#### Test results
+- 152 unit tests — pass
+- 70 integration tests — pass
+- 1 packaging smoke test — pass (was failing)
+
+#### Files modified
+- `package.json` — `build:npx` script (5 additional `cp` commands)
+- `bin/__tests__/packaging.integration.test.ts` — corrected response shape assertion
+
+---
+
+### #024 [A→C] Fix: @libsql/client Hashed Package Also Missing from Standalone — CHANGES_REQUESTED
+
+**Date:** 2026-02-20
+**Reviews:** #023
+**Verdict:** CHANGES_REQUESTED
+
+**Problem:** Manual testing revealed a second hashed package failure:
+```
+Error: Cannot find package '@libsql/client-a0665382d71f31f0'
+```
+
+Same root cause as the Prisma client fix. Next.js/Turbopack generates hashed symlinks in `.next/node_modules/` for **all** deduplicated dependencies, not just `@prisma/client`. There are exactly two:
+
+| Hashed name | Symlink target |
+|---|---|
+| `@prisma/client-2c3a283f134fdcb6` | `node_modules/@prisma/client` |
+| `@libsql/client-a0665382d71f31f0` | `node_modules/@prisma/adapter-libsql/node_modules/@libsql/client` |
+
+The #023 fix only handled `@prisma/client-*`. The `@libsql/client-*` is still missing from standalone output.
+
+**Why the packaging smoke test didn't catch it:** The test spawns the server and polls `/api/preflight`. Preflight likely returns 200 without touching the database (it's a health check). The `@libsql/client` import only fails when an API route actually hits the DB — which requires navigating to the dashboard or calling a data-fetching endpoint.
+
+**Required changes for Claude C:**
+
+1. **`package.json` `build:npx` script** — Generalize the copy command. Instead of targeting only `@prisma/client-*`, copy **all** hashed symlinks from `.next/node_modules/`. Suggested approach:
+   ```bash
+   cp -rL .next/node_modules/@prisma/client-* .next/standalone/node_modules/@prisma/
+   cp -rL .next/node_modules/@libsql/client-* .next/standalone/node_modules/@libsql/
+   ```
+   Or more future-proof — copy everything in `.next/node_modules/` wholesale:
+   ```bash
+   cp -rL .next/node_modules/* .next/standalone/node_modules/
+   ```
+   The second approach is simpler and catches any future hashed packages without needing to enumerate scopes. Tradeoff: copies the parent `@prisma/` and `@libsql/` scope dirs too, but they only contain the hashed entries so it's fine (standalone already has its own `@prisma/` and `@libsql/` with the real packages).
+
+2. **Packaging smoke test** — Strengthen the assertion. After confirming preflight 200, also hit a DB-touching endpoint (e.g., `GET /api/projects`) and assert it doesn't return 500. This would have caught the `@libsql/client` miss.
+
+3. **Verify** — After fix, `find .next/standalone/node_modules/@libsql/client-*/` should exist. Full manual test: `npm pack` → install → start → open browser → dashboard loads without "JSON.parse" error.
+
+### #023 [A→C] Review: Prisma 7 Hashed Client Fix + Packaging Smoke Test — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** Self-implemented (Claude A did plan + implementation in single session)
+**Verdict:** APPROVED
+
+**Summary:** Fixes the `Cannot find module '@prisma/client-<hash>/runtime/client'` crash when running from a tarball. Adds an end-to-end packaging smoke test that would have caught this.
+
+**Changes reviewed:**
+1. `package.json` — `build:npx` now copies dereferenced Prisma hashed client into standalone output via `cp -rL`. Correct and future-proof (`client-*` glob).
+2. `bin/__tests__/packaging.integration.test.ts` (new) — Full pack-install-spawn-poll smoke test. Well-structured cleanup in `afterAll`.
+3. `vitest.config.ts` / `vitest.integration.config.ts` — Integration tests properly separated from unit runs.
+
+**Findings during review (fixed in-session):**
+- **stderr not surfaced on failure** — If the server crashed, the test would time out silently. Added try/catch around `pollUntilReady` that logs stderr before rethrowing. Fixed.
+- **Misleading `packInfo[0]?.name` fallback** — `name` is the package name, not the tarball filename. Replaced with an explicit `expect(tarballName).toBeDefined()` assertion. Fixed.
+
+**Edge cases considered:**
+- If Prisma stops generating `.next/node_modules/@prisma/client-*` in a future version, the `cp` glob fails the build loudly. Correct behavior — silent miss would be worse.
+- `globalSetup` (test DB bootstrap) runs for the packaging test unnecessarily. Harmless overhead, not worth adding config complexity to avoid.
+- ~20s test time acceptable for integration suite. Not a unit-run concern since properly excluded.
+
+**Validation:**
+- `npm test` — 152 unit tests pass
+- `npm run test:integration` — 71 integration tests pass (including packaging smoke)
+- `build:npx` → `.next/standalone/node_modules/@prisma/client-*/runtime/client.js` exists
+
+### #022 [A→C] Review: O1 Deprecation Fixes — APPROVED
+
+**Date:** 2026-02-20
+**Reviews:** #021
+**Verdict:** APPROVED
+
+#### Findings
+
+No issues. Both #020 required fixes verified clean:
+
+1. `settings.example.json` — `featureO1` removed. Confirmed zero matches.
+2. `.env.local.example` — `FEATURE_O1` removed. Confirmed zero matches.
+3. Bonus: `settings.json` runtime file also cleaned — good catch.
+
+Full sweep: `grep -ri "featureO1|FEATURE_O1"` across `src/`, `bin/`, and all `*.json`/`*.example` files — **zero matches**.
+
+Tests: 152 unit + 70 integration = 222 total. All passing.
+
+#### Status
+
+**O1 deprecation is fully closed.** The codebase has zero references to `featureO1`, `FEATURE_O1`, `evidenceJson`, `outcomesJson`, or `O-1` outside of `docs/internal/` (historical log, intentionally preserved) and the historical Prisma migration (left as-is per #020).
+
+**The codebase is release-ready.** All phases (0-50W) complete, Electron removed, O1 removed. Remaining before `npm publish` is a product decision, not an engineering one.
+
+---
+
+### #021 [C→A] O1 Deprecation Fixes — #020 Required Changes Addressed
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** Post-Phase 50W — O1 deprecation (#020 fix round)
+
+#### Goal
+
+Address the 2 required findings from #020: stale `featureO1`/`FEATURE_O1` references in example/config files.
+
+#### Changes
+
+1. **`settings.example.json` — removed `"featureO1": false` line.** (Finding #1)
+2. **`.env.local.example` — removed `FEATURE_O1=false` line.** (Finding #2)
+3. **`settings.json` — removed `"featureO1": true` line.** (Bonus: runtime settings file also had a stale key. Harmless but confusing.)
+
+Finding #3 (historical Prisma migration) left as-is per Claude A's guidance.
+
+#### Files Touched
+
+- `settings.example.json`
+- `.env.local.example`
+- `settings.json`
+
+#### Validation
+
+```
+grep -ri "featureO1|FEATURE_O1" --include="*.json" --include="*.example" → zero matches
+npm test → 152 passed (0 failed)
+npm run test:integration → 70 passed (0 failed)
+```
+
+#### Open Items
+
+None. O1 deprecation is fully closed.
+
+---
+
+### #020 [A→C] Review: O1 Evidence Feature Deprecation — CHANGES_REQUESTED
+
+**Date:** 2026-02-20
+**Reviews:** #019
+**Verdict:** CHANGES_REQUESTED
+
+#### Findings
+
+Core implementation is clean and thorough. All 31 files modified correctly. Schema, types, merge logic, pipeline, LLM prompt, API routes, UI, and tests are all verified free of O1/evidence/outcomes references. `aiInsight` is intact and working (105 references across 13 files). Metadata fields (goal/audience/successMetrics/nextAction/publishTarget) are correctly un-gated — always included in the LLM prompt with no conditional branching.
+
+**Stale references in example/config files (3 findings):**
+
+1. **[Medium] `settings.example.json:10` — `"featureO1": false` still present.**
+   - Impact: New users copying the example file get a stale key. Harmless at runtime (ignored), but confusing.
+   - Fix: Remove the `featureO1` line.
+
+2. **[Medium] `.env.local.example:5` — `FEATURE_O1=false` still present.**
+   - Impact: Same as above — documents a removed feature flag.
+   - Fix: Remove the `FEATURE_O1` line.
+
+3. **[Low] `prisma/migrations/20260131093629_init/migration.sql:65-66` — `evidenceJson`, `outcomesJson` columns in historical migration.**
+   - Impact: None at runtime — bootstrap-db.mjs is the runtime path, and it's correct. This is a historical Prisma migration artifact.
+   - Fix: Leave as-is. Prisma migrations are append-only history. Editing them risks migration drift. Acceptable to keep.
+
+#### Verification Summary
+
+| Check | Result |
+|-------|--------|
+| `grep -ri "featureO1\|FEATURE_O1" src/ bin/` | Zero matches |
+| `grep -ri "evidenceJson\|outcomesJson" src/ bin/` | Zero matches |
+| `grep -ri "O-1" src/` | Zero matches |
+| `aiInsight` references in merge/types/drawer/prompt/provider | Present, working |
+| Metadata fields in LLM prompt | Always included, no conditional |
+| Prisma schema Metadata model | 5 fields (goal, audience, successMetrics, nextAction, publishTarget) — no evidence/outcomes |
+| bootstrap-db.mjs Metadata CREATE TABLE | Matches Prisma schema |
+| Unit tests | 152 pass (2 O1-specific correctly removed) |
+| Integration tests | 70 pass (3 O1-specific correctly removed) |
+
+#### Required Before Next Checkpoint
+
+1. Remove `"featureO1": false` from `settings.example.json`.
+2. Remove `FEATURE_O1=false` from `.env.local.example`.
+
+#### Suggestions (Non-blocking)
+
+- The historical Prisma migration (#3) is fine to leave. Don't edit it.
+
+#### Re-Validation
+
+- Run: `grep -ri "featureO1\|FEATURE_O1" . --include="*.json" --include="*.example"` — should return 0 matches
+- Run: `npm test && npm run test:integration` — should still pass
+
+#### Next Checkpoint Scope
+
+- Fix the 2 example file references above.
+- After that: O1 deprecation is fully closed. Codebase is release-ready for `npm publish`.
+- Done when: zero `featureO1`/`FEATURE_O1` references anywhere in the repo (excluding `docs/internal/` historical log).
+
+---
+
+### #019 [C→A] O1 Evidence Feature Deprecation — Complete
+
+**Date:** 2026-02-20
+**Branch:** main
+**Commit(s):** pending
+**Phase/Task:** Post-Phase 50W — O1 deprecation (per #018 scope)
+
+#### Goal
+
+Remove all O1/evidence/outcomes code, UI, config, schema, and tests. Un-gate metadata workflow fields in LLM prompt. Keep `aiInsight` (separate feature).
+
+#### Changes
+
+**Schema/DB (3 files):**
+- `prisma/schema.prisma` — removed `evidenceJson`, `outcomesJson` from Metadata model
+- `bin/bootstrap-db.mjs` — removed `evidenceJson`, `outcomesJson` from Metadata CREATE TABLE
+- Ran `npx prisma generate` + `npx prisma db push` to sync
+
+**Core logic (7 files):**
+- `src/lib/config.ts` — removed `featureO1` property
+- `src/lib/settings.ts` — removed `featureO1` from AppSettings interface
+- `src/lib/types.ts` — removed `evidence`, `outcomes` from Project interface
+- `src/lib/merge.ts` — removed `evidence`, `outcomes` from MergedProject interface and `buildMergedView()`. Removed `evidenceJson`, `outcomesJson` from ProjectWithRelations metadata type. Removed stale "gated behind featureO1" comment on `aiInsight`.
+- `src/lib/pipeline.ts` — removed evidence/outcomes from metadata upsert write path
+- `src/lib/llm/prompt.ts` — un-gated metadata fields (goal/audience/successMetrics/nextAction/publishTarget always included). Removed evidence/outcomes from prompt template and `parseEnrichment()`.
+- `src/lib/llm/provider.ts` — removed `evidence`, `outcomes` from LlmEnrichment interface. Updated comment.
+
+**API routes (3 files):**
+- `src/app/api/config/route.ts` — removed `featureO1` from response
+- `src/app/api/settings/route.ts` — removed `featureO1` from GET response and BOOL_KEYS
+- `src/app/api/projects/[id]/metadata/route.ts` — removed `evidenceJson`, `outcomesJson` from jsonFields set
+
+**UI (4 files):**
+- `src/app/page.tsx` — removed `featureO1` prop from ProjectDrawer
+- `src/components/project-drawer.tsx` — removed `featureO1` prop, removed entire "O-1 Evidence" collapsible section
+- `src/components/settings-modal.tsx` — removed "Enable O-1 Fields" toggle
+- `src/hooks/use-config.ts` — removed `featureO1` from AppConfig interface and defaults
+
+**Tests (13 files):**
+- `src/lib/__tests__/merge-priority.test.ts` — removed `featureO1` from mock and beforeEach, removed evidenceJson/outcomesJson from fixture metadata, removed entire "featureO1 gate" describe block (2 tests removed)
+- `src/lib/__tests__/merge.integration.test.ts` — removed `featureO1` from mock and beforeEach, removed evidenceJson/outcomesJson from metadata fixtures, removed 2 O1 on/off test cases
+- `src/lib/__tests__/merge-helpers.test.ts` — removed `featureO1` from mock
+- `src/lib/__tests__/attention.test.ts` — removed `evidence`, `outcomes` from fixture
+- `src/lib/__tests__/helpers/fixtures.ts` — removed `evidence`, `outcomes` from LLM_ENRICHMENT_FIXTURE, removed `evidenceJson`, `outcomesJson` from SeedOverrides and seedProject
+- `src/lib/__tests__/pipeline.integration.test.ts` — removed `featureO1` from mock
+- `src/components/__tests__/onboarding-wizard.test.ts` — removed `featureO1` from mock
+- `src/app/api/__tests__/settings-config.integration.test.ts` — removed `featureO1` from mock, changed featureO1 PUT test to featureLlm
+- `src/app/api/__tests__/mutations.integration.test.ts` — removed `featureO1` from mock, removed evidenceJson coercion test
+- `src/app/api/__tests__/preflight.integration.test.ts` — removed `featureO1` from mock
+- `src/app/api/__tests__/projects.integration.test.ts` — removed `featureO1` from mock and beforeEach
+- `src/app/api/__tests__/refresh.integration.test.ts` — removed `featureO1` from mock
+- `bin/__tests__/bootstrap-db.test.ts` — removed `evidenceJson`, `outcomesJson` from expected Metadata columns
+
+**Env/config (1 file):**
+- `.env.local` — removed `FEATURE_O1=true`
+
+**Total: 31 files modified** (30 scoped + bootstrap-db test discovered during validation)
+
+#### Files Touched
+
+Schema: `prisma/schema.prisma`, `bin/bootstrap-db.mjs`
+Core: `src/lib/config.ts`, `src/lib/settings.ts`, `src/lib/types.ts`, `src/lib/merge.ts`, `src/lib/pipeline.ts`, `src/lib/llm/prompt.ts`, `src/lib/llm/provider.ts`
+API: `src/app/api/config/route.ts`, `src/app/api/settings/route.ts`, `src/app/api/projects/[id]/metadata/route.ts`
+UI: `src/app/page.tsx`, `src/components/project-drawer.tsx`, `src/components/settings-modal.tsx`, `src/hooks/use-config.ts`
+Tests: 13 files (see above)
+Env: `.env.local`
+
+#### Validation
+
+```
+npm test → 152 passed (0 failed) — down from 154: removed 2 featureO1 gate tests
+npm run test:integration → 70 passed (0 failed) — down from 73: removed 2 O1 on/off tests + 1 evidenceJson coercion test
+npm run lint → 0 errors, 14 warnings (all pre-existing)
+grep -ri "featureO1|FEATURE_O1" src/ bin/ → zero matches
+grep -ri "evidenceJson|outcomesJson" src/ bin/ → zero matches
+grep -ri "O-1" src/ → zero matches
+aiInsight references: 105 occurrences across 13 files (kept, working)
+```
+
+#### Key Decisions Made
+
+1. **Metadata fields un-gated in LLM prompt** — goal/audience/successMetrics/nextAction/publishTarget are now always requested from the LLM, not conditionally. The `metadataFields` string is now a constant, not branching on config.
+2. **`aiInsight` untouched** — confirmed separate feature, not gated behind O1.
+3. **Schema columns dropped** — `evidenceJson` and `outcomesJson` removed from both Prisma schema and bootstrap SQL. Existing data (15 non-null rows) becomes unused. No migration needed.
+4. **`jsonFields` set in metadata API is now empty** — no JSON coercion fields remain. Set kept as `new Set<string>()` for type safety in case future JSON fields are added.
+
+#### Open Items
+
+None. All #018 scope items addressed.
+
+---
+
+### #018 [A→C] Deprecate O1 Evidence Feature — Scope & Instructions
+
+**Date:** 2026-02-20
+**Verdict:** CHANGES_REQUESTED (new work)
+
+#### Context
+
+User request: completely deprecate the O1 evidence feature. Remove all code, UI, config, and schema artifacts.
+
+#### Scope Analysis
+
+The O1 feature has three layers. Here's what to remove vs keep:
+
+**REMOVE — O1-specific (evidence/outcomes):**
+
+| Layer | What | Files |
+|-------|------|-------|
+| Feature flag | `FEATURE_O1` env var, `featureO1` config property | `.env.local`, `src/lib/config.ts`, `src/lib/settings.ts`, `src/hooks/use-config.ts` |
+| Schema | `evidenceJson`, `outcomesJson` columns on Metadata | `prisma/schema.prisma`, `bin/bootstrap-db.mjs` |
+| Merge | `evidence`, `outcomes` fields on MergedProject | `src/lib/merge.ts`, `src/lib/types.ts` |
+| Pipeline | evidence/outcomes write path in enrichment upsert | `src/lib/pipeline.ts` |
+| LLM prompt | evidence/outcomes in O1-gated prompt section | `src/lib/llm/prompt.ts` |
+| LLM provider | `evidence`, `outcomes` on EnrichmentResult | `src/lib/llm/provider.ts` |
+| UI — drawer | "O-1 Evidence" collapsible section | `src/components/project-drawer.tsx:698-728` |
+| UI — settings | "Enable O-1 Fields" toggle | `src/components/settings-modal.tsx:131-136` |
+| UI — page | `featureO1` prop passed to drawer | `src/app/page.tsx:483` |
+| API — config | `featureO1` in config response | `src/app/api/config/route.ts:8` |
+| API — settings | `featureO1` in settings read/write | `src/app/api/settings/route.ts:11,30` |
+| API — metadata | `evidenceJson`, `outcomesJson` in jsonFields set | `src/app/api/projects/[id]/metadata/route.ts:6` |
+| Tests | All `featureO1` mock properties and O1-specific test cases | 10+ test files (see list below) |
+
+**KEEP — Not O1-specific:**
+
+| What | Why |
+|------|-----|
+| `aiInsight` (score, confidence, reasons, risks, nextBestAction) | Separate feature. NOT gated behind featureO1. Always populated by LLM. Always shown in drawer. |
+| `goal`, `audience`, `successMetrics`, `nextAction`, `publishTarget` on Metadata | General workflow fields. Currently LLM-populated only when O1 is on, but they're also manually editable. **Un-gate these from the O1 conditional in the LLM prompt** — always include them. |
+| `aiInsightJson`, `aiInsightGeneratedAt` on Llm model | Part of LLM enrichment, not O1. |
+
+**DECISION — Metadata fields in LLM prompt:**
+
+Currently `src/lib/llm/prompt.ts:37-46` has goal/audience/successMetrics/nextAction/publishTarget inside the `config.featureO1` conditional block alongside evidence/outcomes. After removing O1:
+- Move goal/audience/successMetrics/nextAction/publishTarget INTO the base prompt (always included)
+- Remove evidence/outcomes entirely from the prompt
+- Delete the `config.featureO1` conditional — the prompt no longer branches
+
+#### Files to Modify (comprehensive list)
+
+**Schema/DB:**
+1. `prisma/schema.prisma` — remove `evidenceJson`, `outcomesJson` from Metadata model
+2. `bin/bootstrap-db.mjs` — remove `evidenceJson`, `outcomesJson` from Metadata CREATE TABLE
+3. Run `npx prisma generate` to regenerate client (src/generated/prisma/ updates automatically)
+
+**Core logic:**
+4. `src/lib/config.ts` — remove `featureO1` property
+5. `src/lib/settings.ts` — remove `featureO1` from Settings interface
+6. `src/lib/types.ts` — remove `evidence`, `outcomes` from WorkflowView
+7. `src/lib/merge.ts` — remove `evidence`, `outcomes` from MergedProject interface and `buildMergedView()`. Remove stale "gated behind featureO1" comment on `aiInsight`.
+8. `src/lib/pipeline.ts` — remove evidence/outcomes from enrichment write path
+9. `src/lib/llm/prompt.ts` — un-gate metadata fields (always include goal/audience/etc). Remove evidence/outcomes from prompt and `parseEnrichmentResponse()`.
+10. `src/lib/llm/provider.ts` — remove `evidence`, `outcomes` from EnrichmentResult
+
+**API routes:**
+11. `src/app/api/config/route.ts` — remove `featureO1` from response
+12. `src/app/api/settings/route.ts` — remove `featureO1` from GET response and PUT allowed keys
+13. `src/app/api/projects/[id]/metadata/route.ts` — remove `evidenceJson`, `outcomesJson` from jsonFields set
+
+**UI:**
+14. `src/app/page.tsx` — remove `featureO1` prop from ProjectDrawer
+15. `src/components/project-drawer.tsx` — remove `featureO1` prop, remove "O-1 Evidence" section (lines 698-728)
+16. `src/components/settings-modal.tsx` — remove "Enable O-1 Fields" toggle
+17. `src/hooks/use-config.ts` — remove `featureO1` from DashboardConfig interface and defaults
+
+**Tests (remove featureO1 mock properties and O1-specific test cases):**
+18. `src/lib/__tests__/merge-priority.test.ts` — remove `featureO1` from mock, remove "featureO1 gate" describe block
+19. `src/lib/__tests__/merge.integration.test.ts` — remove `featureO1` from mock, remove O1 on/off test cases, remove evidenceJson/outcomesJson from metadata fixtures
+20. `src/lib/__tests__/merge-helpers.test.ts` — remove `featureO1` from mock
+21. `src/lib/__tests__/attention.test.ts` — remove `evidence`, `outcomes` from fixture
+22. `src/lib/__tests__/helpers/fixtures.ts` — remove `evidence`, `outcomes` from merged fixture, remove `evidenceJson`, `outcomesJson` from metadata fixture type and builder
+23. `src/lib/__tests__/pipeline.integration.test.ts` — remove `featureO1` from mock
+24. `src/components/__tests__/onboarding-wizard.test.ts` — remove `featureO1` from mock
+25. `src/app/api/__tests__/settings-config.integration.test.ts` — remove `featureO1` from mock, remove featureO1 PUT test
+26. `src/app/api/__tests__/mutations.integration.test.ts` — remove `featureO1` from mock, remove evidenceJson coercion test
+27. `src/app/api/__tests__/preflight.integration.test.ts` — remove `featureO1` from mock
+28. `src/app/api/__tests__/projects.integration.test.ts` — remove `featureO1` from mock
+29. `src/app/api/__tests__/refresh.integration.test.ts` — remove `featureO1` from mock
+
+**Env/config:**
+30. `.env.local` — remove `FEATURE_O1=true`
+
+#### Required Validation
+
+```
+npm test — all pass (count will drop slightly due to removed O1 test cases)
+npm run test:integration — all pass
+npm run lint — no new errors
+grep -ri "featureO1\|FEATURE_O1\|evidence\|outcomes\|O-1\|o1" src/ bin/bootstrap-db.mjs --include="*.ts" --include="*.tsx" --include="*.mjs" — zero matches (excluding aiInsight which is kept)
+```
+
+#### Notes
+
+- **No Prisma migration needed.** The columns being removed (`evidenceJson`, `outcomesJson`) are nullable. Existing data just becomes unused. Run `npx prisma generate` to update the client, and `prisma db push` on dev to sync schema.
+- **`aiInsight` stays.** It's a separate feature, always on, not gated behind O1. The misleading comment in merge.ts should be removed.
+- The `app/layout.tsx:24` reference to "portfolio dashboard" in the meta description is a naming thing, not O1-specific — leave it or change it independently.
+
+---
+
 ### #017 [A→C] Review: Post-Migration Cleanup — APPROVED
 
 **Date:** 2026-02-20

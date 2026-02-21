@@ -4,7 +4,6 @@ import { seedProject, seedMinimalProject } from "./helpers/fixtures";
 
 const mockConfig = vi.hoisted(() => ({
   sanitizePaths: false,
-  featureO1: false,
 }));
 
 vi.mock("@/lib/config", () => ({ config: mockConfig }));
@@ -29,7 +28,6 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   mockConfig.sanitizePaths = false;
-  mockConfig.featureO1 = false;
   await cleanDb(db);
 });
 
@@ -83,8 +81,6 @@ describe("mergeProjectView — integration", () => {
       metadata: {
         goal: "Ship v1",
         audience: "Devs",
-        evidenceJson: JSON.stringify({ commits: 50 }),
-        outcomesJson: JSON.stringify({ users: 10 }),
       },
     });
 
@@ -139,34 +135,6 @@ describe("mergeProjectView — integration", () => {
     expect(r2!.healthScore).toBe(0);
     expect(r2!.hygieneScore).toBe(0);
     expect(r2!.momentumScore).toBe(0);
-  });
-
-  it("featureO1=false hides evidence/outcomes", async () => {
-    mockConfig.featureO1 = false;
-    const id = await seedProject(db, {
-      pathHash: "h-o1-off",
-      metadata: {
-        evidenceJson: JSON.stringify({ x: 1 }),
-        outcomesJson: JSON.stringify({ y: 2 }),
-      },
-    });
-    const result = await mergeProjectView(id);
-    expect(result!.evidence).toBeNull();
-    expect(result!.outcomes).toBeNull();
-  });
-
-  it("featureO1=true populates evidence/outcomes", async () => {
-    mockConfig.featureO1 = true;
-    const id = await seedProject(db, {
-      pathHash: "h-o1-on",
-      metadata: {
-        evidenceJson: JSON.stringify({ x: 1 }),
-        outcomesJson: JSON.stringify({ y: 2 }),
-      },
-    });
-    const result = await mergeProjectView(id);
-    expect(result!.evidence).toEqual({ x: 1 });
-    expect(result!.outcomes).toEqual({ y: 2 });
   });
 
   it("minimal project (scan only) uses graceful defaults", async () => {

@@ -6,7 +6,6 @@ const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
   featureLlm: false,
-  featureO1: false,
   sanitizePaths: false,
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,

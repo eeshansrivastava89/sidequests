@@ -51,8 +51,6 @@ export interface Project {
   successMetrics: string | null;
   nextAction: string | null;
   publishTarget: string | null;
-  evidence: Record<string, unknown> | null;
-  outcomes: Record<string, unknown> | null;
   aiInsight: AiInsight | null;
   lastScanned: string | null;
   updatedAt: string;

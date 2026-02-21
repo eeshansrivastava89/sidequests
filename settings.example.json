@@ -7,6 +7,5 @@
   "llmConcurrency": 3,
   "llmOverwriteMetadata": false,
   "llmDebug": false,
-  "featureO1": false,
   "sanitizePaths": true
 }

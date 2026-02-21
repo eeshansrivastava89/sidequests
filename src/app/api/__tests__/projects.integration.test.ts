@@ -4,7 +4,6 @@ import { seedProject, seedMinimalProject } from "@/lib/__tests__/helpers/fixture
 
 const mockConfig = vi.hoisted(() => ({
   sanitizePaths: false,
-  featureO1: false,
 }));
 
 vi.mock("@/lib/config", () => ({ config: mockConfig }));
@@ -37,7 +36,6 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   mockConfig.sanitizePaths = false;
-  mockConfig.featureO1 = false;
   await cleanDb(db);
 });
 

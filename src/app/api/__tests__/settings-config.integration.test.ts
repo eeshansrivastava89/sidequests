@@ -23,7 +23,6 @@ const mockConfig = vi.hoisted(() => ({
   devRoot: "/Users/test/dev",
   excludeDirs: ["node_modules"],
   featureLlm: false,
-  featureO1: false,
   sanitizePaths: false,
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
@@ -157,7 +156,7 @@ describe("settings migration safety", () => {
   it("handles empty settings.json gracefully", async () => {
     fs.writeFileSync(path.join(tmpDir, "settings.json"), "");
 
-    const putRes = await settingsPUT(makePutRequest({ featureO1: true }));
+    const putRes = await settingsPUT(makePutRequest({ featureLlm: true }));
     const data = await putRes.json();
     expect(data.ok).toBe(true);
   });

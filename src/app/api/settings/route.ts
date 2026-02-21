@@ -8,7 +8,6 @@ export async function GET() {
     excludeDirs: config.excludeDirs.join(", "),
     sanitizePaths: config.sanitizePaths,
     featureLlm: config.featureLlm,
-    featureO1: config.featureO1,
     llmProvider: config.llmProvider,
     llmConcurrency: config.llmConcurrency,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
@@ -27,7 +26,7 @@ export async function GET() {
 }
 
 const BOOL_KEYS: (keyof AppSettings)[] = [
-  "sanitizePaths", "featureLlm", "featureO1",
+  "sanitizePaths", "featureLlm",
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
   "hasCompletedOnboarding",
 ];

@@ -3,7 +3,6 @@ import { buildMergedView, type ProjectWithRelations } from "@/lib/merge";
 
 const mockConfig = vi.hoisted(() => ({
   sanitizePaths: false,
-  featureO1: false,
 }));
 
 vi.mock("@/lib/config", () => ({
@@ -93,8 +92,6 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
       successMetrics: "100 users",
       nextAction: "Write docs",
       publishTarget: "npm",
-      evidenceJson: JSON.stringify({ commits: 50 }),
-      outcomesJson: JSON.stringify({ users: 10 }),
     },
     ...overrides,
   } as ProjectWithRelations;
@@ -102,7 +99,6 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
 
 beforeEach(() => {
   mockConfig.sanitizePaths = false;
-  mockConfig.featureO1 = false;
 });
 
 describe("buildMergedView — priority logic", () => {
@@ -217,18 +213,3 @@ describe("buildMergedView — priority logic", () => {
   });
 });
 
-describe("buildMergedView — featureO1 gate", () => {
-  it("evidence and outcomes are null when featureO1 is false", () => {
-    mockConfig.featureO1 = false;
-    const merged = buildMergedView(makeFixture());
-    expect(merged.evidence).toBeNull();
-    expect(merged.outcomes).toBeNull();
-  });
-
-  it("evidence and outcomes are populated when featureO1 is true", () => {
-    mockConfig.featureO1 = true;
-    const merged = buildMergedView(makeFixture());
-    expect(merged.evidence).toEqual({ commits: 50 });
-    expect(merged.outcomes).toEqual({ users: 10 });
-  });
-});
