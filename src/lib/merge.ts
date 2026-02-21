@@ -65,6 +65,15 @@ export interface MergedProject {
   liveUrl: string | null;
   llmGeneratedAt: string | null;
 
+  // Phase 52W: GitHub data
+  openIssues: number;
+  openPrs: number;
+  ciStatus: string;
+  issuesTopJson: string | null;
+  prsTopJson: string | null;
+  repoVisibility: string;
+  githubFetchedAt: string | null;
+
   // Timestamps
   lastScanned: string | null;
   updatedAt: string;
@@ -109,7 +118,7 @@ export function sanitizePath(pathDisplay: string): string {
 export async function mergeProjectView(projectId: string): Promise<MergedProject | null> {
   const project = await db.project.findUnique({
     where: { id: projectId },
-    include: { scan: true, derived: true, llm: true, override: true, metadata: true },
+    include: { scan: true, derived: true, llm: true, override: true, metadata: true, github: true },
   });
 
   if (!project) return null;
@@ -119,7 +128,7 @@ export async function mergeProjectView(projectId: string): Promise<MergedProject
 export async function mergeAllProjects(): Promise<MergedProject[]> {
   const projects = await db.project.findMany({
     where: { prunedAt: null },
-    include: { scan: true, derived: true, llm: true, override: true, metadata: true },
+    include: { scan: true, derived: true, llm: true, override: true, metadata: true, github: true },
     orderBy: { name: "asc" },
   });
 
@@ -165,10 +174,19 @@ export type ProjectWithRelations = Project & {
     nextAction: string | null;
     publishTarget: string | null;
   } | null;
+  github: {
+    openIssues: number;
+    openPrs: number;
+    ciStatus: string;
+    issuesJson: string | null;
+    prsJson: string | null;
+    repoVisibility: string;
+    fetchedAt: Date;
+  } | null;
 };
 
 export function buildMergedView(project: ProjectWithRelations): MergedProject {
-  const { scan, derived, llm, override, metadata } = project;
+  const { scan, derived, llm, override, metadata, github } = project;
 
   const rawScan = parseJson<RawScan | null>(scan?.rawJson, null);
   const derivedData = parseJson<Record<string, unknown>>(derived?.derivedJson, {});
@@ -250,6 +268,15 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     pitch: llm?.pitch ?? null,
     liveUrl: rawScan?.liveUrl ?? null,
     llmGeneratedAt: llm?.generatedAt?.toISOString() ?? null,
+
+    // GitHub data
+    openIssues: github?.openIssues ?? 0,
+    openPrs: github?.openPrs ?? 0,
+    ciStatus: github?.ciStatus ?? "none",
+    issuesTopJson: github?.issuesJson ?? null,
+    prsTopJson: github?.prsJson ?? null,
+    repoVisibility: github?.repoVisibility ?? "not-on-github",
+    githubFetchedAt: github?.fetchedAt?.toISOString() ?? null,
 
     lastScanned: scan?.scannedAt?.toISOString() ?? null,
     updatedAt: project.updatedAt.toISOString(),

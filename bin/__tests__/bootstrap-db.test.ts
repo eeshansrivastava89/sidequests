@@ -15,6 +15,7 @@ const EXPECTED_TABLES = [
   "Override",
   "Metadata",
   "Activity",
+  "GitHub",
 ];
 
 /** Expected columns per table (name → type). Derived from prisma/schema.prisma. */
@@ -91,6 +92,17 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     payloadJson: "TEXT",
     createdAt: "TEXT",
   },
+  GitHub: {
+    id: "TEXT",
+    projectId: "TEXT",
+    openIssues: "INTEGER",
+    openPrs: "INTEGER",
+    ciStatus: "TEXT",
+    issuesJson: "TEXT",
+    prsJson: "TEXT",
+    repoVisibility: "TEXT",
+    fetchedAt: "TEXT",
+  },
 };
 
 /** Expected unique indexes (index name → table) */
@@ -101,12 +113,13 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   Llm_projectId_key: "Llm",
   Override_projectId_key: "Override",
   Metadata_projectId_key: "Metadata",
+  GitHub_projectId_key: "GitHub",
 };
 
 const EXPECTED_COMPOSITE_INDEX = "Activity_projectId_createdAt_idx";
 
 /** Tables with FK to Project.id */
-const TABLES_WITH_FK = ["Scan", "Derived", "Llm", "Override", "Metadata", "Activity"];
+const TABLES_WITH_FK = ["Scan", "Derived", "Llm", "Override", "Metadata", "Activity", "GitHub"];
 
 let tmpPath: string;
 
@@ -122,7 +135,7 @@ function makeTmpDb(): string {
 }
 
 describe("bootstrapDb — schema parity", () => {
-  it("creates all 7 tables", async () => {
+  it("creates all 8 tables", async () => {
     const dbPath = makeTmpDb();
     await bootstrapDb(dbPath);
 

@@ -23,6 +23,7 @@ model Project {
   llm      Llm?
   override Override?
   metadata Metadata?
+  github   GitHub?
   activity Activity[]
 }
 
@@ -88,6 +89,19 @@ model Metadata {
   successMetrics String?
   nextAction     String?
   publishTarget  String?
+}
+
+model GitHub {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  openIssues      Int      @default(0)
+  openPrs         Int      @default(0)
+  ciStatus        String   @default("none")
+  issuesJson      String?
+  prsJson         String?
+  repoVisibility  String   @default("not-on-github")
+  fetchedAt       DateTime @default(now())
 }
 
 model Activity {

@@ -4,6 +4,7 @@ import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
 import { scanAll, type ScanOutput } from "./pipeline-native/scan";
 import { deriveAll, type DeriveOutput, type ScanProject as DeriveInput } from "./pipeline-native/derive";
+import { syncAllGitHub } from "./pipeline-native/github";
 
 /** Validate scan output shape. */
 export function validateScanOutput(data: unknown): ScanOutput {
@@ -63,6 +64,8 @@ export type PipelineEvent =
   | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm" }
   | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown> }
   | { type: "project_error"; name: string; step: string; error: string }
+  | { type: "github_start" }
+  | { type: "github_complete"; synced: number; skipped: number; errors: number }
   | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmSkipped: number; durationMs: number };
 
 /** Collected info from the store phase, passed to LLM phase. */
@@ -235,7 +238,51 @@ export async function runRefreshPipeline(
     });
   }
 
-  // 4. LLM phase (batched parallel with concurrency limit)
+  // 4. GitHub sync phase
+  if (!signal?.aborted) {
+    emit({ type: "github_start" });
+    const ghInput = storedProjects.map((sp) => ({
+      pathHash: sp.scanned.pathHash as string,
+      remoteUrl: (sp.scanned.remoteUrl as string) ?? null,
+    }));
+    const ghResult = syncAllGitHub(ghInput);
+    for (const ghProject of ghResult.projects) {
+      const sp = storedProjects.find(
+        (s) => (s.scanned.pathHash as string) === ghProject.pathHash
+      );
+      if (!sp) continue;
+      await db.gitHub.upsert({
+        where: { projectId: sp.projectId },
+        create: {
+          projectId: sp.projectId,
+          openIssues: ghProject.data.openIssues,
+          openPrs: ghProject.data.openPrs,
+          ciStatus: ghProject.data.ciStatus,
+          issuesJson: ghProject.data.issuesJson,
+          prsJson: ghProject.data.prsJson,
+          repoVisibility: ghProject.data.repoVisibility,
+          fetchedAt: new Date(ghResult.fetchedAt),
+        },
+        update: {
+          openIssues: ghProject.data.openIssues,
+          openPrs: ghProject.data.openPrs,
+          ciStatus: ghProject.data.ciStatus,
+          issuesJson: ghProject.data.issuesJson,
+          prsJson: ghProject.data.prsJson,
+          repoVisibility: ghProject.data.repoVisibility,
+          fetchedAt: new Date(ghResult.fetchedAt),
+        },
+      });
+    }
+    emit({
+      type: "github_complete",
+      synced: ghResult.projects.length - ghResult.skipped - ghResult.errors,
+      skipped: ghResult.skipped,
+      errors: ghResult.errors,
+    });
+  }
+
+  // 5. LLM phase (batched parallel with concurrency limit)
   const llmProvider = options?.skipLlm ? null : getLlmProvider();
 
   if (llmProvider && !signal?.aborted) {
@@ -363,7 +410,7 @@ export async function runRefreshPipeline(
     llmSkipped += storedProjects.length;
   }
 
-  // 5. Log activity for each project
+  // 6. Log activity for each project
   for (const sp of storedProjects) {
     if (signal?.aborted) break;
     const llmResult = !llmProvider ? "skipped" : (!sp.derived ? "skipped" : "attempted");
@@ -382,7 +429,7 @@ export async function runRefreshPipeline(
     });
   }
 
-  // 6. Cleanup: delete Activity records older than 90 days
+  // 7. Cleanup: delete Activity records older than 90 days
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   await db.activity.deleteMany({
     where: { createdAt: { lt: ninetyDaysAgo } },

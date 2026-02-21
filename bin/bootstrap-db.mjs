@@ -2,7 +2,7 @@
 
 /**
  * Runtime DB schema bootstrap using raw SQL.
- * Uses @libsql/client to run CREATE TABLE IF NOT EXISTS for all 7 Prisma models.
+ * Uses @libsql/client to run CREATE TABLE IF NOT EXISTS for all 8 Prisma models.
  * Idempotent — safe to run every launch.
  */
 
@@ -107,6 +107,21 @@ const SCHEMA_SQL = [
     CONSTRAINT "Activity_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS "Activity_projectId_createdAt_idx" ON "Activity"("projectId", "createdAt")`,
+
+  // 8. GitHub
+  `CREATE TABLE IF NOT EXISTS "GitHub" (
+    "id"             TEXT NOT NULL PRIMARY KEY,
+    "projectId"      TEXT NOT NULL,
+    "openIssues"     INTEGER NOT NULL DEFAULT 0,
+    "openPrs"        INTEGER NOT NULL DEFAULT 0,
+    "ciStatus"       TEXT NOT NULL DEFAULT 'none',
+    "issuesJson"     TEXT,
+    "prsJson"        TEXT,
+    "repoVisibility" TEXT NOT NULL DEFAULT 'not-on-github',
+    "fetchedAt"      TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "GitHub_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "GitHub_projectId_key" ON "GitHub"("projectId")`,
 ];
 
 /**

@@ -1,0 +1,225 @@
+/**
+ * GitHub data collection via `gh` CLI.
+ *
+ * Fetches issues, PRs, CI status, and repo visibility for projects
+ * that have a GitHub remote. Uses GraphQL for bulk data and REST for CI.
+ * Graceful fallback: if `gh` is missing or unauthed, returns empty results.
+ */
+
+import { execFileSync } from "child_process";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface GitHubProjectData {
+  openIssues: number;
+  openPrs: number;
+  ciStatus: "passing" | "failing" | "none";
+  issuesJson: string | null;
+  prsJson: string | null;
+  repoVisibility: "public" | "private" | "not-on-github";
+}
+
+export interface GitHubSyncResult {
+  fetchedAt: string;
+  projects: Array<{ pathHash: string; data: GitHubProjectData }>;
+  skipped: number;
+  errors: number;
+}
+
+interface OwnerRepo {
+  owner: string;
+  repo: string;
+}
+
+interface GitHubSyncInput {
+  pathHash: string;
+  remoteUrl: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function runGh(...args: string[]): string | null {
+  try {
+    return execFileSync("gh", args, {
+      timeout: 10_000,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Exported functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract owner/repo from a GitHub remote URL.
+ * Supports SSH (git@github.com:owner/repo.git) and HTTPS formats.
+ * Returns null for non-GitHub remotes or malformed URLs.
+ */
+export function parseGitHubOwnerRepo(remoteUrl: string): OwnerRepo | null {
+  if (!remoteUrl) return null;
+
+  // SSH: git@github.com:owner/repo.git
+  const sshMatch = remoteUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (sshMatch) {
+    return { owner: sshMatch[1], repo: sshMatch[2] };
+  }
+
+  // HTTPS: https://github.com/owner/repo.git (or without .git)
+  const httpsMatch = remoteUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (httpsMatch) {
+    return { owner: httpsMatch[1], repo: httpsMatch[2] };
+  }
+
+  return null;
+}
+
+/**
+ * Check if `gh` CLI is installed and authenticated.
+ */
+export function isGhAvailable(): boolean {
+  return runGh("auth", "status") !== null;
+}
+
+/**
+ * Fetch GitHub data for a single repo using GraphQL + REST.
+ */
+export function fetchGitHubData(ownerRepo: OwnerRepo): GitHubProjectData {
+  const { owner, repo } = ownerRepo;
+
+  // GraphQL: issues, PRs, visibility in one call
+  const query = `query {
+    repository(owner: "${owner}", name: "${repo}") {
+      visibility
+      issues(states: OPEN, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) {
+        totalCount
+        nodes { title number }
+      }
+      pullRequests(states: OPEN, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) {
+        totalCount
+        nodes { title number }
+      }
+    }
+  }`;
+
+  const graphqlResult = runGh("api", "graphql", "-f", `query=${query}`);
+
+  let openIssues = 0;
+  let openPrs = 0;
+  let issuesJson: string | null = null;
+  let prsJson: string | null = null;
+  let repoVisibility: "public" | "private" = "public";
+
+  if (graphqlResult) {
+    try {
+      const parsed = JSON.parse(graphqlResult);
+      const repoData = parsed?.data?.repository;
+      if (repoData) {
+        openIssues = repoData.issues?.totalCount ?? 0;
+        openPrs = repoData.pullRequests?.totalCount ?? 0;
+
+        const issueNodes = repoData.issues?.nodes;
+        if (Array.isArray(issueNodes) && issueNodes.length > 0) {
+          issuesJson = JSON.stringify(issueNodes.map((n: { title: string; number: number }) => ({
+            title: n.title,
+            number: n.number,
+          })));
+        }
+
+        const prNodes = repoData.pullRequests?.nodes;
+        if (Array.isArray(prNodes) && prNodes.length > 0) {
+          prsJson = JSON.stringify(prNodes.map((n: { title: string; number: number }) => ({
+            title: n.title,
+            number: n.number,
+          })));
+        }
+
+        const vis = repoData.visibility;
+        repoVisibility = vis === "PRIVATE" ? "private" : "public";
+      }
+    } catch {
+      // Parse error — fall through with defaults
+    }
+  }
+
+  // REST: CI status from latest Actions run
+  let ciStatus: "passing" | "failing" | "none" = "none";
+  const ciResult = runGh("api", `repos/${owner}/${repo}/actions/runs?per_page=1`);
+  if (ciResult) {
+    try {
+      const parsed = JSON.parse(ciResult);
+      const runs = parsed?.workflow_runs;
+      if (Array.isArray(runs) && runs.length > 0) {
+        const conclusion = runs[0].conclusion;
+        if (conclusion === "success") ciStatus = "passing";
+        else if (conclusion === "failure") ciStatus = "failing";
+      }
+    } catch {
+      // Parse error — leave as "none"
+    }
+  }
+
+  return { openIssues, openPrs, ciStatus, issuesJson, prsJson, repoVisibility };
+}
+
+/**
+ * Sync GitHub data for all projects. Skips non-GitHub projects.
+ * Returns empty result (no crash) if `gh` is unavailable.
+ */
+export function syncAllGitHub(projects: GitHubSyncInput[]): GitHubSyncResult {
+  const fetchedAt = new Date().toISOString();
+  const result: GitHubSyncResult = { fetchedAt, projects: [], skipped: 0, errors: 0 };
+
+  if (!isGhAvailable()) {
+    result.skipped = projects.length;
+    return result;
+  }
+
+  for (const project of projects) {
+    const ownerRepo = project.remoteUrl ? parseGitHubOwnerRepo(project.remoteUrl) : null;
+
+    if (!ownerRepo) {
+      result.skipped++;
+      result.projects.push({
+        pathHash: project.pathHash,
+        data: {
+          openIssues: 0,
+          openPrs: 0,
+          ciStatus: "none",
+          issuesJson: null,
+          prsJson: null,
+          repoVisibility: "not-on-github",
+        },
+      });
+      continue;
+    }
+
+    try {
+      const data = fetchGitHubData(ownerRepo);
+      result.projects.push({ pathHash: project.pathHash, data });
+    } catch (err) {
+      result.errors++;
+      result.projects.push({
+        pathHash: project.pathHash,
+        data: {
+          openIssues: 0,
+          openPrs: 0,
+          ciStatus: "none",
+          issuesJson: null,
+          prsJson: null,
+          repoVisibility: "not-on-github",
+        },
+      });
+      console.error(`GitHub fetch failed for ${project.pathHash}:`, err);
+    }
+  }
+
+  return result;
+}

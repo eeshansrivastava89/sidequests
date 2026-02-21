@@ -40,6 +40,18 @@ export async function GET() {
   // Core dependencies (git only — pipeline is TS-native, no Python required)
   checks.push(checkBinary("git", "git"));
 
+  // GitHub CLI — core v0.2 dependency (unconditional)
+  const ghCheck = checkBinary("gh", "gh", "Install with: brew install gh");
+  checks.push(ghCheck);
+  if (ghCheck.ok) {
+    try {
+      execSync("gh auth status", { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] });
+      checks.push({ name: "gh-auth", ok: true, message: "Authenticated with GitHub" });
+    } catch {
+      checks.push({ name: "gh-auth", ok: false, message: "gh is not authenticated. Run: gh auth login" });
+    }
+  }
+
   // Provider-specific checks (only when a provider is configured)
   const provider = config.llmProvider;
   if (provider && provider !== "none") {

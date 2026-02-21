@@ -59,6 +59,15 @@ export interface Project {
   pitch: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;
+
+  // Phase 52W: GitHub data
+  openIssues: number;
+  openPrs: number;
+  ciStatus: string;
+  issuesTopJson: string | null;
+  prsTopJson: string | null;
+  repoVisibility: string;
+  githubFetchedAt: string | null;
 }
 
 export interface RawScan {

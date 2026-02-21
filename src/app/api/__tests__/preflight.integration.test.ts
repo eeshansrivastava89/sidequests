@@ -45,13 +45,17 @@ describe("GET /api/preflight — Path A (TS-native)", () => {
     expect(names).toContain("git");
   });
 
-  it("includes only git when llmProvider is none", async () => {
+  it("includes git + gh checks when llmProvider is none", async () => {
     mockConfig.llmProvider = "none";
     const res = await preflightGET();
     const body = await res.json();
 
-    expect(body.checks).toHaveLength(1);
-    expect(body.checks[0].name).toBe("git");
+    const names = body.checks.map((c: { name: string }) => c.name);
+    expect(names).toContain("git");
+    expect(names).toContain("gh");
+    // No provider-specific checks
+    expect(names).not.toContain("claude");
+    expect(names).not.toContain("openrouter");
   });
 
   it("includes provider check when llmProvider is configured", async () => {
