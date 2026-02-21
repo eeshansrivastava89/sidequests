@@ -153,6 +153,26 @@ try {
   warnings++;
 }
 
+// ── 4. Build-machine path in server.js ───────────────────────────────
+
+console.log("\n=== Build Path Gate ===\n");
+
+import { existsSync as fsExists, readFileSync as fsRead } from "node:fs";
+import os from "node:os";
+
+const serverJsPath = ".next/standalone/server.js";
+if (fsExists(serverJsPath)) {
+  const serverContent = fsRead(serverJsPath, "utf-8");
+  const homedir = os.homedir();
+  if (serverContent.includes(homedir)) {
+    fail(`Build-machine home path (${homedir}) found in ${serverJsPath}`);
+  } else {
+    pass("No build-machine paths in server.js");
+  }
+} else {
+  pass("server.js not present (no standalone build)");
+}
+
 // ── Summary ─────────────────────────────────────────────────────────
 
 console.log("\n=== Summary ===\n");

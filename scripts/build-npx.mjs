@@ -6,8 +6,8 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, rmSync, chmodSync, existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, rmSync, chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 
@@ -79,6 +79,15 @@ if (existsSync(prismaDir)) {
 
 // Remove internal docs (may be copied by Next.js standalone)
 rmSync(".next/standalone/docs/internal", { recursive: true, force: true });
+
+// Scrub build-machine absolute paths from server.js
+const serverJs = join(standaloneRoot, "server.js");
+if (existsSync(serverJs)) {
+  const projectRoot = resolve(".");
+  let content = readFileSync(serverJs, "utf-8");
+  content = content.replaceAll(projectRoot, ".");
+  writeFileSync(serverJs, content);
+}
 
 chmodSync("bin/cli.mjs", 0o755);
 
