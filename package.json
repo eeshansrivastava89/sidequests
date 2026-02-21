@@ -2,7 +2,7 @@
   "name": "@eeshans/sidequests",
   "version": "0.1.0",
   "bin": {
-    "sidequests": "./bin/cli.mjs"
+    "sidequests": "bin/cli.mjs"
   },
   "files": [
     "bin/*.mjs",
