@@ -92,6 +92,14 @@ describe("packaging smoke test", () => {
       const tarballDest = path.join(tmpDir, tarballName);
       fs.renameSync(tarballSrc, tarballDest);
 
+      // 2b. Assert no forbidden files in tarball
+      const forbiddenPatterns = [/\.db$/, /settings\.json$/, /docs\/internal\//,  /\.env\.local$/];
+      const fileList = packInfo[0]?.files?.map((f: { path: string }) => f.path) ?? [];
+      for (const pattern of forbiddenPatterns) {
+        const matches = fileList.filter((f: string) => pattern.test(f));
+        expect(matches, `Forbidden pattern ${pattern} found in tarball: ${matches.join(", ")}`).toHaveLength(0);
+      }
+
       // 3. Install into clean directory
       const installDir = path.join(tmpDir, "install");
       fs.mkdirSync(installDir, { recursive: true });

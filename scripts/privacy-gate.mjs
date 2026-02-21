@@ -10,6 +10,7 @@
  */
 
 import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const RED = "\x1b[31m";
 const GREEN = "\x1b[32m";
@@ -78,10 +79,7 @@ const sourceFiles = trackedFiles.filter(
 let userPathHits = [];
 for (const file of sourceFiles) {
   try {
-    const content = execSync(`git show HEAD:${file} 2>/dev/null || cat "${file}"`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const content = readFileSync(file, "utf-8");
     for (const pattern of USER_PATH_PATTERNS) {
       if (pattern.test(content)) {
         userPathHits.push(file);
@@ -99,6 +97,60 @@ if (userPathHits.length > 0) {
   }
 } else {
   pass("No hardcoded user paths in production source files");
+}
+
+// ── 3. Tarball content gate ──────────────────────────────────────────
+
+console.log("\n=== Tarball Content Gate ===\n");
+
+const FORBIDDEN_IN_TARBALL = [
+  /\.db$/,
+  /\.db-journal$/,
+  /\.db-wal$/,
+  /\.db-shm$/,
+  /settings\.json$/,
+  /docs\/internal\//,
+  /\.env\.local$/,
+  /\.env\.production$/,
+  /secrets\.enc$/,
+];
+
+try {
+  const packList = execSync("npm pack --dry-run 2>&1", { encoding: "utf-8" });
+  const lines = packList.split("\n").filter((l) => l.startsWith("npm notice") && !l.includes("Tarball") && !l.includes("name:") && !l.includes("version:") && !l.includes("filename:") && !l.includes("package size:") && !l.includes("unpacked size:") && !l.includes("shasum:") && !l.includes("integrity:") && !l.includes("total files:") && !l.includes("==="));
+
+  let tarballForbiddenFound = false;
+  for (const line of lines) {
+    const match = line.match(/npm notice\s+[\d.]+[kMG]?B\s+(.+)/);
+    if (!match) continue;
+    const filePath = match[1].trim();
+    for (const pattern of FORBIDDEN_IN_TARBALL) {
+      if (pattern.test(filePath)) {
+        fail(`Forbidden file in npm tarball: ${filePath}`);
+        tarballForbiddenFound = true;
+      }
+    }
+  }
+
+  // Also check for user paths in tarball file listing
+  for (const line of lines) {
+    const match = line.match(/npm notice\s+[\d.]+[kMG]?B\s+(.+)/);
+    if (!match) continue;
+    const filePath = match[1].trim();
+    for (const pattern of USER_PATH_PATTERNS) {
+      if (pattern.test(filePath)) {
+        fail(`User path in tarball file path: ${filePath}`);
+        tarballForbiddenFound = true;
+      }
+    }
+  }
+
+  if (!tarballForbiddenFound) {
+    pass("No forbidden files (*.db, settings.json, docs/internal/, .env) in npm tarball");
+  }
+} catch (e) {
+  console.warn("⚠ Could not run tarball content check:", e.message);
+  warnings++;
 }
 
 // ── Summary ─────────────────────────────────────────────────────────

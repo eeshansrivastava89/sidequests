@@ -49,9 +49,25 @@ if (nativePackage && existsSync(`node_modules/${nativePackage}`)) {
   console.warn(`⚠ No native @libsql binding found for ${key}, skipping`);
 }
 
-// 5. Strip env files and set permissions
-rmSync(".next/standalone/.env", { force: true });
-rmSync(".next/standalone/.env.local", { force: true });
+// 5. Strip private/dev files from standalone
+const stripFiles = [
+  ".next/standalone/.env",
+  ".next/standalone/.env.local",
+  ".next/standalone/dev.db",
+  ".next/standalone/settings.json",
+  ".next/standalone/prisma/dev.db",
+  ".next/standalone/prisma/dev.db-journal",
+  ".next/standalone/prisma/dev.db-wal",
+  ".next/standalone/prisma/dev.db-shm",
+];
+
+for (const f of stripFiles) {
+  rmSync(f, { force: true });
+}
+
+// Remove internal docs (may be copied by Next.js standalone)
+rmSync(".next/standalone/docs/internal", { recursive: true, force: true });
+
 chmodSync("bin/cli.mjs", 0o755);
 
 console.log("✓ NPX bundle built successfully");
