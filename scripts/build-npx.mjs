@@ -6,7 +6,8 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, rmSync, chmodSync, existsSync } from "node:fs";
+import { cpSync, rmSync, chmodSync, existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 
@@ -53,16 +54,27 @@ if (nativePackage && existsSync(`node_modules/${nativePackage}`)) {
 const stripFiles = [
   ".next/standalone/.env",
   ".next/standalone/.env.local",
-  ".next/standalone/dev.db",
   ".next/standalone/settings.json",
-  ".next/standalone/prisma/dev.db",
-  ".next/standalone/prisma/dev.db-journal",
-  ".next/standalone/prisma/dev.db-wal",
-  ".next/standalone/prisma/dev.db-shm",
 ];
 
 for (const f of stripFiles) {
   rmSync(f, { force: true });
+}
+
+// Remove ALL .db files (dev.db, test.db, any stray databases)
+const standaloneRoot = ".next/standalone";
+for (const entry of readdirSync(standaloneRoot)) {
+  if (entry.endsWith(".db") || entry.endsWith(".db-journal") || entry.endsWith(".db-wal") || entry.endsWith(".db-shm")) {
+    rmSync(join(standaloneRoot, entry), { force: true });
+  }
+}
+const prismaDir = join(standaloneRoot, "prisma");
+if (existsSync(prismaDir)) {
+  for (const entry of readdirSync(prismaDir)) {
+    if (entry.endsWith(".db") || entry.endsWith(".db-journal") || entry.endsWith(".db-wal") || entry.endsWith(".db-shm")) {
+      rmSync(join(prismaDir, entry), { force: true });
+    }
+  }
 }
 
 // Remove internal docs (may be copied by Next.js standalone)
