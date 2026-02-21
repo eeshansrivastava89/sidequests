@@ -9,6 +9,11 @@
     ".next/standalone/",
     "public/"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eeshansrivastava89/sidequests"
+  },
+  "license": "MIT",
   "engines": {
     "node": ">=20.9.0"
   },
