@@ -25,8 +25,14 @@
 
 ## Release
 
-- [ ] Create and push git tag: `git tag v<version> && git push origin v<version>`
-- [ ] `npm publish` (or `npm publish --access public` for first publish)
+CI auto-publishes to npm on version tags via `.github/workflows/publish.yml` (OIDC trusted publishing with provenance).
+
+```bash
+npm version patch    # bumps version, creates git tag
+git push --tags      # triggers publish workflow
+```
+
+- [ ] Verify CI publish workflow passes
 - [ ] Verify: `npx @eeshans/sidequests@<version>` launches correctly
 
 ## Post-Release

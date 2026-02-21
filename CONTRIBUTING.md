@@ -27,8 +27,8 @@ Thank you for your interest in contributing! This guide will help you get starte
 ## Testing
 
 ```bash
-npm test                    # 154 unit tests
-npm run test:integration    # 73 integration tests
+npm test                    # unit tests
+npm run test:integration    # integration tests
 npm run test:watch          # watch mode
 ```
 
