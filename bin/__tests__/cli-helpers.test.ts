@@ -50,44 +50,10 @@ describe("parseArgs", () => {
 // ── resolveDataDir ────────────────────────────────────────────────────
 
 describe("resolveDataDir", () => {
-  const originalPlatform = process.platform;
-  const originalEnv = { ...process.env };
-
-  afterEach(() => {
-    Object.defineProperty(process, "platform", { value: originalPlatform });
-    process.env = { ...originalEnv };
-  });
-
-  it("returns macOS path on darwin", async () => {
-    Object.defineProperty(process, "platform", { value: "darwin" });
-    // Re-import to pick up platform change
+  it("returns ~/.sidequests", async () => {
     const { resolveDataDir } = await import("../cli-helpers.mjs");
     const result = resolveDataDir();
-    expect(result).toContain("Library/Application Support/ProjectsDashboard");
-  });
-
-  it("returns Windows path on win32", async () => {
-    Object.defineProperty(process, "platform", { value: "win32" });
-    process.env.APPDATA = "/mock/appdata";
-    const { resolveDataDir } = await import("../cli-helpers.mjs");
-    const result = resolveDataDir();
-    expect(result).toContain("ProjectsDashboard");
-  });
-
-  it("returns Linux XDG path on linux", async () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    delete process.env.XDG_DATA_HOME;
-    const { resolveDataDir } = await import("../cli-helpers.mjs");
-    const result = resolveDataDir();
-    expect(result).toContain(".local/share/ProjectsDashboard");
-  });
-
-  it("respects XDG_DATA_HOME on linux", async () => {
-    Object.defineProperty(process, "platform", { value: "linux" });
-    process.env.XDG_DATA_HOME = "/custom/data";
-    const { resolveDataDir } = await import("../cli-helpers.mjs");
-    const result = resolveDataDir();
-    expect(result).toBe("/custom/data/ProjectsDashboard");
+    expect(result).toMatch(/\.sidequests$/);
   });
 });
 

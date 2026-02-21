@@ -8,18 +8,11 @@ import os from "node:os";
 import path from "node:path";
 
 /**
- * Resolve the OS-specific data directory for Sidequests.
+ * Resolve the data directory for Sidequests: ~/.sidequests
  * @returns {string}
  */
 export function resolveDataDir() {
-  switch (process.platform) {
-    case "darwin":
-      return path.join(os.homedir(), "Library", "Application Support", "ProjectsDashboard");
-    case "win32":
-      return path.join(process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming"), "ProjectsDashboard");
-    default:
-      return path.join(process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share"), "ProjectsDashboard");
-  }
+  return path.join(os.homedir(), ".sidequests");
 }
 
 /**
