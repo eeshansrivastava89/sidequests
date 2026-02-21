@@ -1,6 +1,6 @@
 {
   "name": "@eeshans/sidequests",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "bin": {
     "sidequests": "bin/cli.mjs"
   },
