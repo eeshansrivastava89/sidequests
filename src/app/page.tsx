@@ -10,9 +10,9 @@ import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
 
+import type { SignalFilter } from "@/components/stats-bar";
 import { SettingsModal } from "@/components/settings-modal";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
-import { MethodologyModal } from "@/components/methodology-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -94,6 +94,29 @@ function filterBySearch(projects: Project[], query: string): Project[] {
   );
 }
 
+function filterBySignal(projects: Project[], signal: SignalFilter): Project[] {
+  if (!signal) return projects;
+  switch (signal) {
+    case "uncommitted":
+      return projects.filter((p) => p.isDirty);
+    case "open-issues":
+      return projects.filter((p) => p.openIssues > 0);
+    case "ci-failing":
+      return projects.filter((p) => p.ciStatus === "failure");
+    case "not-on-github":
+      return projects.filter((p) => p.repoVisibility === "not-on-github");
+    default:
+      return projects;
+  }
+}
+
+const SIGNAL_LABELS: Record<string, string> = {
+  uncommitted: "Uncommitted",
+  "open-issues": "Open Issues",
+  "ci-failing": "CI Failing",
+  "not-on-github": "Not on GitHub",
+};
+
 /* ── LocalStorage helpers ───────────────────────────────── */
 
 function loadSortKey(): SortKey {
@@ -130,7 +153,7 @@ export default function DashboardPage() {
   const [sortKey, setSortKey] = useState<SortKey>(() => loadSortKey());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [methodologyOpen, setMethodologyOpen] = useState(false);
+  const [signalFilter, setSignalFilter] = useState<SignalFilter>(null);
   const [wizardDismissed, setWizardDismissed] = useState(false);
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -198,8 +221,8 @@ export default function DashboardPage() {
   );
 
   const filtered = useMemo(
-    () => sortProjects(filterBySearch(filterByView(projects, view), search), sortKey),
-    [projects, view, search, sortKey]
+    () => sortProjects(filterBySignal(filterBySearch(filterByView(projects, view), search), signalFilter), sortKey),
+    [projects, view, search, signalFilter, sortKey]
   );
 
   const pinnedProjects = useMemo(
@@ -283,14 +306,6 @@ export default function DashboardPage() {
                   Refresh
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground"
-                onClick={() => setMethodologyOpen(true)}
-              >
-                Scoring Methodology
-              </Button>
               <button
                 type="button"
                 className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -313,7 +328,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <StatsBar projects={projects} deltas={deltaHook.deltas} />
+        <StatsBar projects={projects} activeFilter={signalFilter} onFilter={setSignalFilter} />
 
         {/* Filter tabs + Sort + Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -356,7 +371,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Active filter chips */}
-        {(view !== "all" || search) && (
+        {(view !== "all" || search || signalFilter) && (
           <div className="flex items-center gap-2 flex-wrap">
             {view !== "all" && (
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
@@ -366,6 +381,19 @@ export default function DashboardPage() {
                   className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setView("all")}
                   aria-label="Clear tab filter"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
+            {signalFilter && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                {SIGNAL_LABELS[signalFilter]}
+                <button
+                  type="button"
+                  className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
+                  onClick={() => setSignalFilter(null)}
+                  aria-label="Clear signal filter"
                 >
                   <X className="size-3" />
                 </button>
@@ -387,7 +415,7 @@ export default function DashboardPage() {
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-              onClick={() => { setView("all"); setSearch(""); handleSortChange("lastCommit"); }}
+              onClick={() => { setView("all"); setSearch(""); setSignalFilter(null); handleSortChange("lastCommit"); }}
             >
               Clear all
             </button>
@@ -451,8 +479,6 @@ export default function DashboardPage() {
                   onTogglePin={handleTogglePin}
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
-                  deltas={deltaHook.deltas}
-                  view={view}
                   refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                 />
               </div>
@@ -471,8 +497,6 @@ export default function DashboardPage() {
                   onTogglePin={handleTogglePin}
                   onTouch={handleTouch}
                   sanitizePaths={config.sanitizePaths}
-                  deltas={deltaHook.deltas}
-                  view={view}
                   refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                 />
               </div>
@@ -514,11 +538,6 @@ export default function DashboardPage() {
         onOpenChange={setSettingsOpen}
         config={config}
         onSaved={refetch}
-      />
-
-      <MethodologyModal
-        open={methodologyOpen}
-        onOpenChange={setMethodologyOpen}
       />
 
       <OnboardingWizard

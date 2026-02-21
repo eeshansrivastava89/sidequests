@@ -11,11 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { healthColor, copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
-import { evaluateAttention } from "@/lib/attention";
+import { copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { ProjectDelta } from "@/hooks/use-refresh-deltas";
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -50,7 +48,7 @@ function SectionBox({
   children,
 }: {
   title: string;
-  source?: { type: "scan" | "llm"; timestamp: string | null };
+  source?: { type: "scan" | "llm" | "github"; timestamp: string | null };
   highlight?: boolean;
   children: React.ReactNode;
 }) {
@@ -77,7 +75,7 @@ function CollapsibleSection({
   children,
 }: {
   title: string;
-  source?: { type: "scan" | "llm"; timestamp: string | null };
+  source?: { type: "scan" | "llm" | "github"; timestamp: string | null };
   highlight?: boolean;
   defaultOpen?: boolean;
   children: React.ReactNode;
@@ -108,35 +106,6 @@ function CollapsibleSection({
       </button>
       {open && <div className="px-4 pb-4">{children}</div>}
     </div>
-  );
-}
-
-function StructuredData({ data }: { data: Record<string, unknown> }) {
-  return (
-    <dl className="space-y-1.5">
-      {Object.entries(data).map(([key, value]) => (
-        <div key={key}>
-          <dt className="text-xs font-medium text-muted-foreground capitalize">
-            {key.replace(/([A-Z])/g, " $1").trim()}
-          </dt>
-          <dd className="text-sm mt-0.5">
-            {Array.isArray(value) ? (
-              <ul className="list-disc list-inside space-y-0.5">
-                {value.map((item, i) => (
-                  <li key={i}>{String(item)}</li>
-                ))}
-              </ul>
-            ) : typeof value === "object" && value !== null ? (
-              <div className="pl-3 border-l-2 border-muted mt-1">
-                <StructuredData data={value as Record<string, unknown>} />
-              </div>
-            ) : (
-              <span>{String(value)}</span>
-            )}
-          </dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -230,6 +199,31 @@ function buildTimeline(
   return entries;
 }
 
+/* ── GitHub helpers ────────────────────────────────────── */
+
+function CiStatusLabel({ status }: { status: string }) {
+  switch (status) {
+    case "success":
+      return <span className="text-emerald-500 font-medium">Passing</span>;
+    case "failure":
+      return <span className="text-red-500 font-medium">Failing</span>;
+    case "pending":
+      return <span className="text-amber-500 font-medium">Pending</span>;
+    default:
+      return <span className="text-muted-foreground">None</span>;
+  }
+}
+
+function parseJsonList(json: string | null): Array<{ title: string; number: number }> {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 /* ── Drawer Props ──────────────────────────────────────── */
 
 interface ProjectDrawerProps {
@@ -240,7 +234,7 @@ interface ProjectDrawerProps {
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
   sanitizePaths?: boolean;
-  delta?: ProjectDelta | null;
+  delta?: { newlyEnriched?: boolean } | null;
 }
 
 /* ── Main Drawer ───────────────────────────────────────── */
@@ -290,6 +284,9 @@ export function ProjectDrawer({
   const loc = project.locEstimate || null;
   const services = project.services.length > 0 ? project.services : null;
   const timeline = buildTimeline(project.recentCommits, activities);
+  const hasGitHub = project.repoVisibility !== "not-on-github";
+  const issues = parseJsonList(project.issuesTopJson);
+  const prs = parseJsonList(project.prsTopJson);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -319,7 +316,7 @@ export function ProjectDrawer({
 
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-4">
 
-          {/* Line 3: Status/scores LEFT + Quick actions RIGHT */}
+          {/* Line 3: Status + badges LEFT + Quick actions RIGHT */}
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <StatusSelect
@@ -333,17 +330,6 @@ export function ProjectDrawer({
                     .catch(() => toast.error("Failed to update status"));
                 }}
               />
-              <div className="flex items-center gap-1.5" title={`Hygiene ${project.hygieneScore} / Momentum ${project.momentumScore}`}>
-                <span className={cn("text-sm font-bold tabular-nums", healthColor(project.hygieneScore))}>
-                  {project.hygieneScore}
-                </span>
-                <span className="text-[10px] text-muted-foreground">hyg</span>
-                <span className="text-muted-foreground/40">/</span>
-                <span className={cn("text-sm font-bold tabular-nums", healthColor(project.momentumScore))}>
-                  {project.momentumScore}
-                </span>
-                <span className="text-[10px] text-muted-foreground">mom</span>
-              </div>
               {project.isDirty && (
                 <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
                   uncommitted
@@ -417,38 +403,14 @@ export function ProjectDrawer({
             )}
           </div>
 
-          {/* Attention banner */}
-          {(() => {
-            const attention = evaluateAttention(project);
-            if (!attention.needsAttention) return null;
-            return (
-              <div className={cn(
-                "rounded-md px-3 py-2 text-sm space-y-1",
-                attention.severity === "high" ? "bg-red-50 border border-red-200 dark:bg-red-950/30 dark:border-red-900" :
-                attention.severity === "med" ? "bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900" :
-                "bg-zinc-50 border border-zinc-200 dark:bg-zinc-900/50 dark:border-zinc-800"
-              )}>
-                <span className="text-xs font-medium">Needs Attention</span>
-                <ul className="space-y-0.5">
-                  {attention.reasons.map((r) => (
-                    <li key={r.label} className="flex items-start gap-1.5 text-xs">
-                      <span className="text-muted-foreground mt-px">&bull;</span>
-                      <span>{r.label}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })()}
-
-          {/* Line 4: Last commit message */}
+          {/* Last commit message */}
           {scan?.lastCommitMessage && (
             <div className="font-mono text-sm bg-muted/50 rounded px-2.5 py-1.5 text-foreground/80">
               {scan.lastCommitMessage}
             </div>
           )}
 
-          {/* ── Section 1: Summary + Next Action ── */}
+          {/* ── Section 1: Summary ── */}
           <SectionBox
             title="Summary"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
@@ -465,12 +427,6 @@ export function ProjectDrawer({
                     )}
                   </div>
                 )}
-                {project.nextAction && (
-                  <div className="rounded-md bg-muted p-2.5">
-                    <span className="text-xs font-medium text-muted-foreground">Next Action</span>
-                    <p className="text-sm font-medium mt-0.5">{project.nextAction}</p>
-                  </div>
-                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
@@ -479,10 +435,103 @@ export function ProjectDrawer({
             )}
           </SectionBox>
 
-          {/* ── Section 2: Details (compressed) ── */}
+          {/* ── Section 2: Next Action + Risks ── */}
           <SectionBox
+            title="Next Action & Risks"
+            source={{ type: "llm", timestamp: project.llmGeneratedAt }}
+            highlight={delta?.newlyEnriched}
+          >
+            {project.nextAction || project.risks.length > 0 || project.recommendations.length > 0 ? (
+              <div className="space-y-3">
+                {project.nextAction && (
+                  <div className="rounded-md bg-muted p-2.5">
+                    <span className="text-xs font-medium text-muted-foreground">Next Action</span>
+                    <p className="text-sm font-medium mt-0.5">{project.nextAction}</p>
+                  </div>
+                )}
+                {project.risks.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Risks</span>
+                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
+                      {project.risks.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {project.recommendations.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
+                    <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
+                      {project.recommendations.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                Run LLM enrichment to generate insights.
+              </p>
+            )}
+          </SectionBox>
+
+          {/* ── Section 3: GitHub ── */}
+          {hasGitHub && (
+            <SectionBox
+              title="GitHub"
+              source={{ type: "github", timestamp: project.githubFetchedAt }}
+            >
+              <div className="space-y-3">
+                {/* Summary row */}
+                <div className="flex items-center gap-4 text-sm">
+                  <span>{project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}</span>
+                  <span>{project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}</span>
+                  <span className="flex items-center gap-1">CI: <CiStatusLabel status={project.ciStatus} /></span>
+                  {project.repoVisibility !== "unknown" && (
+                    <Badge variant="outline" className="text-[10px]">{project.repoVisibility}</Badge>
+                  )}
+                </div>
+
+                {/* Top issues */}
+                {issues.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Top Issues</span>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {issues.map((issue) => (
+                        <li key={issue.number} className="text-sm flex items-center gap-1.5">
+                          <span className="text-muted-foreground font-mono text-xs">#{issue.number}</span>
+                          <span className="truncate">{issue.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Top PRs */}
+                {prs.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Open PRs</span>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {prs.map((pr) => (
+                        <li key={pr.number} className="text-sm flex items-center gap-1.5">
+                          <span className="text-muted-foreground font-mono text-xs">#{pr.number}</span>
+                          <span className="truncate">{pr.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </SectionBox>
+          )}
+
+          {/* ── Section 4: Details (compact) ── */}
+          <CollapsibleSection
             title="Details"
             source={{ type: "scan", timestamp: project.lastScanned }}
+            defaultOpen={false}
           >
             <div className="space-y-3">
               {/* 4-column grid: Framework, Languages, Services, LOC */}
@@ -551,28 +600,16 @@ export function ProjectDrawer({
                 </div>
               ) : null}
 
-              {/* Features */}
-              {project.notableFeatures.length > 0 && (
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Features</span>
-                  <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
-                    {project.notableFeatures.map((f, i) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               {scan?.commitCount != null && scan.commitCount > 0 && (
                 <div className="text-[10px] text-muted-foreground pt-1">
                   {scan.commitCount} commits
                 </div>
               )}
             </div>
-          </SectionBox>
+          </CollapsibleSection>
 
-          {/* ── Section 3: Timeline ── */}
-          <SectionBox title="Timeline">
+          {/* ── Section 5: Timeline ── */}
+          <CollapsibleSection title="Timeline" defaultOpen={false}>
             {timeline.length > 0 ? (() => {
               const ITEMS_PER_PAGE = 10;
               const totalPages = Math.ceil(timeline.length / ITEMS_PER_PAGE);
@@ -638,45 +675,7 @@ export function ProjectDrawer({
             })() : (
               <p className="text-sm text-muted-foreground italic">No activity yet.</p>
             )}
-          </SectionBox>
-
-          {/* ── Section 4: Risks & Recommendations ── */}
-          <CollapsibleSection
-            title="Risks & Recommendations"
-            source={{ type: "llm", timestamp: project.llmGeneratedAt }}
-            highlight={delta?.newlyEnriched}
-            defaultOpen={true}
-          >
-            {project.risks.length > 0 || project.recommendations.length > 0 ? (
-              <div className="space-y-3">
-                {project.risks.length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Risks</span>
-                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
-                      {project.risks.map((r, i) => (
-                        <li key={i}>{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {project.recommendations.length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
-                    <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
-                      {project.recommendations.map((r, i) => (
-                        <li key={i}>{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate insights.
-              </p>
-            )}
           </CollapsibleSection>
-
 
         </div>
       </DialogContent>

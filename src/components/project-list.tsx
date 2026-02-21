@@ -1,13 +1,11 @@
 "use client";
 
 import type { Project } from "@/lib/types";
-import type { DashboardDeltas } from "@/hooks/use-refresh-deltas";
 import type { ProjectProgress } from "@/hooks/use-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { healthColor, copyToClipboard } from "@/lib/project-helpers";
-import { evaluateAttention } from "@/lib/attention";
+import { copyToClipboard } from "@/lib/project-helpers";
 import { cn } from "@/lib/utils";
 
 interface ProjectListProps {
@@ -17,8 +15,6 @@ interface ProjectListProps {
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
   sanitizePaths: boolean;
-  deltas?: DashboardDeltas | null;
-  view?: string;
   refreshProgress?: Map<string, ProjectProgress>;
 }
 
@@ -52,15 +48,23 @@ function getLangLabel(project: Project): string | null {
   return FRAMEWORK_LABELS[raw.toLowerCase()] ?? raw;
 }
 
-function formatDaysInactive(days: number | null | undefined): string {
-  if (days == null) return "\u2014";
-  return `${days}d`;
+function CiIndicator({ status }: { status: string }) {
+  switch (status) {
+    case "success":
+      return <span className="text-emerald-500" title="CI passing">&#10003;</span>;
+    case "failure":
+      return <span className="text-red-500" title="CI failing">&#10007;</span>;
+    case "pending":
+      return <span className="text-amber-500" title="CI pending">&#9675;</span>;
+    default:
+      return null;
+  }
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas, view, refreshProgress }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, refreshProgress }: ProjectListProps) {
   const gridCols = sanitizePaths
-    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr]"
-    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr_7rem]";
+    ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem]"
+    : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_auto]";
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
@@ -73,11 +77,6 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         <div className="w-5" />
         <div>Name</div>
         <div className="hidden sm:block">Lang</div>
-        <div className="hidden md:block text-right" title="Structural: README, tests, CI, linter, license, lockfile, deploy, remote">Hygiene</div>
-        <div className="hidden md:block text-right" title="Operational: commit recency, uncommitted changes, ahead/behind, stale branches">Momentum</div>
-        <div className="hidden sm:block text-right">Inactive</div>
-        <div className="hidden lg:block text-right">LOC</div>
-        <div className="hidden md:block">Last Commit</div>
         {!sanitizePaths && <div>Actions</div>}
       </div>
 
@@ -85,6 +84,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
       {projects.map((project) => {
         const isSelected = project.id === selectedId;
         const rawPath = project.pathDisplay;
+        const hasGitHub = project.repoVisibility !== "not-on-github";
 
         return (
           <div
@@ -100,7 +100,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               }
             }}
             className={cn(
-              "grid items-center gap-x-3 px-3 h-10 border-b border-border last:border-b-0 cursor-pointer transition-colors",
+              "grid items-start gap-x-3 px-3 py-2 border-b border-border last:border-b-0 cursor-pointer transition-colors",
               gridCols,
               isSelected
                 ? "bg-accent"
@@ -113,14 +113,14 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               if (prog?.storeStatus === "running") {
                 return (
                   <div
-                    className="w-2.5 h-2.5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0"
+                    className="w-2.5 h-2.5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0 mt-1.5"
                     title="Scanning..."
                   />
                 );
               }
               if (prog?.llmStatus === "running") {
                 return (
-                  <div className="shrink-0" title="Enriching with AI...">
+                  <div className="shrink-0 mt-1" title="Enriching with AI...">
                     <svg width="10" height="10" viewBox="0 0 14 14" fill="none" className="text-amber-500 animate-pulse">
                       <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
                     </svg>
@@ -130,7 +130,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               if (prog?.llmStatus === "error") {
                 return (
                   <div
-                    className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"
+                    className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 mt-1.5"
                     title={prog.llmError ?? "LLM error"}
                   />
                 );
@@ -138,7 +138,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               return (
                 <div
                   className={cn(
-                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    "w-2.5 h-2.5 rounded-full shrink-0 mt-1.5",
                     STATUS_DOT[project.status] ?? STATUS_DOT.archived
                   )}
                   title={project.status}
@@ -150,7 +150,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
             <button
               type="button"
               className={cn(
-                "flex items-center justify-center w-5 h-5 rounded transition-colors",
+                "flex items-center justify-center w-5 h-5 rounded transition-colors mt-0.5",
                 project.pinned
                   ? "text-amber-500 hover:text-amber-600"
                   : "text-muted-foreground/30 hover:text-muted-foreground/60"
@@ -164,8 +164,9 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               <PinIcon filled={project.pinned} className="size-3.5" />
             </button>
 
-            {/* Name + git indicators */}
+            {/* Name + line 2 */}
             <div className="min-w-0">
+              {/* Line 1: name + git badges */}
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-sm truncate" title={rawPath}>
                   {project.name}
@@ -177,31 +178,36 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                   <span className="shrink-0 text-[10px] text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>
                 )}
               </div>
-              {view === "needs-attention" && (() => {
-                const attention = evaluateAttention(project);
-                if (!attention.needsAttention) return null;
-                return (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {attention.reasons.slice(0, 2).map(r => (
-                      <span key={r.code} className={cn(
-                        "text-[9px] rounded px-1 py-0",
-                        r.severity === "high" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
-                        r.severity === "med" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      )}>
-                        {r.label}
-                      </span>
-                    ))}
-                    {attention.reasons.length > 2 && (
-                      <span className="text-[9px] text-muted-foreground">+{attention.reasons.length - 2}</span>
+              {/* Line 2: next action + GitHub badges */}
+              <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground min-w-0">
+                <span className="truncate">
+                  {project.nextAction || "\u2014"}
+                </span>
+                {hasGitHub && (
+                  <>
+                    <span className="shrink-0">&middot;</span>
+                    <span className="shrink-0" title={`${project.openIssues} open issues`}>
+                      {project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}
+                    </span>
+                    <span className="shrink-0">&middot;</span>
+                    <span className="shrink-0" title={`${project.openPrs} open PRs`}>
+                      {project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}
+                    </span>
+                    {project.ciStatus !== "none" && (
+                      <>
+                        <span className="shrink-0">&middot;</span>
+                        <span className="shrink-0 inline-flex items-center gap-0.5">
+                          <CiIndicator status={project.ciStatus} /> CI
+                        </span>
+                      </>
                     )}
-                  </div>
-                );
-              })()}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Language badge */}
-            <div className="hidden sm:block">
+            <div className="hidden sm:block mt-0.5">
               {(() => {
                 const label = getLangLabel(project);
                 return label ? (
@@ -214,66 +220,10 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               })()}
             </div>
 
-            {/* Hygiene */}
-            <div className="hidden md:block text-right font-mono text-xs tabular-nums">
-              <span className={cn("font-semibold", healthColor(project.hygieneScore))}>
-                {project.hygieneScore}
-              </span>
-              {(() => {
-                const d = deltas?.projects.get(project.id);
-                if (!d || d.hygieneScore === 0) return null;
-                return (
-                  <span className={`ml-1 text-[10px] ${d.hygieneScore > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    {d.hygieneScore > 0 ? `+${d.hygieneScore}` : d.hygieneScore}
-                  </span>
-                );
-              })()}
-            </div>
-
-            {/* Momentum */}
-            <div className="hidden md:block text-right font-mono text-xs tabular-nums">
-              <span className={cn("font-semibold", healthColor(project.momentumScore))}>
-                {project.momentumScore}
-              </span>
-              {(() => {
-                const d = deltas?.projects.get(project.id);
-                if (!d || d.momentumScore === 0) return null;
-                return (
-                  <span className={`ml-1 text-[10px] ${d.momentumScore > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    {d.momentumScore > 0 ? `+${d.momentumScore}` : d.momentumScore}
-                  </span>
-                );
-              })()}
-            </div>
-
-            {/* Days inactive */}
-            <div className="hidden sm:block text-right font-mono text-xs text-muted-foreground tabular-nums">
-              {formatDaysInactive(project.scan?.daysInactive)}
-            </div>
-
-            {/* LOC */}
-            <div className="hidden lg:block text-right font-mono text-xs text-muted-foreground tabular-nums">
-              {project.locEstimate ? project.locEstimate.toLocaleString() : "\u2014"}
-              {(() => {
-                const d = deltas?.projects.get(project.id);
-                if (!d || d.locEstimate === 0) return null;
-                return (
-                  <span className={`ml-1 text-[10px] ${d.locEstimate > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                    {d.locEstimate > 0 ? `+${d.locEstimate.toLocaleString()}` : d.locEstimate.toLocaleString()}
-                  </span>
-                );
-              })()}
-            </div>
-
-            {/* Last commit message */}
-            <div className="hidden md:block font-mono text-xs text-muted-foreground truncate min-w-0">
-              {project.scan?.lastCommitMessage ?? "\u2014"}
-            </div>
-
             {/* Quick actions */}
             {!sanitizePaths && (
               <div
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 mt-0.5"
                 onClick={(e) => e.stopPropagation()}
               >
                 <Button

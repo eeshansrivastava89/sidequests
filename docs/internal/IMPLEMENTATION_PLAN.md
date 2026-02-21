@@ -5,7 +5,10 @@
 - [Completed] v1 delivery (Phases 0-51W): infrastructure, scan pipeline, NPX distribution, first publish
 - [Completed] Phase 52W: GitHub data collection (#001→#002)
 - [Completed] Phase 53W: LLM prompt redesign (#003→#004)
-- [Active] Phase 54W: Unified scan UX — next up
+- [Completed] Phase 54W: Unified scan UX (#005→#006→#007→#008)
+- [Completed] Phase 55W: Project list row redesign (#009→#010)
+- [Completed] Phase 56W: Stats cards + header redesign (#011→#012)
+- [Completed] Phase 57W: Project drawer cleanup (#013→#014)
 
 ## v0.2 Vision
 
@@ -48,26 +51,26 @@ Design principles:
 - [x] Rewrote prompt in `prompt.ts` with GitHub-aware context
 - [x] 15 unit tests for new prompt parsing + buildPrompt
 
-## Phase 54W — Unified Scan UX
+## Phase 54W — Unified Scan UX ✓
 
 **What:** Merge Scan + Enrich into a single "Refresh" action with per-row progress.
+**Status:** Complete (reviewed #005→#006→#007→#008, approved 2026-02-21)
 
 **Deliverables:**
-- [ ] Single "Refresh" button replaces Scan + Enrich buttons
-- [ ] Unified pipeline: fast scan → GitHub sync → stream results → LLM enrichment in background
-- [ ] **Server-side pipeline mutex:** module-level lock in `/api/refresh/stream` — if a pipeline is already running, reject with 409 (or abort the old one). Prevents duplicate LLM calls from rapid clicks, tab refreshes, or reconnects. ~10 lines, no external deps.
-- [ ] Per-row progress indicators (spinner during scan, sparkle during LLM enrichment)
-- [ ] Rows update in-place as each project completes (no overlay list)
-- [ ] Toast when all enrichment done, auto-dismiss progress
-- [ ] Update `pipeline.ts` orchestration
-- [ ] Update `/api/refresh/stream` SSE route
-- [ ] Remove `refresh-panel.tsx` overlay
+- [x] Single "Refresh" button replaces Scan + Enrich buttons
+- [x] Unified pipeline: fast scan → GitHub sync → stream results → LLM enrichment in background
+- [x] **Server-side pipeline mutex:** module-level lock in `/api/refresh/stream` with 409 rejection + timestamp-based staleness guard (10-min auto-recovery)
+- [x] Per-row progress indicators (spinner during scan, sparkle during LLM enrichment)
+- [x] Rows update in-place as each project completes (no overlay list)
+- [x] Toast when all enrichment done, auto-dismiss progress
+- [x] Update `pipeline.ts` orchestration
+- [x] Update `/api/refresh/stream` SSE route (switched to fetch-based SSE for 409 handling)
+- [x] Remove `refresh-panel.tsx` overlay
 
-**Exit criteria:** One click does everything. Fast scan results appear in ~10s. LLM enrichment streams in background. No ugly progress list. Concurrent requests are rejected server-side — only one pipeline runs at a time.
-
-## Phase 55W — Project List Row Redesign
+## Phase 55W — Project List Row Redesign ✓
 
 **What:** Replace metric-heavy rows with two-line actionable layout.
+**Status:** Complete (reviewed #009→#010, approved 2026-02-21)
 
 **New row format:**
 ```
@@ -76,19 +79,18 @@ Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
 ```
 
 **Deliverables:**
-- [ ] Redesign `project-list.tsx` with two-line row layout
-- [ ] LLM next action as primary second-line text
-- [ ] GitHub badges: issue count, PR count, CI status (✓/✗/○)
-- [ ] Remove: hygiene column, momentum column, LOC column, days inactive column
-- [ ] Keep: status dot (color from LLM status), name, language, git badges, quick actions
-- [ ] Update `MergedProject` type in `types.ts`
-- [ ] Responsive breakpoints for new layout
+- [x] Redesign `project-list.tsx` with two-line row layout
+- [x] LLM next action as primary second-line text
+- [x] GitHub badges: issue count, PR count, CI status (✓/✗/○)
+- [x] Remove: hygiene column, momentum column, LOC column, days inactive column
+- [x] Keep: status dot (color from LLM status), name, language, git badges, quick actions
+- [ ] Update `MergedProject` type in `types.ts` — not needed (type already had fields from Phase 53W)
+- [x] Responsive breakpoints for new layout (simplified grid, lang badge hidden on sm)
 
-**Exit criteria:** Every project row shows what to DO next. GitHub state visible at a glance. No abstract scores on the list view.
-
-## Phase 56W — Stats Cards + Header Redesign
+## Phase 56W — Stats Cards + Header Redesign ✓
 
 **What:** Replace abstract stats with actionable signals.
+**Status:** Complete (reviewed #011→#012, approved 2026-02-21)
 
 **New cards:**
 | Card | Signal |
@@ -100,27 +102,24 @@ Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
 | Not on GitHub | Projects missing a remote |
 
 **Deliverables:**
-- [ ] Update `stats-bar.tsx` with new card definitions
-- [ ] Cards are clickable — filter project list to matching projects
-- [ ] Remove "Scoring Methodology" button from header
-- [ ] Remove `methodology-modal.tsx`
+- [x] Update `stats-bar.tsx` with new card definitions
+- [x] Cards are clickable — filter project list to matching projects (with amber ring highlight + filter chip)
+- [x] Remove "Scoring Methodology" button from header
+- [x] Remove `methodology-modal.tsx`
 
-**Exit criteria:** Stats cards reflect signals the user actually acts on. Clicking a card filters the list.
-
-## Phase 57W — Project Drawer Cleanup
+## Phase 57W — Project Drawer Cleanup ✓
 
 **What:** Simplify drawer to match new data model.
+**Status:** Complete (reviewed #013→#014, approved 2026-02-21)
 
 **Deliverables:**
-- [ ] **Summary** section: LLM summary (replaces Pitch)
-- [ ] **Next Action + Risks** section: prominent, highlighted
-- [ ] **GitHub** section: open issues list, open PRs list, CI status
-- [ ] **Details** section: framework, languages, services, LOC (compact)
-- [ ] **Timeline**: simplify to git commits + enrichment events
-- [ ] Remove: hygiene/momentum score display, AI Insight section, metadata fields (goal/audience/successMetrics)
-- [ ] Update `project-drawer.tsx`
-
-**Exit criteria:** Drawer shows actionable info. No abstract scores. GitHub state integrated.
+- [x] **Summary** section: LLM summary with status badge + statusReason
+- [x] **Next Action + Risks** section: prominent, with recommendations
+- [x] **GitHub** section: issues/PRs/CI/visibility + top issues/PRs lists
+- [x] **Details** section: collapsed by default, compact 4-column grid
+- [x] **Timeline**: collapsed by default, paginated git commits + activity events
+- [x] Remove: hygiene/momentum score display, AI Insight section, attention banner, notableFeatures, StructuredData
+- [x] Update `project-drawer.tsx`
 
 ---
 
