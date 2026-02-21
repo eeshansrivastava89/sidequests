@@ -5,7 +5,12 @@ import type { RawScan } from "./types";
 
 /**
  * Merged project view — the single shape the UI consumes.
- * Fields are resolved by priority: Override > Metadata > Derived > LLM > Scan
+ * Fields are resolved by priority (varies by field):
+ *   status:     Override > Derived > "archived"
+ *   summary:    Override > LLM > Legacy LLM > Scan description
+ *   nextAction: Metadata > LLM
+ *   tags:       Override > LLM > Derived
+ *   General:    Override > Metadata > LLM > Derived > Scan
  */
 export interface MergedProject {
   id: string;
@@ -182,7 +187,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   const rawScan = parseJson<RawScan | null>(scan?.rawJson, null);
   const derivedData = parseJson<Record<string, unknown>>(derived?.derivedJson, {});
 
-  // Priority: Override > Metadata > Derived > LLM > Scan
+  // status: Override > Derived > "archived" (see per-field table in ARCHITECTURE.md)
   const status =
     override?.statusOverride ??
     derived?.statusAuto ??

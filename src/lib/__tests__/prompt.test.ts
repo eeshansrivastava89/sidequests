@@ -140,7 +140,7 @@ describe("buildPrompt", () => {
       github: {
         openIssues: 5,
         openPrs: 2,
-        ciStatus: "passing",
+        ciStatus: "success",
         repoVisibility: "public",
       },
     };
@@ -148,7 +148,7 @@ describe("buildPrompt", () => {
     expect(prompt).toContain("GitHub data:");
     expect(prompt).toContain("Open Issues: 5");
     expect(prompt).toContain("Open PRs: 2");
-    expect(prompt).toContain("CI Status: passing");
+    expect(prompt).toContain("CI Status: success");
   });
 
   it("omits GitHub section when absent", () => {
@@ -183,7 +183,7 @@ describe("buildPrompt", () => {
       github: {
         openIssues: 3,
         openPrs: 1,
-        ciStatus: "failing",
+        ciStatus: "failure",
         repoVisibility: "private",
         topIssues: '[{"title":"Bug"}]',
         topPrs: '[{"title":"Feature"}]',

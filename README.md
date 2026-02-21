@@ -31,16 +31,16 @@ npx @eeshans/sidequests
 
 That's it. No install, no config files, no accounts. The onboarding wizard handles the rest.
 
-**Requirements:** Node.js 20.9+ and git.
+**Requirements:** Node.js 20.9+ and git. For full functionality: [GitHub CLI](https://cli.github.com/) (`gh`) and an LLM provider.
 
 ## What it does
 
 Sidequests scans your dev directory, discovers every git repo, and builds a dashboard with:
 
-- **Health scores** — hygiene (README, tests, CI, linter) + momentum (commit recency, clean tree, pushed up)
+- **Actionable next steps** — LLM-powered summaries, next actions, risks, and recommendations for every project
+- **GitHub at a glance** — open issues, PRs, and CI status pulled from `gh` CLI
 - **Status tracking** — active, paused, stale, or archived based on commit history
-- **Git status at a glance** — dirty files, unpushed commits, current branch
-- **AI enrichment** — optional LLM-powered summaries, tags, and recommendations
+- **Git state** — dirty files, unpushed commits, current branch
 
 Everything runs locally. Your code never leaves your machine.
 
@@ -48,10 +48,10 @@ Everything runs locally. Your code never leaves your machine.
 
 | | |
 |---|---|
-| **Scan & Score** | Auto-discovers repos, computes health/hygiene/momentum scores |
+| **LLM Enrichment** | AI-powered summaries, next actions, risks — the core value of the tool |
+| **GitHub Integration** | Open issues, PRs, CI status via `gh` CLI |
 | **Smart Status** | Classifies projects as active, paused, stale, or archived |
 | **Git Aware** | Dirty state, ahead/behind, branch tracking |
-| **LLM Enrichment** | Generate summaries and recommendations with 5 providers |
 | **Live Refresh** | SSE-based streaming progress as projects are scanned |
 | **Pin & Override** | Pin favorites, manually override any metadata |
 | **Dark Mode** | Automatic or manual theme switching |
@@ -59,7 +59,7 @@ Everything runs locally. Your code never leaves your machine.
 
 ## LLM providers
 
-AI enrichment is optional — enable it in Settings and pick a provider:
+LLM enrichment powers the core experience — summaries, next actions, risks, and recommendations. Configure a provider in Settings to unlock these features:
 
 | Provider | What you need |
 |---|---|
@@ -86,7 +86,9 @@ npx @eeshans/sidequests [options]
 |---|---|
 | "git not found" in preflight | Install git — `brew install git` or [git-scm.com](https://git-scm.com) |
 | Scan finds 0 projects | Make sure Dev Root points to a folder containing git repos |
+| No GitHub data | Install and authenticate `gh` — `brew install gh && gh auth login` |
 | LLM enrichment fails | Check provider config in Settings, make sure API key or CLI is set up |
+| No summaries/next actions | Configure an LLM provider in Settings |
 | Database errors | Delete `~/.sidequests/dev.db` and restart |
 
 ---

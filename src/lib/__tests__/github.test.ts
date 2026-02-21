@@ -124,7 +124,7 @@ describe("fetchGitHubData", () => {
     expect(result.openIssues).toBe(3);
     expect(result.openPrs).toBe(1);
     expect(result.repoVisibility).toBe("public");
-    expect(result.ciStatus).toBe("passing");
+    expect(result.ciStatus).toBe("success");
     expect(JSON.parse(result.issuesJson!)).toEqual([
       { title: "Bug report", number: 1 },
       { title: "Feature request", number: 2 },
@@ -170,7 +170,7 @@ describe("fetchGitHubData", () => {
     expect(result.repoVisibility).toBe("private");
   });
 
-  it('maps CI conclusion "failure" to "failing"', () => {
+  it('maps CI conclusion "failure" to "failure"', () => {
     mockExecFileSync
       .mockImplementationOnce(() => {
         throw new Error("graphql failed");
@@ -180,7 +180,7 @@ describe("fetchGitHubData", () => {
       );
 
     const result = fetchGitHubData({ owner: "me", repo: "myrepo" });
-    expect(result.ciStatus).toBe("failing");
+    expect(result.ciStatus).toBe("failure");
   });
 
   it('returns ciStatus "none" when no workflow runs', () => {

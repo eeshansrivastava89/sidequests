@@ -10,6 +10,12 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Detect SQLite "no such table" errors from Prisma/LibSQL. */
+function isMissingTableError(error: unknown): boolean {
+  const msg = errorMessage(error);
+  return msg.includes("no such table") || msg.includes("SQLITE_ERROR");
+}
+
 /** Return a standard `{ ok: false, error }` 500 response. */
 export function errorResponse(error: unknown, status = 500) {
   return NextResponse.json(
@@ -21,14 +27,30 @@ export function errorResponse(error: unknown, status = 500) {
 /**
  * Wrap an async route handler with standard error handling.
  * Catches any thrown error and returns `{ ok: false, error }` with 500.
+ * When `missingTableFallback` is provided, missing DB tables return that
+ * response (200) instead of an error — used for routes that should degrade
+ * gracefully on first run before any scan has populated the database.
  */
 export function withErrorHandler<Args extends unknown[]>(
   handler: (...args: Args) => Promise<NextResponse>,
+  options?: { missingTableFallback?: () => NextResponse },
 ) {
   return async (...args: Args): Promise<NextResponse> => {
     try {
       return await handler(...args);
     } catch (error) {
+      if (isMissingTableError(error)) {
+        if (options?.missingTableFallback) {
+          return options.missingTableFallback();
+        }
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Database tables not found. Run `npm run setup` to initialize the database, then restart the dev server.",
+          },
+          { status: 503 },
+        );
+      }
       return errorResponse(error);
     }
   };

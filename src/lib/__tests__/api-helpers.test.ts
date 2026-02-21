@@ -72,6 +72,35 @@ describe("withErrorHandler", () => {
     expect(body.ok).toBe(false);
     expect(body.error).toBe("boom");
   });
+
+  it("returns 503 for missing table errors without fallback", async () => {
+    const handler = withErrorHandler(async () => {
+      throw new Error("SQLITE_ERROR: no such table: main.Project");
+    });
+    const res = await handler();
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Database tables not found");
+  });
+
+  it("returns fallback response for missing table errors when missingTableFallback is provided", async () => {
+    const handler = withErrorHandler(
+      async () => {
+        throw new Error("SQLITE_ERROR: no such table: main.Project");
+      },
+      {
+        missingTableFallback: () =>
+          NextResponse.json({ ok: true, projects: [], lastRefreshedAt: null }),
+      },
+    );
+    const res = await handler();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.projects).toEqual([]);
+    expect(body.lastRefreshedAt).toBeNull();
+  });
 });
 
 describe("safeJsonParse", () => {

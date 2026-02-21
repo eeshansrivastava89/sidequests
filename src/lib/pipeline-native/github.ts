@@ -12,10 +12,13 @@ import { execFileSync } from "child_process";
 // Types
 // ---------------------------------------------------------------------------
 
+/** Canonical CI status values. Matches GitHub Actions conclusion values. */
+export type CiStatus = "success" | "failure" | "pending" | "none";
+
 export interface GitHubProjectData {
   openIssues: number;
   openPrs: number;
-  ciStatus: "passing" | "failing" | "none";
+  ciStatus: CiStatus;
   issuesJson: string | null;
   prsJson: string | null;
   repoVisibility: "public" | "private" | "not-on-github";
@@ -150,7 +153,7 @@ export function fetchGitHubData(ownerRepo: OwnerRepo): GitHubProjectData {
   }
 
   // REST: CI status from latest Actions run
-  let ciStatus: "passing" | "failing" | "none" = "none";
+  let ciStatus: CiStatus = "none";
   const ciResult = runGh("api", `repos/${owner}/${repo}/actions/runs?per_page=1`);
   if (ciResult) {
     try {
@@ -158,8 +161,10 @@ export function fetchGitHubData(ownerRepo: OwnerRepo): GitHubProjectData {
       const runs = parsed?.workflow_runs;
       if (Array.isArray(runs) && runs.length > 0) {
         const conclusion = runs[0].conclusion;
-        if (conclusion === "success") ciStatus = "passing";
-        else if (conclusion === "failure") ciStatus = "failing";
+        const status = runs[0].status;
+        if (conclusion === "success") ciStatus = "success";
+        else if (conclusion === "failure") ciStatus = "failure";
+        else if (status === "in_progress" || status === "queued") ciStatus = "pending";
       }
     } catch {
       // Parse error — leave as "none"
