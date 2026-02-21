@@ -1,4 +1,4 @@
-import type { LlmEnrichment } from "@/lib/llm/provider";
+import type { LlmEnrichment, LlmStatus } from "@/lib/llm/provider";
 
 const NOW = "2025-06-01T12:00:00Z";
 
@@ -158,23 +158,13 @@ export const DERIVE_FIXTURE_REDUCED = {
 // -- LLM enrichment fixture --
 
 export const LLM_ENRICHMENT_FIXTURE: LlmEnrichment = {
-  purpose: "A full-stack Next.js dashboard for project management",
+  summary: "A full-stack Next.js dashboard for project management with scan pipeline and LLM enrichment",
+  nextAction: "Write documentation and add integration tests",
+  status: "building" as LlmStatus,
+  statusReason: "Active development with frequent commits and features in progress",
+  risks: ["No test coverage", "Single maintainer"],
   tags: ["typescript", "next", "dashboard"],
-  notableFeatures: ["SSR", "API routes", "Prisma ORM"],
   recommendations: ["Add unit tests", "Set up CI/CD"],
-  pitch: "The best project dashboard you've never heard of",
-  goal: "Ship production v1",
-  audience: "Solo developers",
-  successMetrics: "100 daily active users",
-  nextAction: "Write documentation",
-  publishTarget: "npm",
-  aiInsight: {
-    score: 78,
-    confidence: "high",
-    reasons: ["Well-structured codebase", "Active development"],
-    risks: ["No test coverage", "Single maintainer"],
-    nextBestAction: "Add comprehensive tests",
-  },
 };
 
 // -- DB seeding helpers --
@@ -211,10 +201,16 @@ interface SeedOverrides {
     locEstimate?: number;
   } | false;
   llm?: {
-    purpose?: string;
+    summary?: string;
+    nextAction?: string;
+    llmStatus?: string;
+    statusReason?: string;
+    risksJson?: string;
     tagsJson?: string;
-    notableFeaturesJson?: string;
     recommendationsJson?: string;
+    // Legacy fields
+    purpose?: string;
+    notableFeaturesJson?: string;
     pitch?: string | null;
     aiInsightJson?: string | null;
   } | false;
@@ -288,10 +284,16 @@ export async function seedProject(
     await db.llm.create({
       data: {
         projectId: project.id,
-        purpose: overrides.llm?.purpose ?? "Test purpose",
+        summary: overrides.llm?.summary ?? "Test project summary",
+        nextAction: overrides.llm?.nextAction ?? "Review and improve tests",
+        llmStatus: overrides.llm?.llmStatus ?? "building",
+        statusReason: overrides.llm?.statusReason ?? "Active development",
+        risksJson: overrides.llm?.risksJson ?? JSON.stringify(["No tests"]),
         tagsJson: overrides.llm?.tagsJson ?? JSON.stringify(["typescript"]),
-        notableFeaturesJson: overrides.llm?.notableFeaturesJson ?? JSON.stringify(["SSR"]),
         recommendationsJson: overrides.llm?.recommendationsJson ?? JSON.stringify(["Add tests"]),
+        // Legacy fields
+        purpose: overrides.llm?.purpose ?? "Test purpose",
+        notableFeaturesJson: overrides.llm?.notableFeaturesJson ?? JSON.stringify(["SSR"]),
         pitch: overrides.llm?.pitch ?? "A great project",
         aiInsightJson: overrides.llm?.aiInsightJson ?? null,
       },

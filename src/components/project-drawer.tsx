@@ -448,17 +448,33 @@ export function ProjectDrawer({
             </div>
           )}
 
-          {/* ── Section 1: Pitch ── */}
+          {/* ── Section 1: Summary + Next Action ── */}
           <SectionBox
-            title="Pitch"
+            title="Summary"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
             highlight={delta?.newlyEnriched}
           >
-            {project.pitch ? (
-              <p className="text-sm leading-relaxed">{project.pitch}</p>
+            {project.summary ? (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed">{project.summary}</p>
+                {project.llmStatus && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px]">{project.llmStatus}</Badge>
+                    {project.statusReason && (
+                      <span className="text-xs text-muted-foreground">{project.statusReason}</span>
+                    )}
+                  </div>
+                )}
+                {project.nextAction && (
+                  <div className="rounded-md bg-muted p-2.5">
+                    <span className="text-xs font-medium text-muted-foreground">Next Action</span>
+                    <p className="text-sm font-medium mt-0.5">{project.nextAction}</p>
+                  </div>
+                )}
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate pitch.
+                Run LLM enrichment to generate summary.
               </p>
             )}
           </SectionBox>
@@ -624,83 +640,40 @@ export function ProjectDrawer({
             )}
           </SectionBox>
 
-          {/* ── Section 4: AI Insights + Recommendations (merged) ── */}
+          {/* ── Section 4: Risks & Recommendations ── */}
           <CollapsibleSection
-            title="AI Insights"
+            title="Risks & Recommendations"
             source={{ type: "llm", timestamp: project.llmGeneratedAt }}
             highlight={delta?.newlyEnriched}
             defaultOpen={true}
           >
-            {project.aiInsight ? (
+            {project.risks.length > 0 || project.recommendations.length > 0 ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold tabular-nums">{project.aiInsight.score}</span>
-                  <span className="text-xs text-muted-foreground">/100</span>
-                  <Badge
-                    variant="secondary"
-                    className={cn(
-                      "text-[10px]",
-                      project.aiInsight.confidence === "high" && "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-                      project.aiInsight.confidence === "medium" && "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-                      project.aiInsight.confidence === "low" && "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-                    )}
-                  >
-                    {project.aiInsight.confidence} confidence
-                  </Badge>
-                </div>
-
-                {project.aiInsight.reasons.length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Reasons</span>
-                    <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
-                      {project.aiInsight.reasons.map((r, i) => (
-                        <li key={i}>{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {project.aiInsight.risks.length > 0 && (
+                {project.risks.length > 0 && (
                   <div>
                     <span className="text-xs font-medium text-muted-foreground">Risks</span>
                     <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
-                      {project.aiInsight.risks.map((r, i) => (
+                      {project.risks.map((r, i) => (
                         <li key={i}>{r}</li>
                       ))}
                     </ul>
                   </div>
                 )}
-
-                <div className="rounded-md bg-muted p-2.5">
-                  <span className="text-xs font-medium text-muted-foreground">Next Best Action</span>
-                  <p className="text-sm font-medium mt-0.5">{project.aiInsight.nextBestAction}</p>
-                </div>
-              </div>
-            ) : project.recommendations.length > 0 ? (
-              <div>
-                <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
-                <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
-                  {project.recommendations.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
+                {project.recommendations.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
+                    <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
+                      {project.recommendations.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground italic">
                 Run LLM enrichment to generate insights.
               </p>
-            )}
-
-            {/* Show recommendations below AI insight when both exist */}
-            {project.aiInsight && project.recommendations.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-border">
-                <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
-                <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
-                  {project.recommendations.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </div>
             )}
           </CollapsibleSection>
 

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
-export type RefreshMode = "scan" | "enrich";
+import { toast } from "sonner";
 
 export interface RefreshEvent {
   type: string;
@@ -30,7 +29,6 @@ export interface ProjectProgress {
 export interface RefreshState {
   active: boolean;
   phase: string;
-  mode: RefreshMode | null;
   projects: Map<string, ProjectProgress>;
   summary: RefreshEvent | null;
   error: string | null;
@@ -39,17 +37,114 @@ export interface RefreshState {
 const INITIAL_STATE: RefreshState = {
   active: false,
   phase: "",
-  mode: null,
   projects: new Map(),
   summary: null,
   error: null,
 };
 
+/** Parse a single SSE frame: "event: <type>\ndata: <json>\n\n" */
+function parseSSE(chunk: string): Array<{ type: string; data: string }> {
+  const events: Array<{ type: string; data: string }> = [];
+  const blocks = chunk.split("\n\n");
+  for (const block of blocks) {
+    if (!block.trim()) continue;
+    let type = "message";
+    let data = "";
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event: ")) type = line.slice(7);
+      else if (line.startsWith("data: ")) data = line.slice(6);
+    }
+    if (data) events.push({ type, data });
+  }
+  return events;
+}
+
 export function useRefresh(onComplete: () => void) {
   const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
-  const start = useCallback((mode: RefreshMode = "enrich") => {
+  const handleEvent = useCallback((type: string, raw: string) => {
+    switch (type) {
+      case "scan_start":
+        setState((s) => ({ ...s, phase: "Scanning filesystem..." }));
+        break;
+      case "scan_complete": {
+        const d = JSON.parse(raw);
+        setState((s) => ({ ...s, phase: `Found ${d.projectCount} projects. Deriving...` }));
+        break;
+      }
+      case "derive_start":
+        setState((s) => ({ ...s, phase: "Computing status and health scores..." }));
+        break;
+      case "derive_complete":
+        setState((s) => ({ ...s, phase: "Storing results..." }));
+        break;
+      case "project_start": {
+        const d: RefreshEvent = JSON.parse(raw);
+        setState((s) => {
+          const projects = new Map(s.projects);
+          const existing = projects.get(d.name!) ?? {
+            name: d.name!,
+            storeStatus: "pending" as const,
+            llmStatus: "pending" as const,
+          };
+          if (d.step === "store") existing.storeStatus = "running";
+          else if (d.step === "llm") existing.llmStatus = "running";
+          projects.set(d.name!, existing);
+          const phase = d.step === "llm"
+            ? `Enriching ${d.name} (${d.index! + 1}/${d.total})`
+            : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
+          return { ...s, projects, phase };
+        });
+        break;
+      }
+      case "project_complete": {
+        const d: RefreshEvent = JSON.parse(raw);
+        setState((s) => {
+          const projects = new Map(s.projects);
+          const existing = projects.get(d.name!);
+          if (existing) {
+            if (d.step === "store") {
+              existing.storeStatus = "done";
+              existing.detail = d.detail;
+            } else if (d.step === "llm") {
+              existing.llmStatus = "done";
+              if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
+            }
+            projects.set(d.name!, existing);
+          }
+          return { ...s, projects };
+        });
+        break;
+      }
+      case "project_error": {
+        const d: RefreshEvent = JSON.parse(raw);
+        setState((s) => {
+          const projects = new Map(s.projects);
+          const existing = projects.get(d.name!);
+          if (existing) {
+            existing.llmStatus = "error";
+            existing.llmError = d.error;
+            projects.set(d.name!, existing);
+          }
+          return { ...s, projects };
+        });
+        break;
+      }
+      case "done": {
+        const d: RefreshEvent = JSON.parse(raw);
+        setState((s) => ({ ...s, active: false, phase: "Complete", summary: d }));
+        break;
+      }
+      case "pipeline_error": {
+        const d = JSON.parse(raw);
+        setState((s) => ({ ...s, active: false, phase: "Error", error: d.error }));
+        break;
+      }
+    }
+  }, []);
+
+  const start = useCallback(() => {
     if (state.active) return;
 
     const abort = new AbortController();
@@ -58,119 +153,79 @@ export function useRefresh(onComplete: () => void) {
     setState({
       active: true,
       phase: "Connecting...",
-      mode,
       projects: new Map(),
       summary: null,
       error: null,
     });
 
-    const eventSource = new EventSource(`/api/refresh/stream?mode=${mode}`);
+    (async () => {
+      let response: Response;
+      try {
+        response = await fetch("/api/refresh/stream", { signal: abort.signal });
+      } catch {
+        if (abort.signal.aborted) return;
+        setState((s) => ({ ...s, active: false, phase: "Error", error: "Connection failed" }));
+        return;
+      }
 
-    eventSource.addEventListener("scan_start", () => {
-      setState((s) => ({ ...s, phase: "Scanning filesystem..." }));
-    });
+      if (response.status === 409) {
+        setState(INITIAL_STATE);
+        toast.info("Refresh already in progress");
+        return;
+      }
 
-    eventSource.addEventListener("scan_complete", (e) => {
-      const data = JSON.parse(e.data);
-      setState((s) => ({ ...s, phase: `Found ${data.projectCount} projects. Deriving...` }));
-    });
+      if (!response.ok || !response.body) {
+        setState((s) => ({ ...s, active: false, phase: "Error", error: `Server error (${response.status})` }));
+        return;
+      }
 
-    eventSource.addEventListener("derive_start", () => {
-      setState((s) => ({ ...s, phase: "Computing status and health scores..." }));
-    });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let completed = false;
 
-    eventSource.addEventListener("derive_complete", () => {
-      setState((s) => ({ ...s, phase: "Storing results..." }));
-    });
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-    eventSource.addEventListener("project_start", (e) => {
-      const data: RefreshEvent = JSON.parse(e.data);
-      setState((s) => {
-        const projects = new Map(s.projects);
-        const existing = projects.get(data.name!) ?? {
-          name: data.name!,
-          storeStatus: "pending" as const,
-          llmStatus: "pending" as const,
-        };
+          // Process complete SSE frames (delimited by \n\n)
+          const frames = parseSSE(buffer);
+          // Keep any trailing incomplete frame in the buffer
+          const lastDoubleNewline = buffer.lastIndexOf("\n\n");
+          buffer = lastDoubleNewline >= 0 ? buffer.slice(lastDoubleNewline + 2) : buffer;
 
-        if (data.step === "store") {
-          existing.storeStatus = "running";
-        } else if (data.step === "llm") {
-          existing.llmStatus = "running";
-        }
-
-        projects.set(data.name!, existing);
-        const phase = data.step === "llm"
-          ? `Enriching ${data.name} (${data.index! + 1}/${data.total})`
-          : `Processing ${data.name} (${data.index! + 1}/${data.total})`;
-        return { ...s, projects, phase };
-      });
-    });
-
-    eventSource.addEventListener("project_complete", (e) => {
-      const data: RefreshEvent = JSON.parse(e.data);
-      setState((s) => {
-        const projects = new Map(s.projects);
-        const existing = projects.get(data.name!);
-        if (existing) {
-          if (data.step === "store") {
-            existing.storeStatus = "done";
-            existing.detail = data.detail;
-          } else if (data.step === "llm") {
-            existing.llmStatus = "done";
-            if (data.detail) existing.detail = { ...existing.detail, ...data.detail };
+          for (const frame of frames) {
+            try {
+              handleEvent(frame.type, frame.data);
+            } catch {
+              // Ignore malformed SSE frames
+            }
+            if (frame.type === "done") completed = true;
           }
-          projects.set(data.name!, existing);
         }
-        return { ...s, projects };
-      });
-    });
-
-    eventSource.addEventListener("project_error", (e) => {
-      const data: RefreshEvent = JSON.parse(e.data);
-      setState((s) => {
-        const projects = new Map(s.projects);
-        const existing = projects.get(data.name!);
-        if (existing) {
-          existing.llmStatus = "error";
-          existing.llmError = data.error;
-          projects.set(data.name!, existing);
-        }
-        return { ...s, projects };
-      });
-    });
-
-    eventSource.addEventListener("done", (e) => {
-      const data: RefreshEvent = JSON.parse(e.data);
-      setState((s) => ({ ...s, active: false, phase: "Complete", summary: data }));
-      eventSource.close();
-      onComplete();
-    });
-
-    eventSource.addEventListener("pipeline_error", (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      setState((s) => ({ ...s, active: false, phase: "Error", error: data.error }));
-      eventSource.close();
-    });
-
-    eventSource.addEventListener("error", () => {
-      // Native SSE error — network disconnect or stream closed
-      if (eventSource.readyState === EventSource.CLOSED) {
+      } catch {
+        if (abort.signal.aborted) return;
         setState((s) => {
-          if (s.summary) return s; // Already completed normally
+          if (s.summary) return s;
           return { ...s, active: false, phase: "Error", error: "Connection lost" };
         });
+        return;
       }
-    });
+
+      if (completed) {
+        onComplete();
+      }
+    })();
 
     // Cleanup on abort
     abort.signal.addEventListener("abort", () => {
-      eventSource.close();
       setState((s) => ({ ...s, active: false, phase: "Cancelled" }));
     });
-  }, [state.active, onComplete]);
+  }, [state.active, onComplete, handleEvent]);
 
-  // Cleanup on unmount — close any open EventSource
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
@@ -181,9 +236,5 @@ export function useRefresh(onComplete: () => void) {
     abortRef.current?.abort();
   }, []);
 
-  const dismiss = useCallback(() => {
-    setState(INITIAL_STATE);
-  }, []);
-
-  return { state, start, cancel, dismiss };
+  return { state, start, cancel };
 }

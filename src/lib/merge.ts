@@ -1,7 +1,6 @@
 import { db } from "./db";
 import { config } from "./config";
 import type { Project } from "@/generated/prisma/client";
-import type { AiInsight } from "./llm/provider";
 import type { RawScan } from "./types";
 
 /**
@@ -19,11 +18,16 @@ export interface MergedProject {
   hygieneScore: number;
   momentumScore: number;
   scoreBreakdown: Record<string, Record<string, number>>;
-  purpose: string | null;
+  summary: string | null;
   tags: string[];
-  notableFeatures: string[];
   recommendations: string[];
   notes: string | null;
+
+  // Phase 53W: LLM actionable fields
+  nextAction: string | null;
+  llmStatus: string | null;
+  statusReason: string | null;
+  risks: string[];
 
   // Promoted derived columns
   isDirty: boolean;
@@ -54,13 +58,10 @@ export interface MergedProject {
   goal: string | null;
   audience: string | null;
   successMetrics: string | null;
-  nextAction: string | null;
   publishTarget: string | null;
 
-  // AI structured insight
-  aiInsight: AiInsight | null;
-
-  // New Phase 29 fields
+  // Legacy fields (kept for backward compat)
+  notableFeatures: string[];
   pitch: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;
@@ -89,26 +90,9 @@ export function parseJson<T>(json: string | null | undefined, fallback: T): T {
   }
 }
 
-const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
-
-export function parseAiInsightJson(json: string | null | undefined): AiInsight | null {
-  if (!json) return null;
-  try {
-    const obj = JSON.parse(json);
-    if (!obj || typeof obj !== "object") return null;
-    if (typeof obj.score !== "number" || !VALID_CONFIDENCE.has(obj.confidence)) return null;
-    if (!Array.isArray(obj.reasons) || typeof obj.nextBestAction !== "string") return null;
-    return obj as AiInsight;
-  } catch {
-    return null;
-  }
-}
-
 export function sanitizePath(pathDisplay: string): string {
   if (!config.sanitizePaths) return pathDisplay;
-  // Replace home directory with ~
   const parts = pathDisplay.split("/");
-  // Show only last 2 segments: ~/parent/project
   if (parts.length > 2) {
     return "~/" + parts.slice(-2).join("/");
   }
@@ -153,10 +137,17 @@ export type ProjectWithRelations = Project & {
     locEstimate: number;
   } | null;
   llm: {
-    purpose: string | null;
+    // New fields
+    summary: string | null;
+    nextAction: string | null;
+    llmStatus: string | null;
+    statusReason: string | null;
+    risksJson: string | null;
     tagsJson: string | null;
-    notableFeaturesJson: string | null;
     recommendationsJson: string | null;
+    // Legacy fields
+    purpose: string | null;
+    notableFeaturesJson: string | null;
     pitch: string | null;
     aiInsightJson: string | null;
     generatedAt: Date;
@@ -202,8 +193,10 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   const momentumScore = derived?.momentumScoreAuto ?? 0;
   const scoreBreakdown = parseJson<Record<string, Record<string, number>>>(derived?.scoreBreakdownJson, {});
 
-  const purpose =
+  // Fallback chain: summary (new) > purpose (legacy) > scan description
+  const summary =
     override?.purposeOverride ??
+    llm?.summary ??
     llm?.purpose ??
     rawScan?.description ??
     null;
@@ -217,6 +210,12 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   const recommendations = parseJson<string[]>(llm?.recommendationsJson, []);
   const notes = override?.notesOverride ?? null;
 
+  // Phase 53W: actionable fields with metadata override priority
+  const nextAction = metadata?.nextAction ?? llm?.nextAction ?? null;
+  const llmStatus = llm?.llmStatus ?? null;
+  const statusReason = llm?.statusReason ?? null;
+  const risks = parseJson<string[]>(llm?.risksJson, []);
+
   return {
     id: project.id,
     name: project.name,
@@ -227,11 +226,15 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     hygieneScore,
     momentumScore,
     scoreBreakdown,
-    purpose,
+    summary,
     tags,
-    notableFeatures,
     recommendations,
     notes,
+
+    nextAction,
+    llmStatus,
+    statusReason,
+    risks,
 
     // Promoted derived columns
     isDirty: derived?.isDirty ?? rawScan?.isDirty ?? false,
@@ -260,11 +263,9 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     goal: metadata?.goal ?? null,
     audience: metadata?.audience ?? null,
     successMetrics: metadata?.successMetrics ?? null,
-    nextAction: metadata?.nextAction ?? null,
     publishTarget: metadata?.publishTarget ?? null,
 
-    aiInsight: parseAiInsightJson(llm?.aiInsightJson),
-
+    notableFeatures,
     pitch: llm?.pitch ?? null,
     liveUrl: rawScan?.liveUrl ?? null,
     llmGeneratedAt: llm?.generatedAt?.toISOString() ?? null,

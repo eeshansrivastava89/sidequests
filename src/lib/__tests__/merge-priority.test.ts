@@ -71,18 +71,18 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
       locEstimate: 5000,
     },
     llm: {
-      purpose: "LLM purpose",
+      summary: "LLM summary",
+      nextAction: "Add tests",
+      llmStatus: "building",
+      statusReason: "Active development",
+      risksJson: JSON.stringify(["No tests"]),
       tagsJson: JSON.stringify(["typescript", "next", "fullstack"]),
-      notableFeaturesJson: JSON.stringify(["SSR", "API routes"]),
       recommendationsJson: JSON.stringify(["Add tests"]),
+      // Legacy
+      purpose: "LLM purpose",
+      notableFeaturesJson: JSON.stringify(["SSR", "API routes"]),
       pitch: "A great project",
-      aiInsightJson: JSON.stringify({
-        score: 80,
-        confidence: "high",
-        reasons: ["Good structure"],
-        risks: ["No tests"],
-        nextBestAction: "Add tests",
-      }),
+      aiInsightJson: null,
       generatedAt: now,
     },
     override: null,
@@ -126,28 +126,39 @@ describe("buildMergedView — priority logic", () => {
     expect(merged.status).toBe("archived");
   });
 
-  it("override.purposeOverride wins over llm.purpose", () => {
+  it("override.purposeOverride wins over llm.summary", () => {
     const fixture = makeFixture({
       override: {
         statusOverride: null,
-        purposeOverride: "Override purpose",
+        purposeOverride: "Override summary",
         tagsOverride: null,
         notesOverride: null,
       },
     });
     const merged = buildMergedView(fixture);
-    expect(merged.purpose).toBe("Override purpose");
+    expect(merged.summary).toBe("Override summary");
   });
 
-  it("llm.purpose wins over scan description when no override", () => {
+  it("llm.summary wins over llm.purpose (legacy) when no override", () => {
     const merged = buildMergedView(makeFixture());
-    expect(merged.purpose).toBe("LLM purpose");
+    expect(merged.summary).toBe("LLM summary");
+  });
+
+  it("llm.purpose (legacy) used as fallback when no summary", () => {
+    const fixture = makeFixture({
+      llm: {
+        ...makeFixture().llm!,
+        summary: null,
+      },
+    });
+    const merged = buildMergedView(fixture);
+    expect(merged.summary).toBe("LLM purpose");
   });
 
   it("scan description used when no override and no llm", () => {
     const fixture = makeFixture({ llm: null });
     const merged = buildMergedView(fixture);
-    expect(merged.purpose).toBe("Scan description");
+    expect(merged.summary).toBe("Scan description");
   });
 
   it("override tags win over llm tags", () => {
@@ -205,7 +216,7 @@ describe("buildMergedView — priority logic", () => {
     });
     const merged = buildMergedView(fixture);
     expect(merged.status).toBe("active"); // from derived
-    expect(merged.purpose).toBe("Scan description"); // from scan
+    expect(merged.summary).toBe("Scan description"); // from scan
     expect(merged.tags).toEqual(["typescript", "next"]); // from derived
     expect(merged.goal).toBeNull();
     expect(merged.nextAction).toBeNull();

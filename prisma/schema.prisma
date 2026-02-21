@@ -59,10 +59,17 @@ model Llm {
   id                     String    @id @default(cuid())
   projectId              String    @unique
   project                Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  purpose                String?
+  // Phase 53W: new actionable fields
+  summary                String?
+  nextAction             String?
+  llmStatus              String?   // LlmStatus: building|shipping|maintaining|blocked|stale|idea
+  statusReason           String?
+  risksJson              String?   // JSON array of risk strings
   tagsJson               String?   // JSON array
-  notableFeaturesJson    String?   // JSON array
   recommendationsJson    String?   // JSON array
+  // Deprecated (kept for rollback safety)
+  purpose                String?
+  notableFeaturesJson    String?   // JSON array
   pitch                  String?
   aiInsightJson          String?   // JSON: { score, confidence, reasons, risks, nextBestAction }
   aiInsightGeneratedAt   DateTime?

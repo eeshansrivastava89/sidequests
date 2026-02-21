@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppConfig } from "@/hooks/use-config";
-import type { RefreshState, RefreshMode } from "@/hooks/use-refresh";
+import type { RefreshState } from "@/hooks/use-refresh";
 import { Field, ProviderFields } from "@/components/settings-fields";
 import { toast } from "sonner";
 
@@ -20,7 +20,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   config: AppConfig;
   onSaved: () => void;
-  onStartScan: (mode: RefreshMode) => void;
+  onStartScan: () => void;
   scanState: RefreshState;
 }
 
@@ -125,7 +125,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
 
   const handleStartScan = () => {
     setScanStarted(true);
-    onStartScan("scan");
+    onStartScan();
   };
 
   const handleComplete = async () => {

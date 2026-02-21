@@ -1,11 +1,3 @@
-export interface AiInsight {
-  score: number;
-  confidence: "low" | "medium" | "high";
-  reasons: string[];
-  risks: string[];
-  nextBestAction: string;
-}
-
 /** Client-side mirror of MergedProject from the API. */
 export interface Project {
   id: string;
@@ -16,11 +8,16 @@ export interface Project {
   hygieneScore: number;
   momentumScore: number;
   scoreBreakdown: Record<string, Record<string, number>>;
-  purpose: string | null;
+  summary: string | null;
   tags: string[];
-  notableFeatures: string[];
   recommendations: string[];
   notes: string | null;
+
+  // Phase 53W: LLM actionable fields
+  nextAction: string | null;
+  llmStatus: string | null;
+  statusReason: string | null;
+  risks: string[];
 
   // Promoted derived columns
   isDirty: boolean;
@@ -49,13 +46,12 @@ export interface Project {
   goal: string | null;
   audience: string | null;
   successMetrics: string | null;
-  nextAction: string | null;
   publishTarget: string | null;
-  aiInsight: AiInsight | null;
   lastScanned: string | null;
   updatedAt: string;
 
-  // Phase 29: new fields
+  // Legacy fields (kept for backward compat)
+  notableFeatures: string[];
   pitch: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;

@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
-import { useRefresh, type RefreshMode } from "@/hooks/use-refresh";
+import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import type { Project, WorkflowView, SortKey } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDrawer } from "@/components/project-drawer";
-import { RefreshPanel } from "@/components/refresh-panel";
+
 import { SettingsModal } from "@/components/settings-modal";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { MethodologyModal } from "@/components/methodology-modal";
@@ -89,7 +89,7 @@ function filterBySearch(projects: Project[], query: string): Project[] {
       p.name.toLowerCase().includes(q) ||
       p.status.toLowerCase().includes(q) ||
       p.tags.some((t) => t.toLowerCase().includes(q)) ||
-      p.purpose?.toLowerCase().includes(q) ||
+      p.summary?.toLowerCase().includes(q) ||
       p.scan?.languages?.primary?.toLowerCase().includes(q)
   );
 }
@@ -156,10 +156,11 @@ export default function DashboardPage() {
         toast.error(s.error);
       } else if (s.summary) {
         const count = s.summary.projectCount ?? 0;
-        if (s.mode === "enrich") {
-          toast.success(`Enriched ${s.summary.llmSucceeded ?? 0} of ${count} projects`);
+        const llmOk = s.summary.llmSucceeded ?? 0;
+        if (llmOk > 0) {
+          toast.success(`Refreshed ${count} projects, enriched ${llmOk}`);
         } else {
-          toast.success(`Found ${count} projects`);
+          toast.success(`Refreshed ${count} projects`);
         }
       }
     }
@@ -172,9 +173,9 @@ export default function DashboardPage() {
   }, []);
 
 
-  const handleRefresh = useCallback((mode: RefreshMode) => {
+  const handleRefresh = useCallback(() => {
     deltaHook.snapshot();
-    refreshHook.start(mode);
+    refreshHook.start();
   }, [deltaHook, refreshHook]);
 
   const handleSortChange = useCallback((key: SortKey) => {
@@ -241,7 +242,7 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={() => handleRefresh("scan")}>Retry</Button>
+        <Button onClick={() => handleRefresh()}>Retry</Button>
       </div>
     );
   }
@@ -261,41 +262,26 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-center gap-2">
               {refreshHook.state.active ? (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={refreshHook.cancel}
-                >
-                  Cancel
-                </Button>
-              ) : (
                 <>
+                  <span className="text-xs text-muted-foreground max-w-[200px] truncate">
+                    {refreshHook.state.phase}
+                  </span>
                   <Button
                     size="sm"
-                    variant="outline"
-                    onClick={() => handleRefresh("scan")}
+                    variant="destructive"
+                    onClick={refreshHook.cancel}
                   >
-                    Scan
+                    Cancel
                   </Button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 h-8 px-3 text-sm font-medium rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all active:scale-[0.97] shadow-sm"
-                    onClick={() => {
-                      if (!config.llmProvider || config.llmProvider === "none") {
-                        setSettingsOpen(true);
-                      } else {
-                        handleRefresh("enrich");
-                      }
-                    }}
-                    title={!config.llmProvider || config.llmProvider === "none" ? "Configure an LLM provider in Settings first" : undefined}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0">
-                      <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
-                      <path d="M11 2l.5 1.2L12.7 3.7l-1.2.5L11 5.4l-.5-1.2-1.2-.5 1.2-.5L11 2z" fill="currentColor" opacity="0.6" />
-                    </svg>
-                    Enrich with AI
-                  </button>
                 </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRefresh()}
+                >
+                  Refresh
+                </Button>
               )}
               <Button
                 size="sm"
@@ -327,13 +313,6 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <RefreshPanel
-          state={refreshHook.state}
-          onDismiss={refreshHook.dismiss}
-          deltaSummary={deltaHook.deltas?.causeSummary}
-          projectDeltas={deltaHook.deltas?.projects}
-        />
-
         <StatsBar projects={projects} deltas={deltaHook.deltas} />
 
         {/* Filter tabs + Sort + Search */}
@@ -445,7 +424,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium">Run a Scan</p>
                   <p className="text-xs text-muted-foreground mb-1.5">Discover all git projects in your dev root</p>
-                  <Button size="sm" onClick={() => handleRefresh("scan")}>
+                  <Button size="sm" onClick={() => handleRefresh()}>
                     Scan Now
                   </Button>
                 </div>
@@ -474,6 +453,7 @@ export default function DashboardPage() {
                   sanitizePaths={config.sanitizePaths}
                   deltas={deltaHook.deltas}
                   view={view}
+                  refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                 />
               </div>
             )}
@@ -493,6 +473,7 @@ export default function DashboardPage() {
                   sanitizePaths={config.sanitizePaths}
                   deltas={deltaHook.deltas}
                   view={view}
+                  refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                 />
               </div>
             )}

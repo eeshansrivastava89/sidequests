@@ -1,238 +1,179 @@
-# Projects Dashboard v2 - Implementation Plan
+# Sidequests — Implementation Plan
 
-This plan is the execution map from the current codebase to a web-first distribution model that runs through a single NPX command.
+## Status (2026-02-21)
 
-## Status (2026-02-20)
+- [Completed] v1 delivery (Phases 0-51W): infrastructure, scan pipeline, NPX distribution, first publish
+- [Completed] Phase 52W: GitHub data collection (#001→#002)
+- [Completed] Phase 53W: LLM prompt redesign (#003→#004)
+- [Active] Phase 54W: Unified scan UX — next up
 
-- [Completed] Historical delivery (Phases 0-40): completed
-- [Completed] Runtime and pipeline foundation (Phases 41-44): completed
-- [Completed] Safety and onboarding baseline (Phases 45-46): completed
-- [Superseded] Desktop-first release track (legacy Phases 47-50): replaced by NPX/web pivot
-- [Completed] Direction lock + docs realignment (Phase 47W): all deliverables checked
-- [Completed] CLI launcher + NPX bootstrap (Phase 48W): all deliverables checked, approved in #008
-- [Completed] QA/CI for web + CLI distribution (Phase 49W): approved in #010
-- [Completed] Electron deprecation + release transition (Phase 50W)
-- [Completed] Prisma 7 hashed client packaging fix (#023-#026)
-- [Completed] FEATURE_LLM deprecation (#027-#028): LLM enrichment always-on, gated by provider config
-- [Completed] Pre-publish polish (Phase 51W): toast system, attention UX, package rename, error handling
+## v0.2 Vision
 
-## Pivot Summary
+Transform Sidequests from an observation dashboard into a hands-off action recommender. LLM enrichment becomes the core value prop. GitHub state (issues, PRs, CI) is integrated. The UI shows what to DO, not what to SCORE.
 
-The repository now has TS-native scan/derive, stable API routes, and onboarding UX that do not require Electron-specific runtime behavior. The remaining work is to ship and support the product as:
+Design principles:
+1. LLM enrichment is the product — not optional, not secondary
+2. Single view, single Refresh button — one page, one action
+3. Hands-off — system figures everything out from code, git, GitHub, and LLM
+4. Show actions, not metrics — replace scores with verbs
 
-1. web server runtime
-2. CLI launcher
-3. single command entrypoint (`npx ...`)
+---
 
-## Carry-Forward Assets (Keep)
+## Phase 52W — GitHub Data Collection ✓
 
-- Runtime boundary hardening (`APP_DATA_DIR`, settings/db path decoupling)
-- TS-native scan/derive pipeline and parity fixtures
-- Safety controls (`SANITIZE_PATHS`, `LLM_ALLOW_UNSAFE`)
-- First-run onboarding wizard and diagnostics checks
-- Setup bootstrap script and clean-clone validation flow
+**What:** Add read-only GitHub state to each project via `gh` CLI.
+**Status:** Complete (reviewed #001→#002, approved 2026-02-21)
 
-## Deprecation Scope (Planned)
+**Deliverables:**
+- [x] New `src/lib/pipeline-native/github.ts` — fetches issues, PRs, CI status per project
+- [x] New `GitHub` Prisma model (openIssues, openPrs, ciStatus, issuesJson, prsJson, repoVisibility)
+- [x] Runtime migration via bootstrap-db.mjs (no Prisma migration file needed)
+- [x] Preflight check for `gh` CLI auth status
+- [x] Graceful fallback when no remote URL or `gh` not available
+- [x] 18 unit tests for GitHub data collection
 
-- `desktop/` main-process shell and preload bridge
-- Desktop packaging lane (`electron-builder.yml`, entitlements path, DMG workflow assumptions)
-- Electron-specific smoke coverage and update plumbing
-- Electron dependencies (`electron`, `electron-builder`, `electron-updater`)
+## Phase 53W — LLM Prompt Redesign ✓
 
-## Web/NPX Roadmap
+**What:** Redesign LLM input/output to produce actionable next steps instead of abstract analysis.
+**Status:** Complete (reviewed #003→#004, approved 2026-02-21)
 
-## Phase 47W - Direction Lock + Docs Realignment
+**Deliverables:**
+- [x] Richer LLM input: scan data + GitHub state + previous analysis
+- [x] New output schema: `nextAction`, `status` (building/shipping/maintaining/blocked/stale/idea), `statusReason`, `risks[]`, `summary`, `tags[]`, `recommendations[]`
+- [x] Deprecated from output: `pitch`, `aiInsight` (score/confidence), `purpose` (kept in schema for rollback)
+- [x] Stopped populating: `goal`, `audience`, `successMetrics`, `publishTarget` (metadata write removed from pipeline)
+- [x] Updated `LlmEnrichment` interface in `provider.ts`
+- [x] Updated Llm Prisma model (5 new columns, old columns kept as deprecated)
+- [x] Updated `merge.ts` merge logic (summary fallback chain, metadata.nextAction > llm.nextAction)
+- [x] Rewrote prompt in `prompt.ts` with GitHub-aware context
+- [x] 15 unit tests for new prompt parsing + buildPrompt
 
-What:
-- Formally lock the distribution pivot to web/CLI NPX
-- Align architecture and plan docs to current runtime truth
+## Phase 54W — Unified Scan UX
 
-Deliverables:
-- [x] Mark legacy desktop phases as historical/superseded in plan docs
-- [x] Update architecture docs to TS-native scan/derive (remove Python-runtime wording)
-- [x] Document explicit security tradeoff: keychain storage (desktop) vs `.env.local` (web/CLI)
-- [x] Define NPX versioning policy (`@latest` default guidance + pinned-version guidance)
+**What:** Merge Scan + Enrich into a single "Refresh" action with per-row progress.
 
-Exit Criteria:
-- no conflicting "desktop is default" language in core internal docs
-- pivot decision is explicit and reviewable from docs alone
+**Deliverables:**
+- [ ] Single "Refresh" button replaces Scan + Enrich buttons
+- [ ] Unified pipeline: fast scan → GitHub sync → stream results → LLM enrichment in background
+- [ ] **Server-side pipeline mutex:** module-level lock in `/api/refresh/stream` — if a pipeline is already running, reject with 409 (or abort the old one). Prevents duplicate LLM calls from rapid clicks, tab refreshes, or reconnects. ~10 lines, no external deps.
+- [ ] Per-row progress indicators (spinner during scan, sparkle during LLM enrichment)
+- [ ] Rows update in-place as each project completes (no overlay list)
+- [ ] Toast when all enrichment done, auto-dismiss progress
+- [ ] Update `pipeline.ts` orchestration
+- [ ] Update `/api/refresh/stream` SSE route
+- [ ] Remove `refresh-panel.tsx` overlay
 
-## Phase 48W - CLI Launcher + NPX Bootstrap
+**Exit criteria:** One click does everything. Fast scan results appear in ~10s. LLM enrichment streams in background. No ugly progress list. Concurrent requests are rejected server-side — only one pipeline runs at a time.
 
-What:
-- Provide a published CLI entrypoint that starts the app with one command
+## Phase 55W — Project List Row Redesign
 
-How:
-- add `bin` entry and launcher command (`projects-dashboard`)
-- run prerequisite checks (Node, git)
-- bootstrap first-run state (env + settings + db)
-- start server on free port and open default browser
-- support clean shutdown via SIGINT/SIGTERM
+**What:** Replace metric-heavy rows with two-line actionable layout.
 
-Deliverables:
-- [x] `bin/` CLI with start command path suitable for NPX execution
-- [x] runtime-safe DB bootstrap strategy for NPX users (no hidden dev-only assumptions)
-- [x] browser auto-open behavior with opt-out flag
-- [x] command help and troubleshooting output for common failures
-- [x] package naming decided (`@eeshans/sidequests`)
+**New row format:**
+```
+Line 1: [status dot] [name] [language] [git badges] [quick actions]
+Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
+```
 
-Exit Criteria:
-- user can run `npx <package>@latest` and reach dashboard in one session
-- first-run bootstrap succeeds on clean machine with documented prerequisites
+**Deliverables:**
+- [ ] Redesign `project-list.tsx` with two-line row layout
+- [ ] LLM next action as primary second-line text
+- [ ] GitHub badges: issue count, PR count, CI status (✓/✗/○)
+- [ ] Remove: hygiene column, momentum column, LOC column, days inactive column
+- [ ] Keep: status dot (color from LLM status), name, language, git badges, quick actions
+- [ ] Update `MergedProject` type in `types.ts`
+- [ ] Responsive breakpoints for new layout
 
-## Phase 49W - QA/CI for Web + CLI Distribution
+**Exit criteria:** Every project row shows what to DO next. GitHub state visible at a glance. No abstract scores on the list view.
 
-What:
-- replace desktop QA gates with web/CLI gates
+## Phase 56W — Stats Cards + Header Redesign
 
-Coverage targets:
-- CLI launch and graceful termination
-- first-run bootstrap behavior
-- scan-only and enrich flows in web runtime
-- settings persistence and secret handling expectations
-- cross-platform smoke checks (macOS/Linux minimum)
+**What:** Replace abstract stats with actionable signals.
 
-Deliverables:
-- [x] CI job for CLI launch smoke and API readiness checks (`.github/workflows/ci.yml`)
-- [x] Bootstrap schema parity test (`bin/__tests__/bootstrap-db.test.ts` — 5 PRAGMA-based tests)
-- [x] CLI helpers extraction + smoke tests (`bin/cli-helpers.mjs`, `bin/__tests__/cli-helpers.test.ts` — 16 tests)
-- [x] Local validation gate (`validate:source-web` includes lint, test, integration, build:npx, privacy)
-- [ ] clean-clone validation for NPX invocation path (partial — CI covers `npm ci` + full pipeline; `npm pack` + `npx` deferred to 50W)
-- [ ] release-candidate signoff table for web/CLI acceptance criteria (deferred to 50W)
+**New cards:**
+| Card | Signal |
+|------|--------|
+| Projects | Total count |
+| Uncommitted | Dirty working trees |
+| Open Issues | Total across all GitHub repos |
+| CI Failing | Projects with failing CI |
+| Not on GitHub | Projects missing a remote |
 
-Exit Criteria:
-- deterministic CLI/web smoke suite passes in CI ✓
-- release candidate is signable without Electron-only checks ✓ (CI pipeline has no Electron dependencies)
+**Deliverables:**
+- [ ] Update `stats-bar.tsx` with new card definitions
+- [ ] Cards are clickable — filter project list to matching projects
+- [ ] Remove "Scoring Methodology" button from header
+- [ ] Remove `methodology-modal.tsx`
 
-## Phase 50W - Electron Deprecation + Release Transition
+**Exit criteria:** Stats cards reflect signals the user actually acts on. Clicking a card filters the list.
 
-What:
-- finalize migration from desktop-first repo shape to web/CLI release shape
+## Phase 57W — Project Drawer Cleanup
 
-How:
-- remove or archive Electron runtime code
-- prune Electron dependencies and scripts
-- publish migration guidance for existing desktop users
-- run final privacy gate against web/CLI artifacts
+**What:** Simplify drawer to match new data model.
 
-Deliverables:
-- [x] desktop runtime either removed from mainline or moved to archived branch/tag
-- [x] package scripts and dependencies reflect web/CLI source of truth
-- [ ] migration notes published (desktop users -> web/CLI path)
-- [x] final privacy/artifact gate passes for release bundle
+**Deliverables:**
+- [ ] **Summary** section: LLM summary (replaces Pitch)
+- [ ] **Next Action + Risks** section: prominent, highlighted
+- [ ] **GitHub** section: open issues list, open PRs list, CI status
+- [ ] **Details** section: framework, languages, services, LOC (compact)
+- [ ] **Timeline**: simplify to git commits + enrichment events
+- [ ] Remove: hygiene/momentum score display, AI Insight section, metadata fields (goal/audience/successMetrics)
+- [ ] Update `project-drawer.tsx`
 
-Exit Criteria:
-- main branch has no active Electron release dependency
-- OSS onboarding path is one-command NPX plus optional source dev workflow
+**Exit criteria:** Drawer shows actionable info. No abstract scores. GitHub state integrated.
 
-## Phase 51W - Pre-Publish Polish
+---
 
-What:
-- Final UX and packaging fixes before first `npm publish` of `@eeshans/sidequests`
+## Implementation Order
 
-Deliverables:
-- [x] Prisma 7 hashed client packaging fix (#023-#026)
-- [x] @libsql/client hashed package + transitive deps fix (#024-#026)
-- [x] Packaging smoke test (build → pack → install → start → preflight + DB endpoint)
-- [x] FEATURE_LLM toggle removed (#027-#028) — LLM enrichment always-on, gated by provider
-- [x] "Enrich with AI" button opens Settings when no provider configured
-- [x] Toast notification system — Sonner, scan/enrich completion, status override (#030)
-- [x] Attention reasons fully expanded in project drawer (#030)
-- [x] Package name updated to `@eeshans/sidequests` across all refs (#030)
-- [x] Scan error messages wrapped in user-friendly text with collapsible details (#030)
-- [x] Preflight "Re-check" button in settings modal (#030)
-- [x] Provider-specific help hints in preflight results (#030)
-
-Exit Criteria:
-- `npm pack` + install in clean dir + `npx @eeshans/sidequests` → dashboard loads, scan works, enrich button guides to config
-- All user actions have visible feedback (toast or inline)
-- 0 silent failures in the happy path
-
-## Prisma Bootstrap Strategy (Decision Gate)
-
-NPX distribution must not assume dev-only tooling is available at runtime. The current `setup.mjs` calls `npx prisma generate` and `npx prisma db push`, which rely on `prisma` being installed (currently a devDependency).
-
-### Options
-
-| Option | How | Pros | Cons |
-|---|---|---|---|
-| **A. Ship pre-generated client + use `@prisma/client` migrations API** | Run `prisma generate` at build/publish time. At runtime, use `@prisma/client` programmatic API or raw SQL to ensure schema exists. | No Prisma CLI needed at runtime. Smallest published package. | Requires a runtime migration shim (one-time `CREATE TABLE IF NOT EXISTS` for 7 tables). |
-| **B. Move `prisma` to production dependencies** | Add `prisma` to `dependencies` (not just `devDependencies`). Keep current `npx prisma generate` + `npx prisma db push` flow. | Minimal code changes. Current setup.mjs works as-is. | Adds ~15MB to published package. `prisma generate` runs a binary download on first use. |
-| **C. Bundle Prisma engines in published package** | Use `prisma generate` at publish time and include the query engine binary in `files`. Ship without the CLI. | Pre-built, no network fetch at runtime. | Platform-specific engine binaries increase package size per target OS. |
-
-### Recommended Path
-
-**Option A** (ship pre-generated client + runtime schema check). Rationale:
-
-- The schema is stable (7 models, SQLite). A lightweight `CREATE TABLE IF NOT EXISTS` migration script is trivial and deterministic.
-- Eliminates Prisma CLI as a runtime dependency entirely.
-- Keeps the published package small and portable.
-- `prisma generate` runs once at publish/build time, producing the client in `node_modules/.prisma/client/` which gets bundled in the standalone output.
-
-Implemented in Phase 48W (`bin/bootstrap-db.mjs` — `CREATE TABLE IF NOT EXISTS` for all 7 models using `@libsql/client`).
-
-## Publish Strategy (Decided)
-
-- **Package name:** `@eeshans/sidequests`
-- **Binary name:** `sidequests`
-- **Install/run:** `npx @eeshans/sidequests` (or `npx @eeshans/sidequests@latest`)
-- **Registry:** npmjs (default)
-- **Versioning:** semver, starting at `0.1.0`
-
-## Legacy Branch Strategy
-
-To keep rollback safety while simplifying mainline:
-
-- create and retain a desktop snapshot tag before deprecation cut
-- preserve Electron artifacts/history in git, not in active runtime path
-- document support policy (desktop lane frozen, web/CLI lane active)
-
-## Visual Execution Map
+Phases 52W + 53W can run in parallel (both backend, no UI changes).
+Phases 54W-57W are sequential (each builds on previous).
 
 ```mermaid
 flowchart LR
-  A[Phases 0-46 Completed] --> B[47W Direction Lock]
-  B --> C[48W CLI + NPX Bootstrap]
-  C --> D[49W Web/CLI QA Gate]
-  D --> E[50W Electron Deprecation]
-  E --> F[51W Pre-Publish Polish]
-  F --> G[npm publish @eeshans/sidequests]
+  A[52W GitHub Data] --> C[54W Unified Scan]
+  B[53W LLM Prompt] --> C
+  C --> D[55W Row Redesign]
+  D --> E[56W Stats Cards]
+  E --> F[57W Drawer Cleanup]
+  F --> G[v0.2 Release]
 ```
 
-## Schedule Model
+## Verification (v0.2)
 
-- Aggressive track: ~2-3 weeks for docs + CLI + smoke gating
-- Conservative track: ~4-5 weeks including migration hardening and cross-platform issues
-- Timeline risk drivers: NPX bootstrap details, publish naming availability, and CI matrix reliability
+1. `npm test` — all tests pass
+2. `npm run test:integration` — integration tests pass
+3. `npm run check:privacy` — privacy gate passes
+4. Manual: `npm run dev` → click Refresh → fast scan results appear → GitHub data appears → LLM enrichment streams per-row → new row layout → drawer sections → stats cards filter
+5. `npm run build:npx` → `npx @eeshans/sidequests` from clean dir works
+6. User path demo: open dashboard → read one project row → know what to do next in <10s
 
-## Acceptance Criteria (Current Pivot)
+---
 
-### Product
-- dashboard behavior remains functionally equivalent to current API/UI semantics
-- merge/scoring semantics unchanged unless explicitly versioned
+<details>
+<summary>Historical: v1 Implementation (Phases 0-51W)</summary>
 
-### Onboarding
-- first external user can launch with one NPX command and complete first scan in one session
-- diagnostics and remediation remain visible in product
+**Completed phases:**
+- Phases 0-40: Initial development (scan pipeline, Prisma storage, UI, LLM providers)
+- Phases 41-44: Runtime and pipeline foundation
+- Phases 45-46: Safety and onboarding baseline
+- Phase 47W: NPX pivot direction lock + docs realignment
+- Phase 48W: CLI launcher + NPX bootstrap (`bin/cli.mjs`, `bin/cli-helpers.mjs`)
+- Phase 49W: Web/CLI QA gate (CI, bootstrap tests, CLI helper tests)
+- Phase 50W: Electron deprecation + release transition
+- Phase 51W: Pre-publish polish (toast system, attention UX, package rename to `@eeshans/sidequests`, model selection, preflight improvements)
 
-### Security
-- secrets handling posture is explicitly documented for web/CLI mode
-- unsafe provider execution remains explicit opt-in
+**Post-51W fixes (pre-publish):**
+- Prisma 7 hashed client packaging fix (#023-#026)
+- FEATURE_LLM removal (#027-#028)
+- Platform-aware build script (`scripts/build-npx.mjs`)
+- OIDC trusted publishing workflow
+- Privacy/security hardening (tarball content gate, build-path scrubbing)
+- Data directory renamed to `~/.sidequests`
+- CI + Publish merged into single workflow
 
-### Distribution
-- NPX/web launch path is reproducible from clean clone and from published package
-- versioning/update semantics are explicit (`@latest` vs pinned)
-
-### OSS Readiness
-- docs are accurate, minimal, and testable from clean checkout
-- contribution flow is web/CLI aligned with no desktop-only blockers
-
-## Checkpoint Reviews
-
-- Checkpoint A: after Phase 47W (direction lock + docs alignment) ✓
-- Checkpoint B: after Phase 48W (CLI bootstrap working) ✓
-- Checkpoint C: after Phase 49W (web/CLI quality gate green) ✓
-- Checkpoint D: after Phase 50W (Electron deprecation finalized) ✓
-- Checkpoint E: after Phase 51W (pre-publish polish + manual browser test)
-
-At each checkpoint, run a user-path demo: `npx @eeshans/sidequests -> configure -> scan -> enrich` and capture regressions before advancing.
+**Key decisions:**
+- Prisma bootstrap: Option A (pre-generated client + runtime CREATE TABLE IF NOT EXISTS)
+- Distribution: npm with OIDC trusted publishing + provenance
+- Release flow: `npm version patch && git push --tags`
+</details>

@@ -75,6 +75,14 @@ interface StoredProject {
   scanned: Record<string, unknown>;
   derived: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] } | undefined;
   path: string;
+  github?: {
+    openIssues: number;
+    openPrs: number;
+    ciStatus: string;
+    repoVisibility: string;
+    topIssues?: string;
+    topPrs?: string;
+  };
 }
 
 function hashRawJson(rawJson: string): string {
@@ -274,6 +282,22 @@ export async function runRefreshPipeline(
         },
       });
     }
+    // Attach GitHub data to stored projects for LLM input
+    for (const ghProject of ghResult.projects) {
+      const sp = storedProjects.find(
+        (s) => (s.scanned.pathHash as string) === ghProject.pathHash
+      );
+      if (!sp || ghProject.data.repoVisibility === "not-on-github") continue;
+      sp.github = {
+        openIssues: ghProject.data.openIssues,
+        openPrs: ghProject.data.openPrs,
+        ciStatus: ghProject.data.ciStatus,
+        repoVisibility: ghProject.data.repoVisibility,
+        topIssues: ghProject.data.issuesJson ?? undefined,
+        topPrs: ghProject.data.prsJson ?? undefined,
+      };
+    }
+
     emit({
       type: "github_complete",
       synced: ghResult.projects.length - ghResult.skipped - ghResult.errors,
@@ -306,80 +330,45 @@ export async function runRefreshPipeline(
           const idx = storedProjects.indexOf(sp);
           emit({ type: "project_start", name: sp.name, index: idx, total, step: "llm" });
 
+          // Fetch previous summary for continuity
+          const existingLlm = await db.llm.findUnique({
+            where: { projectId: sp.projectId },
+            select: { summary: true, purpose: true },
+          });
+          const previousSummary = existingLlm?.summary ?? existingLlm?.purpose ?? undefined;
+
           const enrichment: LlmEnrichment = await llmProvider.enrich({
             name: sp.name,
             path: sp.path,
             scan: sp.scanned,
             derived: sp.derived!,
+            github: sp.github,
+            previousSummary,
           });
-
-          const aiInsightJson = enrichment.aiInsight ? JSON.stringify(enrichment.aiInsight) : null;
 
           await db.llm.upsert({
             where: { projectId: sp.projectId },
             create: {
               projectId: sp.projectId,
-              purpose: enrichment.purpose,
+              summary: enrichment.summary,
+              nextAction: enrichment.nextAction,
+              llmStatus: enrichment.status,
+              statusReason: enrichment.statusReason,
+              risksJson: JSON.stringify(enrichment.risks),
               tagsJson: JSON.stringify(enrichment.tags),
-              notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
-              pitch: enrichment.pitch ?? null,
-              aiInsightJson,
-              aiInsightGeneratedAt: enrichment.aiInsight ? new Date() : null,
             },
             update: {
-              purpose: enrichment.purpose,
+              summary: enrichment.summary,
+              nextAction: enrichment.nextAction,
+              llmStatus: enrichment.status,
+              statusReason: enrichment.statusReason,
+              risksJson: JSON.stringify(enrichment.risks),
               tagsJson: JSON.stringify(enrichment.tags),
-              notableFeaturesJson: JSON.stringify(enrichment.notableFeatures),
               recommendationsJson: JSON.stringify(enrichment.recommendations),
-              pitch: enrichment.pitch ?? null,
-              aiInsightJson,
-              aiInsightGeneratedAt: enrichment.aiInsight ? new Date() : undefined,
               generatedAt: new Date(),
             },
           });
-
-          // Upsert metadata if LLM returned any metadata fields
-          const hasMetadata = enrichment.goal || enrichment.audience || enrichment.successMetrics ||
-            enrichment.nextAction || enrichment.publishTarget;
-
-          if (hasMetadata) {
-            const llmMeta: Record<string, string | undefined> = {
-              goal: enrichment.goal,
-              audience: enrichment.audience,
-              successMetrics: enrichment.successMetrics,
-              nextAction: enrichment.nextAction,
-              publishTarget: enrichment.publishTarget,
-            };
-
-            if (config.llmOverwriteMetadata) {
-              const data = Object.fromEntries(
-                Object.entries(llmMeta).filter(([, v]) => v !== undefined)
-              );
-              await db.metadata.upsert({
-                where: { projectId: sp.projectId },
-                create: { projectId: sp.projectId, ...data },
-                update: data,
-              });
-            } else {
-              const existing = await db.metadata.findUnique({ where: { projectId: sp.projectId } });
-              const updates: Record<string, string> = {};
-              for (const [key, val] of Object.entries(llmMeta)) {
-                if (val === undefined) continue;
-                const existingVal = existing?.[key as keyof typeof existing];
-                if (!existingVal || (typeof existingVal === "string" && existingVal.trim() === "")) {
-                  updates[key] = val;
-                }
-              }
-              if (Object.keys(updates).length > 0) {
-                await db.metadata.upsert({
-                  where: { projectId: sp.projectId },
-                  create: { projectId: sp.projectId, ...updates },
-                  update: updates,
-                });
-              }
-            }
-          }
 
           return { sp, enrichment };
         })
@@ -393,7 +382,7 @@ export async function runRefreshPipeline(
             type: "project_complete",
             name: result.value.sp.name,
             step: "llm",
-            detail: { purpose: result.value.enrichment.purpose },
+            detail: { summary: result.value.enrichment.summary },
           });
         } else {
           llmFailed++;

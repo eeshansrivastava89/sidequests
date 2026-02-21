@@ -2,6 +2,7 @@
 
 import type { Project } from "@/lib/types";
 import type { DashboardDeltas } from "@/hooks/use-refresh-deltas";
+import type { ProjectProgress } from "@/hooks/use-refresh";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
@@ -18,6 +19,7 @@ interface ProjectListProps {
   sanitizePaths: boolean;
   deltas?: DashboardDeltas | null;
   view?: string;
+  refreshProgress?: Map<string, ProjectProgress>;
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -55,7 +57,7 @@ function formatDaysInactive(days: number | null | undefined): string {
   return `${days}d`;
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas, view }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, deltas, view, refreshProgress }: ProjectListProps) {
   const gridCols = sanitizePaths
     ? "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr]"
     : "grid-cols-[0.75rem_1.25rem_1fr_4.5rem_4rem_5rem_3rem_5.5rem_1fr_7rem]";
@@ -105,14 +107,44 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                 : "hover:bg-muted/50"
             )}
           >
-            {/* Status dot */}
-            <div
-              className={cn(
-                "w-2.5 h-2.5 rounded-full shrink-0",
-                STATUS_DOT[project.status] ?? STATUS_DOT.archived
-              )}
-              title={project.status}
-            />
+            {/* Status dot / progress indicator */}
+            {(() => {
+              const prog = refreshProgress?.get(project.name);
+              if (prog?.storeStatus === "running") {
+                return (
+                  <div
+                    className="w-2.5 h-2.5 rounded-full border-2 border-blue-500 border-t-transparent animate-spin shrink-0"
+                    title="Scanning..."
+                  />
+                );
+              }
+              if (prog?.llmStatus === "running") {
+                return (
+                  <div className="shrink-0" title="Enriching with AI...">
+                    <svg width="10" height="10" viewBox="0 0 14 14" fill="none" className="text-amber-500 animate-pulse">
+                      <path d="M7 1l1.5 3.5L12 6l-3.5 1.5L7 11 5.5 7.5 2 6l3.5-1.5L7 1z" fill="currentColor" opacity="0.9" />
+                    </svg>
+                  </div>
+                );
+              }
+              if (prog?.llmStatus === "error") {
+                return (
+                  <div
+                    className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"
+                    title={prog.llmError ?? "LLM error"}
+                  />
+                );
+              }
+              return (
+                <div
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    STATUS_DOT[project.status] ?? STATUS_DOT.archived
+                  )}
+                  title={project.status}
+                />
+              );
+            })()}
 
             {/* Pin toggle */}
             <button

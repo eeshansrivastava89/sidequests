@@ -1,63 +1,52 @@
 import { config } from "../config";
-import type { LlmInput, LlmEnrichment, AiInsight } from "./provider";
+import type { LlmInput, LlmEnrichment, LlmStatus } from "./provider";
 
-export const SYSTEM_PROMPT = `You are a developer portfolio analyst. Given a project's scan data and derived metrics, produce a JSON object with these exact fields:
+const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "stale", "idea"]);
 
-- "purpose": A 1-2 sentence description of what this project does.
+export const SYSTEM_PROMPT = `You are a developer project analyst. Given a project's scan data, derived metrics, and optional GitHub data, produce a JSON object with these exact fields:
+
+- "summary": A 1-2 sentence description of what this project does and its current state.
+- "nextAction": The single most important thing the developer should do next. Always provide a concrete, actionable step.
+- "status": One of "building", "shipping", "maintaining", "blocked", "stale", or "idea".
+  - "building": actively being developed, frequent commits, features in progress
+  - "shipping": ready or nearly ready for release/deployment
+  - "maintaining": stable, only bug fixes or minor updates
+  - "blocked": has open issues or PRs blocking progress, CI failures, or unresolved problems
+  - "stale": no recent activity, needs attention or archiving decision
+  - "idea": early stage, minimal code, exploration phase
+- "statusReason": A short explanation of why you chose this status.
+- "risks": An array of 1-3 risks or concerns about the project.
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
-- "notableFeatures": An array of 2-5 notable aspects of this project.
 - "recommendations": An array of 2-4 actionable next steps to improve the project.
-- "pitch": A 1-2 sentence product pitch as if selling this project to the world.
-- "aiInsight": An object with structured assessment:
-  - "score": A number 0-100 representing your overall AI assessment of the project.
-  - "confidence": One of "low", "medium", or "high" indicating how confident you are in the assessment.
-  - "reasons": An array of 2-4 short sentences explaining the score.
-  - "risks": An array of 1-3 risks or concerns about the project.
-  - "nextBestAction": A single sentence describing the most impactful next step.
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
-function sanitizePath(p: string): string {
+export function sanitizePath(p: string): string {
   if (!config.sanitizePaths) return p;
   const parts = p.split("/");
   if (parts.length > 2) return "~/" + parts.slice(-2).join("/");
   return p;
 }
 
-function sanitizeScan(scan: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeScan(scan: Record<string, unknown>): Record<string, unknown> {
   if (!config.sanitizePaths) return scan;
   const copy = { ...scan };
-  // Remove fields that contain absolute paths
   delete copy.path;
   delete copy.pathDisplay;
   return copy;
 }
 
 export function buildPrompt(input: LlmInput): string {
-  const metadataFields = `,
-  "goal": "1 sentence project goal",
-  "audience": "who this project is for",
-  "successMetrics": "how success is measured",
-  "nextAction": "single most important next step",
-  "publishTarget": "where this should be published/deployed"`;
-
-  const aiInsightField = `,
-  "aiInsight": {
-    "score": 0,
-    "confidence": "low|medium|high",
-    "reasons": ["2-4 short explanations for the score"],
-    "risks": ["1-3 risks or concerns"],
-    "nextBestAction": "single most impactful next step"
-  }`;
-
-  return `Analyze this project and respond with ONLY a JSON object (no markdown fences, no commentary):
+  let prompt = `Analyze this project and respond with ONLY a JSON object (no markdown fences, no commentary):
 
 {
-  "purpose": "1-2 sentence description",
+  "summary": "1-2 sentence description + current state",
+  "nextAction": "single most important next step",
+  "status": "building|shipping|maintaining|blocked|stale|idea",
+  "statusReason": "why this status",
+  "risks": ["1-3 risks or concerns"],
   "tags": ["3-8 descriptive tags"],
-  "notableFeatures": ["2-5 notable aspects"],
-  "recommendations": ["2-4 actionable next steps"],
-  "pitch": "1-2 sentence product pitch"${metadataFields}${aiInsightField}
+  "recommendations": ["2-4 actionable next steps"]
 }
 
 Project data:
@@ -66,10 +55,36 @@ Name: ${input.name}
 Path: ${sanitizePath(input.path)}
 Status: ${input.derived.statusAuto}
 Health Score: ${input.derived.healthScoreAuto}/100
+Hygiene Score: ${input.derived.hygieneScoreAuto}/100
+Momentum Score: ${input.derived.momentumScoreAuto}/100
 Derived Tags: ${input.derived.tags.join(", ") || "none"}
 
 Raw scan data:
 ${JSON.stringify(sanitizeScan(input.scan), null, 2)}`;
+
+  if (input.github) {
+    prompt += `
+
+GitHub data:
+Open Issues: ${input.github.openIssues}
+Open PRs: ${input.github.openPrs}
+CI Status: ${input.github.ciStatus}
+Repo Visibility: ${input.github.repoVisibility}`;
+    if (input.github.topIssues) {
+      prompt += `\nTop Issues: ${input.github.topIssues}`;
+    }
+    if (input.github.topPrs) {
+      prompt += `\nTop PRs: ${input.github.topPrs}`;
+    }
+  }
+
+  if (input.previousSummary) {
+    prompt += `
+
+Previous summary (for continuity): ${input.previousSummary}`;
+  }
+
+  return prompt;
 }
 
 /**
@@ -80,7 +95,6 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   let obj: Record<string, unknown> | null = null;
 
   if (typeof raw === "string") {
-    // Try direct parse first; fall back to extracting a JSON block from the response
     try {
       obj = JSON.parse(raw);
     } catch {
@@ -97,56 +111,22 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
     obj = raw as Record<string, unknown>;
   }
 
-  const base: LlmEnrichment = {
-    purpose: typeof obj?.purpose === "string" ? obj.purpose : "",
-    tags: Array.isArray(obj?.tags) ? obj.tags : [],
-    notableFeatures: Array.isArray(obj?.notableFeatures) ? obj.notableFeatures : [],
-    recommendations: Array.isArray(obj?.recommendations) ? obj.recommendations : [],
-  };
-
-  // Extract optional metadata fields
-  if (typeof obj?.goal === "string") base.goal = obj.goal;
-  if (typeof obj?.audience === "string") base.audience = obj.audience;
-  if (typeof obj?.successMetrics === "string") base.successMetrics = obj.successMetrics;
-  if (typeof obj?.nextAction === "string") base.nextAction = obj.nextAction;
-  if (typeof obj?.publishTarget === "string") base.publishTarget = obj.publishTarget;
-  if (typeof obj?.pitch === "string") base.pitch = obj.pitch;
-  // Extract and validate aiInsight with runtime type checks
-  const insight = parseAiInsight(obj?.aiInsight);
-  if (insight) base.aiInsight = insight;
-
-  return base;
-}
-
-const VALID_CONFIDENCE = new Set(["low", "medium", "high"]);
-
-function parseAiInsight(raw: unknown): AiInsight | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const obj = raw as Record<string, unknown>;
-
-  const score = typeof obj.score === "number" ? obj.score : NaN;
-  if (!Number.isFinite(score) || score < 0 || score > 100) return undefined;
-
-  const confidence = typeof obj.confidence === "string" ? obj.confidence : "";
-  if (!VALID_CONFIDENCE.has(confidence)) return undefined;
-
-  const reasons = Array.isArray(obj.reasons)
-    ? obj.reasons.filter((r): r is string => typeof r === "string")
-    : [];
-  if (reasons.length === 0) return undefined;
-
-  const risks = Array.isArray(obj.risks)
+  const summary = typeof obj?.summary === "string" ? obj.summary : "";
+  const nextAction = typeof obj?.nextAction === "string" && obj.nextAction
+    ? obj.nextAction
+    : "Review project and decide next step";
+  const rawStatus = typeof obj?.status === "string" ? obj.status as LlmStatus : "idea";
+  const status: LlmStatus = VALID_STATUSES.has(rawStatus) ? rawStatus : "idea";
+  const statusReason = typeof obj?.statusReason === "string" ? obj.statusReason : "";
+  const risks = Array.isArray(obj?.risks)
     ? obj.risks.filter((r): r is string => typeof r === "string")
     : [];
+  const tags = Array.isArray(obj?.tags)
+    ? obj.tags.filter((t): t is string => typeof t === "string")
+    : [];
+  const recommendations = Array.isArray(obj?.recommendations)
+    ? obj.recommendations.filter((r): r is string => typeof r === "string")
+    : [];
 
-  const nextBestAction = typeof obj.nextBestAction === "string" ? obj.nextBestAction : "";
-  if (!nextBestAction) return undefined;
-
-  return {
-    score: Math.round(score),
-    confidence: confidence as AiInsight["confidence"],
-    reasons,
-    risks,
-    nextBestAction,
-  };
+  return { summary, nextAction, status, statusReason, risks, tags, recommendations };
 }

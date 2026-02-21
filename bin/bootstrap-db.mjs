@@ -59,10 +59,15 @@ const SCHEMA_SQL = [
   `CREATE TABLE IF NOT EXISTS "Llm" (
     "id"                     TEXT NOT NULL PRIMARY KEY,
     "projectId"              TEXT NOT NULL,
-    "purpose"                TEXT,
+    "summary"                TEXT,
+    "nextAction"             TEXT,
+    "llmStatus"              TEXT,
+    "statusReason"           TEXT,
+    "risksJson"              TEXT,
     "tagsJson"               TEXT,
-    "notableFeaturesJson"    TEXT,
     "recommendationsJson"    TEXT,
+    "purpose"                TEXT,
+    "notableFeaturesJson"    TEXT,
     "pitch"                  TEXT,
     "aiInsightJson"          TEXT,
     "aiInsightGeneratedAt"   TEXT,
@@ -125,6 +130,20 @@ const SCHEMA_SQL = [
 ];
 
 /**
+ * Additive migrations: ALTER TABLE statements to add new columns to existing tables.
+ * Each entry is idempotent — "IF NOT EXISTS" is not supported by SQLite ALTER TABLE,
+ * so we catch errors for columns that already exist.
+ */
+const MIGRATIONS = [
+  // Phase 53W: new Llm columns
+  `ALTER TABLE "Llm" ADD COLUMN "summary" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "nextAction" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "llmStatus" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "statusReason" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "risksJson" TEXT`,
+];
+
+/**
  * Bootstrap the database schema at the given path.
  * @param {string} dbPath — absolute path to the SQLite file
  */
@@ -133,6 +152,15 @@ export async function bootstrapDb(dbPath) {
 
   for (const sql of SCHEMA_SQL) {
     await client.execute(sql);
+  }
+
+  // Run additive migrations (ignore "duplicate column" errors)
+  for (const sql of MIGRATIONS) {
+    try {
+      await client.execute(sql);
+    } catch (err) {
+      if (!String(err).includes("duplicate column")) throw err;
+    }
   }
 
   client.close();

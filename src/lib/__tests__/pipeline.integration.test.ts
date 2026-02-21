@@ -95,7 +95,7 @@ describe("pipeline integration — store phase", () => {
     expect(llms).toHaveLength(0);
   });
 
-  it("full pipeline happy path (LLM enabled): creates all 7 models", async () => {
+  it("full pipeline happy path (LLM enabled): creates Llm records (no Metadata from LLM)", async () => {
     mockConfig.llmProvider = "claude-cli";
     const result = await runRefreshPipeline();
 
@@ -107,8 +107,9 @@ describe("pipeline integration — store phase", () => {
     const llms = await db.llm.findMany();
     expect(llms).toHaveLength(3);
 
+    // Phase 53W: LLM no longer populates Metadata
     const metadata = await db.metadata.findMany();
-    expect(metadata).toHaveLength(3);
+    expect(metadata).toHaveLength(0);
 
     const activities = await db.activity.findMany();
     expect(activities).toHaveLength(3);
@@ -189,18 +190,22 @@ describe("pipeline integration — soft-prune", () => {
 });
 
 describe("pipeline integration — LLM enrichment", () => {
-  it("success creates Llm + Metadata records", async () => {
+  it("success creates Llm records with new fields, does NOT populate Metadata", async () => {
     mockConfig.llmProvider = "claude-cli";
     await runRefreshPipeline();
 
     const llm = await db.llm.findFirst();
     expect(llm).not.toBeNull();
-    expect(llm.purpose).toBe(LLM_ENRICHMENT_FIXTURE.purpose);
+    expect(llm.summary).toBe(LLM_ENRICHMENT_FIXTURE.summary);
+    expect(llm.nextAction).toBe(LLM_ENRICHMENT_FIXTURE.nextAction);
+    expect(llm.llmStatus).toBe(LLM_ENRICHMENT_FIXTURE.status);
+    expect(llm.statusReason).toBe(LLM_ENRICHMENT_FIXTURE.statusReason);
+    expect(JSON.parse(llm.risksJson)).toEqual(LLM_ENRICHMENT_FIXTURE.risks);
     expect(JSON.parse(llm.tagsJson)).toEqual(LLM_ENRICHMENT_FIXTURE.tags);
 
+    // Phase 53W: LLM no longer writes Metadata
     const meta = await db.metadata.findFirst();
-    expect(meta).not.toBeNull();
-    expect(meta.goal).toBe(LLM_ENRICHMENT_FIXTURE.goal);
+    expect(meta).toBeNull();
   });
 
   it("failure for one project doesn't block others", async () => {
@@ -220,39 +225,17 @@ describe("pipeline integration — LLM enrichment", () => {
     expect(doneEvent.llmSucceeded).toBe(2);
   });
 
-  it("respects llmOverwriteMetadata=false (preserves existing non-empty fields)", async () => {
+  it("LLM re-run updates existing Llm record (upsert)", async () => {
     mockConfig.llmProvider = "claude-cli";
-    mockConfig.llmOverwriteMetadata = false;
-
-    // First run seeds metadata from LLM
     await runRefreshPipeline();
 
-    // Manually update goal to something different
-    const meta = await db.metadata.findFirst();
-    await db.metadata.update({ where: { id: meta.id }, data: { goal: "My custom goal" } });
+    const llmBefore = await db.llm.findFirst();
+    expect(llmBefore).not.toBeNull();
 
-    // Second run should NOT overwrite
+    // Run again — should update, not create duplicate
     await runRefreshPipeline();
-
-    const updated = await db.metadata.findFirst({ where: { id: meta.id } });
-    expect(updated.goal).toBe("My custom goal");
-  });
-
-  it("respects llmOverwriteMetadata=true (overwrites)", async () => {
-    mockConfig.llmProvider = "claude-cli";
-    mockConfig.llmOverwriteMetadata = false;
-
-    // First run
-    await runRefreshPipeline();
-    const meta = await db.metadata.findFirst();
-    await db.metadata.update({ where: { id: meta.id }, data: { goal: "My custom goal" } });
-
-    // Second run with overwrite=true
-    mockConfig.llmOverwriteMetadata = true;
-    await runRefreshPipeline();
-
-    const updated = await db.metadata.findFirst({ where: { id: meta.id } });
-    expect(updated.goal).toBe(LLM_ENRICHMENT_FIXTURE.goal);
+    const llms = await db.llm.findMany();
+    expect(llms).toHaveLength(3); // Still 3, not 6
   });
 });
 

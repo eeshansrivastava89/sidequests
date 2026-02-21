@@ -3,28 +3,16 @@
  * All providers must return this shape.
  */
 
-export interface AiInsight {
-  score: number;
-  confidence: "low" | "medium" | "high";
-  reasons: string[];
-  risks: string[];
-  nextBestAction: string;
-}
+export type LlmStatus = "building" | "shipping" | "maintaining" | "blocked" | "stale" | "idea";
 
 export interface LlmEnrichment {
-  purpose: string;
+  summary: string;           // replaces purpose + pitch
+  nextAction: string;        // always populated
+  status: LlmStatus;         // LLM-assessed project phase
+  statusReason: string;      // why this status
+  risks: string[];           // flat array
   tags: string[];
-  notableFeatures: string[];
   recommendations: string[];
-  pitch?: string;
-  takeaways?: Record<string, string>;
-  // Optional metadata fields
-  goal?: string;
-  audience?: string;
-  successMetrics?: string;
-  nextAction?: string;
-  publishTarget?: string;
-  aiInsight?: AiInsight;
 }
 
 export interface LlmInput {
@@ -34,8 +22,19 @@ export interface LlmInput {
   derived: {
     statusAuto: string;
     healthScoreAuto: number;
+    hygieneScoreAuto: number;
+    momentumScoreAuto: number;
     tags: string[];
   };
+  github?: {
+    openIssues: number;
+    openPrs: number;
+    ciStatus: string;
+    repoVisibility: string;
+    topIssues?: string;
+    topPrs?: string;
+  };
+  previousSummary?: string;
 }
 
 export interface LlmProvider {

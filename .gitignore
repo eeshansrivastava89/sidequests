@@ -63,3 +63,6 @@ __pycache__/
 # claude code session files
 .claude/*.md
 .claude/projects/
+
+# archive of internal review logs
+/docs/internal/archive/

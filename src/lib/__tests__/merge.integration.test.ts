@@ -108,7 +108,7 @@ describe("mergeProjectView — integration", () => {
       override: { purposeOverride: "My override" },
     });
     const result = await mergeProjectView(id);
-    expect(result!.purpose).toBe("My override");
+    expect(result!.summary).toBe("My override");
   });
 
   it("override tags > LLM tags > derived tags", async () => {
@@ -145,7 +145,7 @@ describe("mergeProjectView — integration", () => {
     expect(result!.status).toBe("archived");
     expect(result!.healthScore).toBe(0);
     expect(result!.tags).toEqual([]);
-    expect(result!.purpose).toBeNull();
+    expect(result!.summary).toBeNull();
     expect(result!.goal).toBeNull();
   });
 });

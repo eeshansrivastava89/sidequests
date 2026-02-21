@@ -72,7 +72,7 @@ export interface ProjectSnapshot {
   ahead: number;
   llmGeneratedAt: string | null;
   nextAction: string | null;
-  purpose: string | null;
+  summary: string | null;
   daysInactive: number;
 }
 
@@ -97,7 +97,7 @@ export function snapProject(p: Project): ProjectSnapshot {
     ahead: p.ahead,
     llmGeneratedAt: p.llmGeneratedAt,
     nextAction: p.nextAction,
-    purpose: p.purpose,
+    summary: p.summary,
     daysInactive: p.scan?.daysInactive ?? 0,
   };
 }
@@ -237,7 +237,7 @@ export function useRefreshDeltas(projects: Project[]) {
 
       // Semantic change: purpose or nextAction content actually changed
       const semanticChanged =
-        newlyEnriched && (p.purpose !== old.purpose || p.nextAction !== old.nextAction);
+        newlyEnriched && (p.summary !== old.summary || p.nextAction !== old.nextAction);
 
       const causes = computeCauses(old, curSnap, newlyEnriched);
 
