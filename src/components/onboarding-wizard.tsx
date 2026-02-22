@@ -201,12 +201,10 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   const handleSaveAndContinue = async () => {
     setSaving(true);
     try {
-      const { openrouterApiKey, ...nonSecretDraft } = draft;
-
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nonSecretDraft),
+        body: JSON.stringify(draft),
       });
       if (!res.ok) throw new Error("Save failed");
       toast.success("Settings saved");

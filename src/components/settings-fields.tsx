@@ -6,7 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { AppConfig } from "@/hooks/use-config";
 
-export const PROVIDERS = ["claude-cli", "openrouter", "ollama", "mlx", "codex-cli"] as const;
+/** Active providers shown in UI. See GitHub issue #2 for re-enabling openrouter/ollama/mlx. */
+export const PROVIDERS = ["claude-cli", "codex-cli", "none"] as const;
 
 export const CLAUDE_CLI_MODELS = [
   { value: "", label: "Default" },
