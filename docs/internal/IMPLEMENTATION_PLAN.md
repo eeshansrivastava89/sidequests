@@ -10,7 +10,8 @@
 - [Completed] Phase 56W: Stats cards + header redesign (#011→#012)
 - [Completed] Phase 57W: Project drawer cleanup (#013→#014)
 - [Completed] Phase 58W: Reliability + onboarding flow (#007→#015)
-- [Planned] v0.3 UX recovery: phases 59W-60W (project workspace redesign, signal clarity)
+- [Completed] Phase 59W: Project workspace redesign (#017→#020)
+- [Planned] v0.3 UX recovery remaining: phase 60W (signal clarity + interaction polish)
 
 ## v0.2 Vision
 
@@ -125,7 +126,7 @@ Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
 
 ---
 
-## v0.3 UX Recovery (Planned, 3 phases only)
+## v0.3 UX Recovery (3 phases total)
 
 Goal: resolve the current real-world UX friction without a long rewrite. Keep implementation fast by using existing stack only: Tailwind + shadcn/ui + existing Radix primitives already in repo.
 
@@ -159,17 +160,18 @@ Constraints:
 ## Phase 59W — Project Workspace Redesign (Replace Current Modal UX)
 
 **What:** Replace text-heavy modal with a more functional project workspace.
+**Status:** Complete (reviewed #017→#020, approved 2026-02-22)
 
 **Decision (lock for v0.3):**
 - Use a **split workspace on the main page** (left project list rail + right project detail pane) instead of full-page route migration. This keeps scope smaller and faster than route-level rewrite.
 
 **Deliverables:**
-- [ ] Project click opens persistent right detail pane (not centered modal)
-- [ ] GitHub block is top-priority in detail pane
-- [ ] Issues/PRs/CI actions are clickable (direct GitHub links)
-- [ ] Details section moved higher; all major sections expanded by default
-- [ ] Content density improved: less wall-of-text, more compact action rows/chips
-- [ ] Mobile behavior: pane becomes full-screen sheet with clear close/back affordance
+- [x] Project click opens persistent right detail pane (not centered modal)
+- [x] GitHub block is top-priority in detail pane
+- [x] Issues/PRs/CI actions are clickable (direct GitHub links)
+- [x] Details section moved higher; all major sections expanded by default
+- [x] Content density improved: less wall-of-text, more compact action rows/chips
+- [x] Mobile behavior: pane becomes full-screen sheet with clear close/back affordance
 
 **Primary files:**
 - `src/app/page.tsx`
