@@ -48,19 +48,10 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Handle secret keys separately from regular settings
-      const { openrouterApiKey, ...nonSecretDraft } = draft;
-      const keyChanged = openrouterApiKey !== config.openrouterApiKey;
-
-      if (keyChanged && openrouterApiKey !== "***") {
-        toast.warning("API key cannot be saved via UI. Set OPENROUTER_API_KEY in .env.local instead.");
-      }
-
-      // Save non-secret settings via API
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nonSecretDraft),
+        body: JSON.stringify(draft),
       });
       if (!res.ok) throw new Error("Save failed");
       toast.success("Settings saved");

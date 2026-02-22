@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { config } from "@/lib/config";
-import { type AppSettings, getSettings, writeSettings, clearSettingsCache, SECRET_KEYS } from "@/lib/settings";
-/** GET — returns all effective config (settings.json > env > defaults). Masks API keys. */
+import { type AppSettings, getSettings, writeSettings, clearSettingsCache } from "@/lib/settings";
+/** GET — returns all effective config (settings.json defaults). Masks API keys for UI display. */
 export async function GET() {
   return NextResponse.json({
     devRoot: config.devRoot,
@@ -13,7 +13,6 @@ export async function GET() {
     llmDebug: config.llmDebug,
     claudeCliModel: config.claudeCliModel ?? "",
     codexCliModel: config.codexCliModel ?? "",
-    // Mask secret: show "***" if present (via env var), empty string if not
     openrouterApiKey: config.openrouterApiKey ? "***" : "",
     openrouterModel: config.openrouterModel,
     ollamaUrl: config.ollamaUrl,
@@ -35,14 +34,13 @@ const STR_KEYS: (keyof AppSettings)[] = [
 ];
 const NUM_KEYS: (keyof AppSettings)[] = ["llmConcurrency"];
 
-/** PUT — merge incoming fields into settings.json. Secrets are NOT persisted here. */
+/** PUT — merge incoming fields into settings.json. */
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
     clearSettingsCache();
     const current = getSettings();
     const updated: AppSettings = { ...current };
-    const secretsSkipped: string[] = [];
 
     for (const key of BOOL_KEYS) {
       if (key in body && typeof body[key] === "boolean") {
@@ -51,15 +49,8 @@ export async function PUT(req: Request) {
     }
     for (const key of STR_KEYS) {
       if (key in body && typeof body[key] === "string") {
-        // Skip masked placeholders
+        // Skip masked placeholders — don't overwrite real key with "***"
         if (key === "openrouterApiKey" && body[key] === "***") continue;
-        // Secret keys: never persist to settings.json — come from .env.local only.
-        if ((SECRET_KEYS as string[]).includes(key)) {
-          if (body[key] && body[key] !== "***") {
-            secretsSkipped.push(key);
-          }
-          continue;
-        }
         (updated as Record<string, unknown>)[key] = body[key];
       }
     }
@@ -69,9 +60,8 @@ export async function PUT(req: Request) {
       }
     }
 
-    // writeSettings already strips SECRET_KEYS as a safety net
     writeSettings(updated);
-    return NextResponse.json({ ok: true, secretsSkipped });
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }

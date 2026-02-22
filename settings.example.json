@@ -6,7 +6,12 @@
   "llmConcurrency": 3,
   "llmOverwriteMetadata": false,
   "llmDebug": false,
-  "sanitizePaths": true,
   "claudeCliModel": "",
-  "codexCliModel": ""
+  "codexCliModel": "",
+  "openrouterApiKey": "",
+  "openrouterModel": "",
+  "ollamaUrl": "",
+  "ollamaModel": "",
+  "mlxUrl": "",
+  "mlxModel": ""
 }

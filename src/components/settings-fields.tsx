@@ -150,7 +150,7 @@ export function ProviderFields({
 
       {provider === "openrouter" && (
         <>
-          <Field label="API Key" description="Set OPENROUTER_API_KEY in .env.local">
+          <Field label="API Key" description="Saved to settings.json">
             <Input
               type="password"
               value={draft.openrouterApiKey}

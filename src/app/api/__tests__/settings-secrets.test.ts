@@ -20,7 +20,7 @@ vi.mock("@/lib/app-paths", () => {
   };
 });
 
-describe("settings API — secret handling", () => {
+describe("settings API — single config source", () => {
   beforeEach(() => {
     fs.mkdirSync(tmpDir, { recursive: true });
   });
@@ -37,46 +37,53 @@ describe("settings API — secret handling", () => {
     return route;
   }
 
-  it("GET masks openrouterApiKey when env var is present", async () => {
-    process.env.OPENROUTER_API_KEY = "sk-real-secret";
+  it("GET masks openrouterApiKey when present in settings.json", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "settings.json"),
+      JSON.stringify({ openrouterApiKey: "sk-real-secret" })
+    );
     const { GET } = await loadRoutes();
     const res = await GET();
     const data = await res.json();
     expect(data.openrouterApiKey).toBe("***");
   });
 
-  it("GET shows empty openrouterApiKey when env var is absent", async () => {
-    delete process.env.OPENROUTER_API_KEY;
+  it("GET shows empty openrouterApiKey when not configured", async () => {
+    fs.writeFileSync(path.join(tmpDir, "settings.json"), JSON.stringify({}));
     const { GET } = await loadRoutes();
     const res = await GET();
     const data = await res.json();
     expect(data.openrouterApiKey).toBe("");
   });
 
-  it("PUT does not persist openrouterApiKey to settings.json", async () => {
+  it("PUT persists openrouterApiKey to settings.json", async () => {
     const { PUT } = await loadRoutes();
     const req = new Request("http://localhost/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         devRoot: "~/projects",
-        openrouterApiKey: "sk-should-not-persist",
+        openrouterApiKey: "sk-should-persist",
         llmProvider: "openrouter",
       }),
     });
     const res = await PUT(req);
     const data = await res.json();
     expect(data.ok).toBe(true);
-    expect(data.secretsSkipped).toContain("openrouterApiKey");
 
     // Verify disk
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(onDisk.openrouterApiKey).toBeUndefined();
+    expect(onDisk.openrouterApiKey).toBe("sk-should-persist");
     expect(onDisk.devRoot).toBe("~/projects");
     expect(onDisk.llmProvider).toBe("openrouter");
   });
 
-  it("PUT ignores masked placeholder '***'", async () => {
+  it("PUT ignores masked placeholder '***' for openrouterApiKey", async () => {
+    // Pre-populate with a real key
+    fs.writeFileSync(
+      path.join(tmpDir, "settings.json"),
+      JSON.stringify({ openrouterApiKey: "sk-existing-key" })
+    );
     const { PUT } = await loadRoutes();
     const req = new Request("http://localhost/api/settings", {
       method: "PUT",
@@ -89,8 +96,10 @@ describe("settings API — secret handling", () => {
     const res = await PUT(req);
     const data = await res.json();
     expect(data.ok).toBe(true);
-    // *** is not a real key, should not appear in secretsSkipped
-    expect(data.secretsSkipped).not.toContain("openrouterApiKey");
+
+    // Existing key should be preserved, not overwritten with "***"
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.openrouterApiKey).toBe("sk-existing-key");
   });
 
   it("PUT persists non-secret string keys normally", async () => {

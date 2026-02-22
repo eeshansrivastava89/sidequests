@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
 
-describe("settings — secret key stripping", () => {
+describe("settings — openrouterApiKey persistence", () => {
   const tmpDir = path.join(os.tmpdir(), "pd-settings-test-" + Date.now());
   const originalEnv = { ...process.env };
 
@@ -21,13 +21,12 @@ describe("settings — secret key stripping", () => {
   async function loadFresh() {
     const appPaths = await import("@/lib/app-paths");
     appPaths.resetPaths();
-    // Clear settings cache by re-importing
     const settings = await import("@/lib/settings");
     settings.clearSettingsCache();
     return settings;
   }
 
-  it("writeSettings strips openrouterApiKey from disk", async () => {
+  it("writeSettings persists openrouterApiKey to disk", async () => {
     const { writeSettings } = await loadFresh();
     writeSettings({
       devRoot: "~/dev",
@@ -35,12 +34,12 @@ describe("settings — secret key stripping", () => {
       llmProvider: "openrouter",
     });
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(onDisk.openrouterApiKey).toBeUndefined();
+    expect(onDisk.openrouterApiKey).toBe("sk-secret-key");
     expect(onDisk.devRoot).toBe("~/dev");
     expect(onDisk.llmProvider).toBe("openrouter");
   });
 
-  it("writeSettings preserves non-secret keys", async () => {
+  it("writeSettings preserves all keys", async () => {
     const { writeSettings } = await loadFresh();
     writeSettings({
       devRoot: "~/projects",
@@ -53,23 +52,15 @@ describe("settings — secret key stripping", () => {
     expect(onDisk.ollamaUrl).toBe("http://localhost:11434");
   });
 
-  it("getSettings warns when secret key found in settings.json", async () => {
-    // Write a settings file with a secret key directly (simulating pre-migration state)
+  it("getSettings reads openrouterApiKey from settings.json", async () => {
     fs.writeFileSync(
       path.join(tmpDir, "settings.json"),
-      JSON.stringify({ openrouterApiKey: "sk-old-key", devRoot: "~/dev" })
+      JSON.stringify({ openrouterApiKey: "sk-from-file", devRoot: "~/dev" })
     );
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { getSettings, clearSettingsCache } = await loadFresh();
     clearSettingsCache();
     const settings = getSettings();
-    expect(settings.openrouterApiKey).toBe("sk-old-key"); // Still reads it for compat
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("openrouterApiKey"));
-    warnSpy.mockRestore();
-  });
-
-  it("SECRET_KEYS contains openrouterApiKey", async () => {
-    const { SECRET_KEYS } = await loadFresh();
-    expect(SECRET_KEYS).toContain("openrouterApiKey");
+    expect(settings.openrouterApiKey).toBe("sk-from-file");
+    expect(settings.devRoot).toBe("~/dev");
   });
 });

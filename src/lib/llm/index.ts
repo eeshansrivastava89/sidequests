@@ -22,8 +22,8 @@ const unsafeProviders: Record<string, LlmProvider> = {
 
 /**
  * Returns the active LLM provider, or null if provider is "none" or unconfigured.
- * Provider is selected by LLM_PROVIDER env var (default: claude-cli).
- * Unsafe providers (codex-cli) require LLM_ALLOW_UNSAFE=true.
+ * Provider is selected by llmProvider in settings.json (default: claude-cli).
+ * Unsafe providers (codex-cli) require llmAllowUnsafe=true.
  */
 export function getLlmProvider(): LlmProvider | null {
   const name = config.llmProvider;
@@ -34,8 +34,8 @@ export function getLlmProvider(): LlmProvider | null {
   if (unsafe) {
     if (!config.llmAllowUnsafe) {
       throw new Error(
-        `LLM_PROVIDER "${name}" can perform agentic actions (file edits, commands). ` +
-        `Set LLM_ALLOW_UNSAFE=true to enable it.`
+        `Provider "${name}" can perform agentic actions (file edits, commands). ` +
+        `Set llmAllowUnsafe=true in Settings to enable it.`
       );
     }
     return unsafe;
@@ -45,7 +45,7 @@ export function getLlmProvider(): LlmProvider | null {
   if (!provider) {
     const all = [...Object.keys(providers), ...Object.keys(unsafeProviders)];
     throw new Error(
-      `Unknown LLM_PROVIDER "${name}". Available: ${all.join(", ")}`
+      `Unknown llmProvider "${name}". Available: ${all.join(", ")}`
     );
   }
   return provider;

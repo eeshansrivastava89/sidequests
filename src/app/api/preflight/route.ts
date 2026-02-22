@@ -64,7 +64,7 @@ export async function GET() {
 
   // OpenRouter
   {
-    const hasKey = !!(process.env.OPENROUTER_API_KEY || config.openrouterApiKey);
+    const hasKey = !!config.openrouterApiKey;
     checks.push({ name: "openrouter", ok: hasKey, message: hasKey ? "API key configured" : "No API key set", tier: "optional" });
   }
 

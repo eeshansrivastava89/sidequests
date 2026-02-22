@@ -4,7 +4,7 @@ import { config } from "../config";
 
 /**
  * OpenRouter provider — calls the OpenRouter chat completions API.
- * Requires OPENROUTER_API_KEY and optionally OPENROUTER_MODEL.
+ * Requires openrouterApiKey in settings.json.
  */
 export const openrouterProvider: LlmProvider = {
   name: "openrouter",
@@ -12,7 +12,7 @@ export const openrouterProvider: LlmProvider = {
   async enrich(input: LlmInput): Promise<LlmEnrichment> {
     const apiKey = config.openrouterApiKey;
     if (!apiKey) {
-      throw new Error("OPENROUTER_API_KEY is required for the openrouter provider");
+      throw new Error("openrouterApiKey is required — set it in Settings");
     }
     const model = config.openrouterModel;
 
