@@ -9,10 +9,27 @@ import type { RefreshState } from "@/hooks/use-refresh";
 import { Field, ProviderFields } from "@/components/settings-fields";
 import { toast } from "sonner";
 
-interface PreflightCheck {
+export interface PreflightCheck {
   name: string;
   ok: boolean;
   message: string;
+  tier?: "required" | "optional";
+}
+
+/** Sort preflight checks: required first, then optional. */
+export function sortPreflightChecks(checks: PreflightCheck[]): PreflightCheck[] {
+  return [...checks].sort((a, b) => {
+    const tierOrder = (t?: string) => t === "required" ? 0 : 1;
+    return tierOrder(a.tier) - tierOrder(b.tier);
+  });
+}
+
+/** Compute the diagnostics banner state from preflight checks. */
+export function computeDiagnosticsBanner(checks: PreflightCheck[]): "all_pass" | "required_pass" | "required_fail" {
+  const allPass = checks.every((c) => c.ok);
+  if (allPass) return "all_pass";
+  const requiredPass = checks.filter((c) => c.tier === "required").every((c) => c.ok);
+  return requiredPass ? "required_pass" : "required_fail";
 }
 
 interface Props {
@@ -44,6 +61,108 @@ function buildDraft(config: AppConfig): AppConfig {
     devRoot: config.devRoot || "~/dev",
     excludeDirs: config.excludeDirs || DEFAULT_EXCLUDE_DIRS,
   };
+}
+
+export interface ScanStepProps {
+  devRoot: string;
+  scanStarted: boolean;
+  scanState: RefreshState;
+  onStartScan: () => void;
+  onComplete: () => void;
+  onBack: () => void;
+}
+
+/** Step 4: First Scan — exported for direct render testing. */
+export function ScanStep({ devRoot, scanStarted, scanState, onStartScan, onComplete, onBack }: ScanStepProps) {
+  const scanCoreReady = scanStarted && scanState.deterministicReady;
+  const scanDone = scanStarted && !scanState.active && scanState.summary;
+  const scanError = scanStarted && !scanState.active && scanState.error;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">First Scan</h2>
+        <p className="text-sm text-muted-foreground">
+          Ready to scan <code className="bg-muted px-1.5 py-0.5 rounded text-foreground">{devRoot}</code>
+        </p>
+      </div>
+
+      {!scanStarted && (
+        <div className="text-center py-4">
+          <Button onClick={onStartScan}>
+            Start Scan
+          </Button>
+        </div>
+      )}
+
+      {scanStarted && scanState.active && (
+        <div className="space-y-3 py-3">
+          <div className="flex items-center gap-3">
+            <div className="size-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm">{scanState.phase}</span>
+          </div>
+          {scanCoreReady && (
+            <div className="rounded-md bg-blue-500/10 border border-blue-500/20 p-3">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                Core scan complete. You can open the dashboard now while LLM enrichment continues in the background.
+              </p>
+              <div className="pt-2">
+                <Button onClick={onComplete}>
+                  Open Dashboard Now
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {scanDone && (
+        <div className="space-y-3 py-2">
+          <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3">
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              Found {scanState.summary?.projectCount ?? 0} projects
+            </p>
+          </div>
+          <div className="text-center">
+            <Button onClick={onComplete}>
+              Open Dashboard
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {scanError && (
+        <div className="space-y-3 py-2">
+          <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 space-y-2">
+            <p className="text-sm font-medium text-red-700 dark:text-red-400">
+              {friendlyError(scanState.error!)}
+            </p>
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-foreground transition-colors">Details</summary>
+              <pre className="mt-1 whitespace-pre-wrap break-all">{scanState.error}</pre>
+            </details>
+          </div>
+          <div className="flex justify-center gap-2">
+            <Button variant="outline" onClick={onComplete}>
+              Skip
+            </Button>
+            <Button onClick={onStartScan}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!scanStarted && (
+        <div className="flex justify-between pt-2">
+          <Button variant="ghost" onClick={onBack}>Back</Button>
+          <Button variant="ghost" onClick={onComplete}>
+            Skip
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartScan, scanState }: Props) {
@@ -124,10 +243,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
     onOpenChange(false);
   };
 
-  const allChecksPassed = preflight?.every((c) => c.ok) ?? false;
-  const scanCoreReady = scanStarted && scanState.deterministicReady;
-  const scanDone = scanStarted && !scanState.active && scanState.summary;
-  const scanError = scanStarted && !scanState.active && scanState.error;
+  const bannerState = preflight ? computeDiagnosticsBanner(preflight) : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -228,13 +344,24 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
                 </div>
               ) : preflight ? (
                 <div className="space-y-2">
-                  {preflight.map((check) => (
+                  {sortPreflightChecks(preflight).map((check) => (
                     <div key={check.name} className="flex items-start gap-2">
-                      <span className={`mt-0.5 ${check.ok ? "text-emerald-500" : "text-red-500"}`}>
+                      <span className={`mt-0.5 ${check.ok ? "text-emerald-500" : check.tier === "required" ? "text-red-500" : "text-amber-500"}`}>
                         {check.ok ? "\u2713" : "\u2717"}
                       </span>
                       <div>
-                        <span className="text-sm font-medium">{check.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{check.name}</span>
+                          {!check.ok && check.tier && (
+                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                              check.tier === "required"
+                                ? "bg-red-500/15 text-red-600 dark:text-red-400"
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                            }`}>
+                              {check.tier}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">{check.message}</p>
                         {!check.ok && check.name.toLowerCase().includes("git") && (
                           <p className="text-xs text-amber-600 mt-0.5">
@@ -250,16 +377,22 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
                     </div>
                   ))}
 
-                  {allChecksPassed ? (
+                  {bannerState === "all_pass" ? (
                     <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 mt-2">
                       <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
                         All checks passed
                       </p>
                     </div>
-                  ) : (
+                  ) : bannerState === "required_pass" ? (
                     <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 mt-2">
                       <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                        Some checks failed. You can continue, but some features may not work.
+                        Required checks passed. Some optional features are unavailable.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 mt-2">
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                        Required checks failed. Fix these before continuing.
                       </p>
                     </div>
                   )}
@@ -279,89 +412,14 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
 
           {/* Step 4: First Scan */}
           {step === 3 && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">First Scan</h2>
-                <p className="text-sm text-muted-foreground">
-                  Ready to scan <code className="bg-muted px-1.5 py-0.5 rounded text-foreground">{draft.devRoot}</code>
-                </p>
-              </div>
-
-              {!scanStarted && (
-                <div className="text-center py-4">
-                  <Button onClick={handleStartScan}>
-                    Start Scan
-                  </Button>
-                </div>
-              )}
-
-              {scanStarted && scanState.active && (
-                <div className="space-y-3 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="size-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">{scanState.phase}</span>
-                  </div>
-                  {scanCoreReady && (
-                    <div className="rounded-md bg-blue-500/10 border border-blue-500/20 p-3">
-                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                        Core scan complete. You can open the dashboard now while LLM enrichment continues in the background.
-                      </p>
-                      <div className="pt-2">
-                        <Button onClick={handleComplete}>
-                          Open Dashboard Now
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {scanDone && (
-                <div className="space-y-3 py-2">
-                  <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3">
-                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                      Found {scanState.summary?.projectCount ?? 0} projects
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <Button onClick={handleComplete}>
-                      Open Dashboard
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {scanError && (
-                <div className="space-y-3 py-2">
-                  <div className="rounded-md bg-red-500/10 border border-red-500/20 p-3 space-y-2">
-                    <p className="text-sm font-medium text-red-700 dark:text-red-400">
-                      {friendlyError(scanState.error!)}
-                    </p>
-                    <details className="text-xs text-muted-foreground">
-                      <summary className="cursor-pointer hover:text-foreground transition-colors">Details</summary>
-                      <pre className="mt-1 whitespace-pre-wrap break-all">{scanState.error}</pre>
-                    </details>
-                  </div>
-                  <div className="flex justify-center gap-2">
-                    <Button variant="outline" onClick={handleComplete}>
-                      Skip
-                    </Button>
-                    <Button onClick={handleStartScan}>
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {!scanStarted && (
-                <div className="flex justify-between pt-2">
-                  <Button variant="ghost" onClick={() => setStep(2)}>Back</Button>
-                  <Button variant="ghost" onClick={handleComplete}>
-                    Skip
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ScanStep
+              devRoot={draft.devRoot}
+              scanStarted={scanStarted}
+              scanState={scanState}
+              onStartScan={handleStartScan}
+              onComplete={handleComplete}
+              onBack={() => setStep(2)}
+            />
           )}
         </div>
       </DialogContent>

@@ -49,7 +49,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** Parse a single SSE frame: "event: <type>\ndata: <json>\n\n" */
-function parseSSE(chunk: string): Array<{ type: string; data: string }> {
+export function parseSSE(chunk: string): Array<{ type: string; data: string }> {
   const events: Array<{ type: string; data: string }> = [];
   const blocks = chunk.split("\n\n");
   for (const block of blocks) {
@@ -65,6 +65,90 @@ function parseSSE(chunk: string): Array<{ type: string; data: string }> {
   return events;
 }
 
+/** Pure state reducer for SSE events — testable without React. */
+export function reduceRefreshEvent(state: RefreshState, type: string, raw: string): RefreshState {
+  switch (type) {
+    case "scan_start":
+      return { ...state, phase: "Scanning filesystem..." };
+    case "scan_complete": {
+      const d = JSON.parse(raw);
+      return { ...state, phase: `Found ${d.projectCount} projects. Deriving...` };
+    }
+    case "derive_start":
+      return { ...state, phase: "Computing status and health scores..." };
+    case "derive_complete":
+      return { ...state, phase: "Saving scan results..." };
+    case "github_start":
+      return { ...state, phase: "Syncing GitHub data..." };
+    case "github_complete":
+      return {
+        ...state,
+        deterministicReady: true,
+        phase: "Core scan complete. LLM enrichment continues in background...",
+      };
+    case "project_start": {
+      const d: RefreshEvent = JSON.parse(raw);
+      const projects = new Map(state.projects);
+      const existing = projects.get(d.name!) ?? {
+        name: d.name!,
+        storeStatus: "pending" as const,
+        llmStatus: "pending" as const,
+      };
+      if (d.step === "store") existing.storeStatus = "running";
+      else if (d.step === "llm") existing.llmStatus = "running";
+      projects.set(d.name!, existing);
+      const phase = d.step === "llm"
+        ? `Enriching ${d.name} (${d.index! + 1}/${d.total})`
+        : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
+      const deterministicReady = d.step === "llm" ? true : state.deterministicReady;
+      return { ...state, projects, phase, deterministicReady };
+    }
+    case "project_complete": {
+      const d: RefreshEvent = JSON.parse(raw);
+      const projects = new Map(state.projects);
+      const existing = projects.get(d.name!);
+      if (existing) {
+        if (d.step === "store") {
+          existing.storeStatus = "done";
+          existing.detail = d.detail;
+        } else if (d.step === "llm") {
+          existing.llmStatus = "done";
+          if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
+        }
+        projects.set(d.name!, existing);
+      }
+      return { ...state, projects };
+    }
+    case "project_error": {
+      const d: RefreshEvent = JSON.parse(raw);
+      const projects = new Map(state.projects);
+      const existing = projects.get(d.name!);
+      if (existing) {
+        existing.llmStatus = "error";
+        existing.llmError = d.error;
+        projects.set(d.name!, existing);
+      }
+      return { ...state, projects };
+    }
+    case "done": {
+      const d: RefreshEvent = JSON.parse(raw);
+      return {
+        ...state,
+        active: false,
+        phase: "Complete",
+        deterministicReady: true,
+        summary: d,
+      };
+    }
+    case "pipeline_error": {
+      const d = JSON.parse(raw);
+      return { ...state, active: false, phase: "Error", error: d.error };
+    }
+    default:
+      return state;
+  }
+}
+
 export function useRefresh(onComplete: () => void) {
   const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
@@ -72,104 +156,13 @@ export function useRefresh(onComplete: () => void) {
   const cancelRequestedAtRef = useRef(0);
 
   const handleEvent = useCallback((type: string, raw: string) => {
-    switch (type) {
-      case "scan_start":
-        setState((s) => ({ ...s, phase: "Scanning filesystem..." }));
-        break;
-      case "scan_complete": {
-        const d = JSON.parse(raw);
-        setState((s) => ({ ...s, phase: `Found ${d.projectCount} projects. Deriving...` }));
-        break;
-      }
-      case "derive_start":
-        setState((s) => ({ ...s, phase: "Computing status and health scores..." }));
-        break;
-      case "derive_complete":
-        setState((s) => ({ ...s, phase: "Saving scan results..." }));
-        break;
-      case "github_start":
-        setState((s) => ({ ...s, phase: "Syncing GitHub data..." }));
-        break;
-      case "github_complete":
-        setState((s) => ({
-          ...s,
-          deterministicReady: true,
-          phase: "Core scan complete. LLM enrichment continues in background...",
-        }));
-        if (!hydratedCoreRef.current) {
-          hydratedCoreRef.current = true;
-          onComplete();
-        }
-        break;
-      case "project_start": {
-        const d: RefreshEvent = JSON.parse(raw);
-        setState((s) => {
-          const projects = new Map(s.projects);
-          const existing = projects.get(d.name!) ?? {
-            name: d.name!,
-            storeStatus: "pending" as const,
-            llmStatus: "pending" as const,
-          };
-          if (d.step === "store") existing.storeStatus = "running";
-          else if (d.step === "llm") existing.llmStatus = "running";
-          projects.set(d.name!, existing);
-          const phase = d.step === "llm"
-            ? `Enriching ${d.name} (${d.index! + 1}/${d.total})`
-            : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
-          const deterministicReady = d.step === "llm" ? true : s.deterministicReady;
-          return { ...s, projects, phase, deterministicReady };
-        });
-        break;
-      }
-      case "project_complete": {
-        const d: RefreshEvent = JSON.parse(raw);
-        setState((s) => {
-          const projects = new Map(s.projects);
-          const existing = projects.get(d.name!);
-          if (existing) {
-            if (d.step === "store") {
-              existing.storeStatus = "done";
-              existing.detail = d.detail;
-            } else if (d.step === "llm") {
-              existing.llmStatus = "done";
-              if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
-            }
-            projects.set(d.name!, existing);
-          }
-          return { ...s, projects };
-        });
-        break;
-      }
-      case "project_error": {
-        const d: RefreshEvent = JSON.parse(raw);
-        setState((s) => {
-          const projects = new Map(s.projects);
-          const existing = projects.get(d.name!);
-          if (existing) {
-            existing.llmStatus = "error";
-            existing.llmError = d.error;
-            projects.set(d.name!, existing);
-          }
-          return { ...s, projects };
-        });
-        break;
-      }
-      case "done": {
-        const d: RefreshEvent = JSON.parse(raw);
-        setState((s) => ({
-          ...s,
-          active: false,
-          phase: "Complete",
-          deterministicReady: true,
-          summary: d,
-        }));
-        break;
-      }
-      case "pipeline_error": {
-        const d = JSON.parse(raw);
-        setState((s) => ({ ...s, active: false, phase: "Error", error: d.error }));
-        break;
-      }
+    setState((s) => {
+      const next = reduceRefreshEvent(s, type, raw);
+      return next;
+    });
+    if (type === "github_complete" && !hydratedCoreRef.current) {
+      hydratedCoreRef.current = true;
+      onComplete();
     }
   }, [onComplete]);
 

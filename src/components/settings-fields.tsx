@@ -124,7 +124,7 @@ export function ProviderFields({
   draft: AppConfig;
   set: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
 }) {
-  const provider = draft.llmProvider || "claude-cli";
+  const provider = !draft.llmProvider || draft.llmProvider === "none" ? "claude-cli" : draft.llmProvider;
 
   return (
     <>

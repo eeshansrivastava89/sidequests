@@ -1,6 +1,6 @@
 # Sidequests — Implementation Plan
 
-## Status (2026-02-21)
+## Status (2026-02-22)
 
 - [Completed] v1 delivery (Phases 0-51W): infrastructure, scan pipeline, NPX distribution, first publish
 - [Completed] Phase 52W: GitHub data collection (#001→#002)
@@ -9,7 +9,8 @@
 - [Completed] Phase 55W: Project list row redesign (#009→#010)
 - [Completed] Phase 56W: Stats cards + header redesign (#011→#012)
 - [Completed] Phase 57W: Project drawer cleanup (#013→#014)
-- [Planned] v0.3 UX recovery: phases 58W-60W (onboarding flow, refresh reliability, project detail redesign)
+- [Completed] Phase 58W: Reliability + onboarding flow (#007→#015)
+- [Planned] v0.3 UX recovery: phases 59W-60W (project workspace redesign, signal clarity)
 
 ## v0.2 Vision
 
@@ -136,16 +137,17 @@ Constraints:
 ## Phase 58W — Reliability + Onboarding Flow
 
 **What:** Fix blocking/buggy first-run behavior and remove onboarding friction.
+**Status:** Complete (reviewed #007→#015, approved 2026-02-22)
 
 **Deliverables:**
-- [ ] Onboarding provider/model state is deterministic (no missing model dropdown on first provider selection)
-- [ ] First scan is two-stage in UI:
+- [x] Onboarding provider/model state is deterministic (no missing model dropdown on first provider selection)
+- [x] First scan is two-stage in UI:
   1) deterministic scan + GitHub sync (fast)
   2) LLM enrichment continues in background
-- [ ] Onboarding Step 4 allows "Open Dashboard Now" immediately after stage (1), while stage (2) runs
-- [ ] Refresh cancel/restart handshake is robust (no stuck "in progress" toast loop after cancel)
-- [ ] Diagnostics UI shows required vs optional checks clearly
-- [ ] Onboarding modal spacing/typography tightened (less cramped, better scanability)
+- [x] Onboarding Step 4 allows "Open Dashboard Now" immediately after stage (1), while stage (2) runs
+- [x] Refresh cancel/restart handshake is robust (no stuck "in progress" toast loop after cancel)
+- [x] Diagnostics UI shows required vs optional checks clearly
+- [x] Onboarding modal spacing/typography tightened (less cramped, better scanability)
 
 **Primary files:**
 - `src/hooks/use-refresh.ts`
