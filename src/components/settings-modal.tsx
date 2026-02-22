@@ -85,12 +85,15 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="overflow-y-auto px-6 space-y-6 max-h-[calc(80vh-8rem)]">
+        <div className="overflow-y-auto scrollbar-hide px-6 space-y-8 max-h-[calc(80vh-8rem)]">
           {/* ── General ── */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              General
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                General
+              </h3>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
             <Field label="Dev Root" description="Root directory to scan for projects">
               <Input
@@ -118,9 +121,12 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
           {/* ── LLM Provider ── */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              LLM Provider
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                LLM Provider
+              </h3>
+              <div className="flex-1 h-px bg-border" />
+            </div>
 
             <ProviderFields draft={draft} set={set} />
 
@@ -158,41 +164,55 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
           {/* ── System Status ── */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                 System Status
               </h3>
-              {!preflightLoading && (
-                <Button size="sm" variant="ghost" onClick={fetchPreflight} className="h-6 text-xs">
-                  Re-check
-                </Button>
-              )}
+              <div className="flex-1 h-px bg-border" />
             </div>
             {preflightLoading ? (
               <p className="text-sm text-muted-foreground">Checking...</p>
             ) : preflight ? (
-              <div className="space-y-1.5">
-                {preflight.map((check) => (
-                  <div key={check.name} className="flex items-center gap-2">
-                    <span className={check.ok ? "text-emerald-500" : "text-red-500"}>
-                      {check.ok ? "\u2713" : "\u2717"}
-                    </span>
-                    <span className="text-sm font-medium">{check.name}</span>
-                    <span className="text-xs text-muted-foreground truncate">{check.message}</span>
-                  </div>
-                ))}
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="divide-y divide-border">
+                  {preflight.map((check) => {
+                    // Green = ok, red = required & failed, grey = optional & not active
+                    const dotColor = check.ok
+                      ? "bg-emerald-500"
+                      : (check as { tier?: string }).tier === "required"
+                        ? "bg-red-500"
+                        : "bg-muted-foreground/30";
+                    return (
+                      <div key={check.name} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
+                          <span className="text-sm">{check.name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground truncate ml-4">{check.message}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">Unable to check system status.</p>
+            )}
+            {!preflightLoading && (
+              <Button size="sm" variant="ghost" onClick={fetchPreflight} className="text-xs text-blue-600 dark:text-blue-400">
+                Re-check
+              </Button>
             )}
           </section>
 
         </div>
 
-        {/* ── Save — sticky outside scroll area ── */}
-        <div className="flex justify-end px-6 py-4 border-t border-border">
+        {/* ── Footer — sticky outside scroll area ── */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save Settings"}
+            {saving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </DialogContent>

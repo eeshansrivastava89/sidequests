@@ -54,46 +54,36 @@ export async function GET() {
     }
   }
 
-  // LLM provider — optional (enables summaries, next actions, risks)
+  // LLM providers — check all, mark active provider and inactive ones
   const provider = config.llmProvider;
-  if (provider && provider !== "none") {
-    switch (provider) {
-      case "claude-cli":
-        checks.push(checkBinary("claude", "claude", "optional", "Install with: npm install -g @anthropic-ai/claude-code"));
-        break;
-      case "openrouter": {
-        const hasKey = !!(process.env.OPENROUTER_API_KEY || config.openrouterApiKey);
-        checks.push({
-          name: "openrouter",
-          ok: hasKey,
-          message: hasKey ? "API key configured" : "OPENROUTER_API_KEY not set (configure in Settings)",
-          tier: "optional",
-        });
-        break;
-      }
-      case "ollama": {
-        const url = config.ollamaUrl || "http://localhost:11434";
-        checks.push(await checkUrl("ollama", url, "optional", "Is Ollama running? Try: ollama serve"));
-        break;
-      }
-      case "mlx": {
-        const url = config.mlxUrl || "http://localhost:8080";
-        checks.push(await checkUrl("mlx", url, "optional", "Is the MLX server running on the expected port?"));
-        break;
-      }
-      case "codex-cli": {
-        checks.push(checkBinary("codex", "codex", "optional"));
-        if (!config.llmAllowUnsafe) {
-          checks.push({
-            name: "codex-cli-unsafe",
-            ok: false,
-            message: "codex-cli requires Allow Unsafe to be enabled in Settings",
-            tier: "optional",
-          });
-        }
-        break;
-      }
-    }
+
+  // LLM providers — green if installed/reachable, grey if not
+  // Claude CLI
+  const claudeCheck = checkBinary("claude", "claude", "optional", "Install with: npm install -g @anthropic-ai/claude-code");
+  checks.push(claudeCheck);
+
+  // OpenRouter
+  {
+    const hasKey = !!(process.env.OPENROUTER_API_KEY || config.openrouterApiKey);
+    checks.push({ name: "openrouter", ok: hasKey, message: hasKey ? "API key configured" : "No API key set", tier: "optional" });
+  }
+
+  // Ollama
+  {
+    const url = config.ollamaUrl || "http://localhost:11434";
+    checks.push(await checkUrl("ollama", url, "optional", "Is Ollama running? Try: ollama serve"));
+  }
+
+  // MLX
+  {
+    const url = config.mlxUrl || "http://localhost:8080";
+    checks.push(await checkUrl("mlx", url, "optional", "Is the MLX server running?"));
+  }
+
+  // Codex CLI
+  {
+    const codexCheck = checkBinary("codex", "codex", "optional");
+    checks.push(codexCheck);
   }
 
   return NextResponse.json({ checks });

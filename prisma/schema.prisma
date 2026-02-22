@@ -64,9 +64,12 @@ model Llm {
   nextAction             String?
   llmStatus              String?   // LlmStatus: building|shipping|maintaining|blocked|stale|idea
   statusReason           String?
-  risksJson              String?   // JSON array of risk strings
+  risksJson              String?   // deprecated — use insightsJson
   tagsJson               String?   // JSON array
-  recommendationsJson    String?   // JSON array
+  recommendationsJson    String?   // deprecated — use insightsJson
+  insightsJson           String?   // JSON array — consolidated insights
+  framework              String?
+  primaryLanguage        String?
   // Deprecated (kept for rollback safety)
   purpose                String?
   notableFeaturesJson    String?   // JSON array

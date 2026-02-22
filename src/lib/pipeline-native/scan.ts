@@ -27,6 +27,7 @@ const LANGUAGE_INDICATORS: Record<string, string> = {
   "mix.exs": "Elixir",
   "Package.swift": "Swift",
   "composer.json": "PHP",
+  "index.html": "HTML/CSS",
 };
 
 const SOURCE_EXTENSIONS = new Set([
@@ -38,33 +39,6 @@ const SKIP_WALK_DIRS = new Set([
   "node_modules", ".venv", ".git", "__pycache__", "dist", "build",
   ".next", "target", ".tox", "venv", "env",
 ]);
-
-const FRAMEWORK_MAP_JS: Record<string, string> = {
-  next: "nextjs",
-  react: "react",
-  vue: "vue",
-  "@angular/core": "angular",
-  express: "express",
-  fastify: "fastify",
-  svelte: "svelte",
-  nuxt: "nuxt",
-  "@remix-run/react": "remix",
-  gatsby: "gatsby",
-};
-
-const FRAMEWORK_MAP_RUST: Record<string, string> = {
-  axum: "axum",
-  "actix-web": "actix",
-  rocket: "rocket",
-  warp: "warp",
-};
-
-const FRAMEWORK_MAP_PYTHON: [string, string][] = [
-  ["fastapi", "fastapi"],
-  ["django", "django"],
-  ["flask", "flask"],
-  ["starlette", "starlette"],
-];
 
 const SERVICE_DEPS: Record<string, string> = {
   "@supabase/supabase-js": "supabase",
@@ -398,53 +372,6 @@ function getDescription(projectPath: string): string | null {
   return null;
 }
 
-function detectFramework(projectPath: string): string | null {
-  // Check package.json
-  const pkg = readJsonSafe(path.join(projectPath, "package.json"));
-  if (pkg) {
-    const allDeps: Record<string, unknown> = {
-      ...((pkg.dependencies as Record<string, unknown>) ?? {}),
-      ...((pkg.devDependencies as Record<string, unknown>) ?? {}),
-    };
-    for (const [depName, framework] of Object.entries(FRAMEWORK_MAP_JS)) {
-      if (depName in allDeps) return framework;
-    }
-  }
-
-  // Check Cargo.toml
-  const cargoPath = path.join(projectPath, "Cargo.toml");
-  if (fs.existsSync(cargoPath)) {
-    try {
-      const text = fs.readFileSync(cargoPath, "utf-8");
-      for (const [depName, framework] of Object.entries(FRAMEWORK_MAP_RUST)) {
-        if (text.includes(depName)) return framework;
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // Check pyproject.toml and requirements.txt
-  let pyText = "";
-  for (const f of ["pyproject.toml", "requirements.txt"]) {
-    const fp = path.join(projectPath, f);
-    if (fs.existsSync(fp)) {
-      try {
-        pyText += fs.readFileSync(fp, "utf-8");
-      } catch {
-        // ignore
-      }
-    }
-  }
-  if (pyText) {
-    for (const [depName, framework] of FRAMEWORK_MAP_PYTHON) {
-      if (pyText.includes(depName)) return framework;
-    }
-  }
-
-  return null;
-}
-
 function detectScripts(projectPath: string): string[] {
   const pkg = readJsonSafe(path.join(projectPath, "package.json"));
   if (pkg) {
@@ -531,7 +458,7 @@ export function scanProject(absPath: string): Record<string, unknown> {
   const deployment = checkDeployment(absPath);
   const [todoCount, fixmeCount, locEstimate] = countTodos(absPath);
   const description = getDescription(absPath);
-  const framework = detectFramework(absPath);
+  const framework = null; // Phase 61W: framework detection moved to LLM enrichment
 
   let liveUrl: string | null = null;
   const pkg = readJsonSafe(path.join(absPath, "package.json"));

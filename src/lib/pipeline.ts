@@ -131,6 +131,7 @@ export async function runRefreshPipeline(
     data: { prunedAt: null },
   });
 
+
   const total = scanData.projects.length;
 
   // 3. Store phase (sequential) — upsert Project, Scan, Derived for each project
@@ -158,7 +159,6 @@ export async function runRefreshPipeline(
       update: {
         name,
         pathDisplay: projPath,
-        lastTouchedAt: new Date(),
       },
     });
 
@@ -188,7 +188,7 @@ export async function runRefreshPipeline(
       const isDirty = (scanned.isDirty as boolean) ?? false;
       const ahead = (scanned.ahead as number) ?? 0;
       const behind = (scanned.behind as number) ?? 0;
-      const framework = (scanned.framework as string) ?? null;
+      const framework = null; // Phase 61W: framework detection moved to LLM enrichment
       const branchName = (scanned.branch as string) ?? null;
       const lastCommitDateStr = scanned.lastCommitDate as string | null;
       const lastCommitDate = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
@@ -354,18 +354,20 @@ export async function runRefreshPipeline(
               nextAction: enrichment.nextAction,
               llmStatus: enrichment.status,
               statusReason: enrichment.statusReason,
-              risksJson: JSON.stringify(enrichment.risks),
               tagsJson: JSON.stringify(enrichment.tags),
-              recommendationsJson: JSON.stringify(enrichment.recommendations),
+              insightsJson: JSON.stringify(enrichment.insights),
+              framework: enrichment.framework,
+              primaryLanguage: enrichment.primaryLanguage,
             },
             update: {
               summary: enrichment.summary,
               nextAction: enrichment.nextAction,
               llmStatus: enrichment.status,
               statusReason: enrichment.statusReason,
-              risksJson: JSON.stringify(enrichment.risks),
               tagsJson: JSON.stringify(enrichment.tags),
-              recommendationsJson: JSON.stringify(enrichment.recommendations),
+              insightsJson: JSON.stringify(enrichment.insights),
+              framework: enrichment.framework,
+              primaryLanguage: enrichment.primaryLanguage,
               generatedAt: new Date(),
             },
           });

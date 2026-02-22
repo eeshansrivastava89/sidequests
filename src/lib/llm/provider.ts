@@ -10,9 +10,10 @@ export interface LlmEnrichment {
   nextAction: string;        // always populated
   status: LlmStatus;         // LLM-assessed project phase
   statusReason: string;      // why this status
-  risks: string[];           // flat array
   tags: string[];
-  recommendations: string[];
+  insights: string[];         // consolidated risks + recommendations
+  framework: string | null;        // e.g. "Next.js", "Astro", "FastAPI", "Axum"
+  primaryLanguage: string | null;  // e.g. "TypeScript", "Python", "Rust"
 }
 
 export interface LlmInput {

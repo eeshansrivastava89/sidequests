@@ -148,7 +148,7 @@ describe("pipeline integration — store phase", () => {
     expect(derived.momentumScoreAuto).toBe(75);
     expect(derived.isDirty).toBe(false);
     expect(derived.ahead).toBe(0);
-    expect(derived.framework).toBe("next");
+    expect(derived.framework).toBeNull(); // Phase 61W: framework detection moved to LLM
     expect(derived.locEstimate).toBe(5000);
   });
 });
@@ -200,7 +200,7 @@ describe("pipeline integration — LLM enrichment", () => {
     expect(llm.nextAction).toBe(LLM_ENRICHMENT_FIXTURE.nextAction);
     expect(llm.llmStatus).toBe(LLM_ENRICHMENT_FIXTURE.status);
     expect(llm.statusReason).toBe(LLM_ENRICHMENT_FIXTURE.statusReason);
-    expect(JSON.parse(llm.risksJson)).toEqual(LLM_ENRICHMENT_FIXTURE.risks);
+    expect(JSON.parse(llm.insightsJson)).toEqual(LLM_ENRICHMENT_FIXTURE.insights);
     expect(JSON.parse(llm.tagsJson)).toEqual(LLM_ENRICHMENT_FIXTURE.tags);
 
     // Phase 53W: LLM no longer writes Metadata

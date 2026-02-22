@@ -9,9 +9,18 @@ interface StatsBarProps {
   projects: Project[];
   activeFilter?: SignalFilter;
   onFilter?: (filter: SignalFilter) => void;
+  onClearAll?: () => void;
 }
 
-export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
+/* Catppuccin-aligned accent colors per card type */
+const ACCENT_CLASSES: Record<string, string> = {
+  uncommitted: "text-[#fab387] dark:text-[#fab387]",     // peach
+  "open-issues": "text-[#fab387] dark:text-[#fab387]",   // peach
+  "ci-failing": "text-[#f38ba8] dark:text-[#f38ba8]",    // red
+  "not-on-github": "text-muted-foreground",               // grey/muted
+};
+
+export function StatsBar({ projects, activeFilter, onFilter, onClearAll }: StatsBarProps) {
   const total = projects.length;
   const uncommitted = projects.filter((p) => p.isDirty).length;
   const openIssues = projects.reduce((sum, p) => sum + p.openIssues, 0);
@@ -32,7 +41,7 @@ export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       {cards.map((c) => {
         const isActive = c.key !== null && activeFilter === c.key;
         const isClickable = Boolean(onFilter);
@@ -44,13 +53,13 @@ export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
             onClick={() => {
               if (!isClickable) return;
               if (c.key === null) {
-                onFilter?.(null);
+                if (onClearAll) { onClearAll(); } else { onFilter?.(null); }
               } else {
                 onFilter?.(isActive ? null : c.key);
               }
             }}
             className={cn(
-              "rounded-lg border bg-card px-4 py-3 text-center transition-colors",
+              "rounded-xl border bg-card px-5 py-4 text-center transition-colors",
               isActive
                 ? "border-amber-500 ring-1 ring-amber-500/50"
                 : "border-border",
@@ -59,12 +68,12 @@ export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
             )}
           >
             <div className={cn(
-              "text-2xl font-semibold tracking-tight",
-              c.accent ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+              "text-3xl font-bold tracking-tight",
+              c.accent && c.key ? ACCENT_CLASSES[c.key] : "text-foreground"
             )}>
               {c.value}
             </div>
-            <div className="text-xs text-muted-foreground">{c.label}</div>
+            <div className="text-sm text-muted-foreground mt-1">{c.label}</div>
           </button>
         );
       })}

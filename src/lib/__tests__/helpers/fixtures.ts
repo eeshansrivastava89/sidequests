@@ -162,9 +162,8 @@ export const LLM_ENRICHMENT_FIXTURE: LlmEnrichment = {
   nextAction: "Write documentation and add integration tests",
   status: "building" as LlmStatus,
   statusReason: "Active development with frequent commits and features in progress",
-  risks: ["No test coverage", "Single maintainer"],
   tags: ["typescript", "next", "dashboard"],
-  recommendations: ["Add unit tests", "Set up CI/CD"],
+  insights: ["Add unit tests to prevent regressions as the codebase grows", "Set up CI/CD to automate builds and catch issues early", "Consider adding a second maintainer to reduce bus factor risk"],
 };
 
 // -- DB seeding helpers --
@@ -291,6 +290,9 @@ export async function seedProject(
         risksJson: overrides.llm?.risksJson ?? JSON.stringify(["No tests"]),
         tagsJson: overrides.llm?.tagsJson ?? JSON.stringify(["typescript"]),
         recommendationsJson: overrides.llm?.recommendationsJson ?? JSON.stringify(["Add tests"]),
+        insightsJson: overrides.llm?.insightsJson ?? JSON.stringify(["Add tests to improve coverage"]),
+        framework: overrides.llm?.framework ?? "Next.js",
+        primaryLanguage: overrides.llm?.primaryLanguage ?? "TypeScript",
         // Legacy fields
         purpose: overrides.llm?.purpose ?? "Test purpose",
         notableFeaturesJson: overrides.llm?.notableFeaturesJson ?? JSON.stringify(["SSR"]),

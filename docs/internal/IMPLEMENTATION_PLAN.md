@@ -11,7 +11,9 @@
 - [Completed] Phase 57W: Project drawer cleanup (#013→#014)
 - [Completed] Phase 58W: Reliability + onboarding flow (#007→#015)
 - [Completed] Phase 59W: Project workspace redesign (#017→#020)
-- [Planned] v0.3 UX recovery remaining: phase 60W (signal clarity + interaction polish)
+- [Completed] Phase 60W: Signal clarity + interaction polish (#021→#024)
+- [Completed] v0.3 UX recovery: phases 58W-60W
+- [Completed] Phase 61W: LLM-sourced framework/language + consolidated insights
 
 ## v0.2 Vision
 
@@ -117,7 +119,7 @@ Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
 
 **Deliverables:**
 - [x] **Summary** section: LLM summary with status badge + statusReason
-- [x] **Next Action + Risks** section: prominent, with recommendations
+- [x] **Next Action + Insights** section: prominent, consolidated observations
 - [x] **GitHub** section: issues/PRs/CI/visibility + top issues/PRs lists
 - [x] **Details** section: collapsed by default, compact 4-column grid
 - [x] **Timeline**: collapsed by default, paginated git commits + activity events
@@ -182,15 +184,16 @@ Constraints:
 ## Phase 60W — Signal Clarity + Interaction Polish
 
 **What:** Make status/filter semantics obvious and interaction model predictable.
+**Status:** Complete (reviewed #021→#024, approved 2026-02-22)
 
 **Deliverables:**
-- [ ] Status color legend integrated into top filter tabs (dot colors match row status dots)
-- [ ] Stats cards interaction consistency:
+- [x] Status color legend integrated into top filter tabs (dot colors match row status dots)
+- [x] Stats cards interaction consistency:
   - Projects card explicitly clears filters
   - active filter state is visually obvious
-- [ ] "Needs Attention" and other status/filter chips have consistent color language
-- [ ] Improve keyboard and focus behavior for list → detail interactions
-- [ ] Add regression tests for:
+- [x] "Needs Attention" and other status/filter chips have consistent color language
+- [x] Improve keyboard and focus behavior for list → detail interactions
+- [x] Add regression tests for:
   - cancel then refresh
   - first-scan unblock behavior
   - provider/model conditional rendering
@@ -199,18 +202,44 @@ Constraints:
 - `src/app/page.tsx`
 - `src/components/stats-bar.tsx`
 - `src/components/project-list.tsx`
+- `src/lib/status-colors.ts`
 - `src/hooks/use-refresh.ts`
 - `src/components/__tests__/onboarding-wizard.test.ts`
-- `src/app/api/__tests__/refresh.integration.test.ts`
+- `src/components/__tests__/stats-bar-filter.test.tsx`
+- `src/components/__tests__/project-list-keyboard.test.tsx`
+- `src/hooks/__tests__/use-refresh-restart.test.tsx`
+
+## Phase 61W — LLM-Sourced Framework/Language + Consolidated Insights
+
+**What:** Move framework/language detection from hardcoded maps to LLM enrichment. Consolidate risks + recommendations into unified insights.
+**Status:** Complete
+
+**Deliverables:**
+- [x] Added `framework` and `primaryLanguage` to LLM output schema — LLM determines these from scan context
+- [x] Removed deterministic framework detection (`FRAMEWORK_MAP_JS`, `FRAMEWORK_MAP_RUST`, `FRAMEWORK_MAP_PYTHON`, `detectFramework()`) from `scan.ts`
+- [x] Removed `FRAMEWORK_LABELS` map from `project-list.tsx` — LLM returns human-readable labels directly
+- [x] Consolidated `risks[]` + `recommendations[]` into single `insights[]` field — each insight combines concern + action
+- [x] Updated LLM prompt to request distinct, non-redundant insights (3-5 bullets)
+- [x] Added `insightsJson`, `framework`, `primaryLanguage` columns to Llm DB model
+- [x] Backward compat: merge layer falls back to legacy risksJson + recommendationsJson when insightsJson is null
+- [x] Aligned `prisma` CLI version to `^7.3.0` (matching `@prisma/client`)
+
+**Primary files:**
+- `src/lib/llm/provider.ts`, `src/lib/llm/prompt.ts`
+- `src/lib/pipeline-native/scan.ts`
+- `src/lib/pipeline.ts`, `src/lib/merge.ts`
+- `src/lib/types.ts`, `src/components/project-list.tsx`, `src/components/project-detail-pane.tsx`
+- `prisma/schema.prisma`, `bin/bootstrap-db.mjs`
 
 ---
 
-## Implementation Order
+## Implementation Sequence
 
-Phases 52W + 53W can run in parallel (both backend, no UI changes).
-Phases 54W-57W are sequential (each builds on previous).
-Phases 58W-60W are sequential and UX-focused.
+Current execution state:
+- Completed: 52W, 53W, 54W, 55W, 56W, 57W, 58W, 59W, 60W, 61W
+- Next: roadmap decision for v0.4 scope
 
+Historical execution order (reference):
 ```mermaid
 flowchart LR
   A[52W GitHub Data] --> C[54W Unified Scan]
@@ -223,6 +252,7 @@ flowchart LR
   H --> I[59W Workspace Redesign]
   I --> J[60W Signal + Interaction Polish]
   J --> K[v0.3 UX Release]
+  K --> L[61W Framework/Language + Insights]
 ```
 
 ## Verification (v0.2)

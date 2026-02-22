@@ -10,20 +10,20 @@ export interface Project {
   scoreBreakdown: Record<string, Record<string, number>>;
   summary: string | null;
   tags: string[];
-  recommendations: string[];
+  insights: string[];
   notes: string | null;
 
   // Phase 53W: LLM actionable fields
   nextAction: string | null;
   llmStatus: string | null;
   statusReason: string | null;
-  risks: string[];
 
   // Promoted derived columns
   isDirty: boolean;
   ahead: number;
   behind: number;
   framework: string | null;
+  primaryLanguage: string | null;
   branchName: string | null;
   lastCommitDate: string | null;
   locEstimate: number;

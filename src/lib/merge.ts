@@ -25,20 +25,21 @@ export interface MergedProject {
   scoreBreakdown: Record<string, Record<string, number>>;
   summary: string | null;
   tags: string[];
-  recommendations: string[];
+  insights: string[];
   notes: string | null;
 
   // Phase 53W: LLM actionable fields
   nextAction: string | null;
   llmStatus: string | null;
   statusReason: string | null;
-  risks: string[];
+  // risks removed — use insights
 
   // Promoted derived columns
   isDirty: boolean;
   ahead: number;
   behind: number;
   framework: string | null;
+  primaryLanguage: string | null;
   branchName: string | null;
   lastCommitDate: string | null;
   locEstimate: number;
@@ -150,6 +151,9 @@ export type ProjectWithRelations = Project & {
     risksJson: string | null;
     tagsJson: string | null;
     recommendationsJson: string | null;
+    insightsJson: string | null;
+    framework: string | null;
+    primaryLanguage: string | null;
     // Legacy fields
     purpose: string | null;
     notableFeaturesJson: string | null;
@@ -212,14 +216,18 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     (Array.isArray(derivedData.tags) ? derivedData.tags as string[] : []);
 
   const notableFeatures = parseJson<string[]>(llm?.notableFeaturesJson, []);
-  const recommendations = parseJson<string[]>(llm?.recommendationsJson, []);
+  // Consolidated insights — fallback to legacy risks+recommendations for old data
+  const insights = parseJson<string[]>(llm?.insightsJson, null as unknown as string[])
+    ?? [
+      ...parseJson<string[]>(llm?.risksJson, []),
+      ...parseJson<string[]>(llm?.recommendationsJson, []),
+    ];
   const notes = override?.notesOverride ?? null;
 
   // Phase 53W: actionable fields with metadata override priority
   const nextAction = metadata?.nextAction ?? llm?.nextAction ?? null;
   const llmStatus = llm?.llmStatus ?? null;
   const statusReason = llm?.statusReason ?? null;
-  const risks = parseJson<string[]>(llm?.risksJson, []);
 
   return {
     id: project.id,
@@ -233,19 +241,19 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     scoreBreakdown,
     summary,
     tags,
-    recommendations,
+    insights,
     notes,
 
     nextAction,
     llmStatus,
     statusReason,
-    risks,
 
     // Promoted derived columns
     isDirty: derived?.isDirty ?? rawScan?.isDirty ?? false,
     ahead: derived?.ahead ?? rawScan?.ahead ?? 0,
     behind: derived?.behind ?? rawScan?.behind ?? 0,
-    framework: derived?.framework ?? rawScan?.framework ?? null,
+    framework: llm?.framework ?? null,
+    primaryLanguage: llm?.primaryLanguage ?? null,
     branchName: derived?.branchName ?? rawScan?.branch ?? null,
     lastCommitDate: derived?.lastCommitDate?.toISOString() ?? rawScan?.lastCommitDate ?? null,
     locEstimate: derived?.locEstimate ?? rawScan?.locEstimate ?? 0,

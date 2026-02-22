@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { copyToClipboard, formatRelativeDate } from "@/lib/project-helpers";
+import { copyToClipboard, formatRelativeDate, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { X, ExternalLink } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -36,28 +36,26 @@ function StatusSelect({
   );
 }
 
-function SectionBox({
+function SectionCard({
   title,
-  source,
-  highlight,
+  sourceLabel,
   children,
 }: {
   title: string;
-  source?: { type: "scan" | "llm" | "github"; timestamp: string | null };
-  highlight?: boolean;
+  sourceLabel?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("border border-border rounded-lg p-3", highlight && "border-l-2 border-l-amber-400")}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
-        {source && (
-          <span className="text-[10px] text-muted-foreground">
-            {source.type} · {source.timestamp ? formatRelativeDate(source.timestamp) : "\u2014"}
-          </span>
+    <div className="rounded-xl border border-border overflow-hidden">
+      <div className="px-5 py-3 bg-card border-b border-border flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        {sourceLabel && (
+          <span className="text-xs text-muted-foreground">{sourceLabel}</span>
         )}
       </div>
-      {children}
+      <div className="px-5 py-4">
+        {children}
+      </div>
     </div>
   );
 }
@@ -105,12 +103,12 @@ interface TimelineEntry {
   date: string;
 }
 
-const TIMELINE_BADGE_CLASSES: Record<string, string> = {
-  git: "bg-zinc-100 text-zinc-600",
-  scan: "bg-blue-100 text-blue-700",
-  llm: "bg-purple-100 text-purple-700",
-  user: "bg-emerald-100 text-emerald-700",
-  pin: "bg-amber-100 text-amber-700",
+const TIMELINE_TYPE_CLASSES: Record<string, string> = {
+  git: "text-muted-foreground",
+  scan: "text-blue-500",
+  llm: "text-purple-500",
+  user: "text-emerald-500",
+  pin: "text-amber-500",
 };
 
 function activityToTimelineType(entryType: string): string {
@@ -176,14 +174,6 @@ function parseJsonList(json: string | null): Array<{ title: string; number: numb
   }
 }
 
-function parseGitHubOwnerRepo(remoteUrl: string | null | undefined): { owner: string; repo: string } | null {
-  if (!remoteUrl) return null;
-  const sshMatch = remoteUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
-  const httpsMatch = remoteUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  return null;
-}
 
 /* ── Props ─────────────────────────────────────────────── */
 
@@ -210,11 +200,18 @@ export function ProjectDetailPane({
 }: ProjectDetailPaneProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [timelinePage, setTimelinePage] = useState(0);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Reset state + fetch activity when project changes
+  const changeTimelinePage = useCallback((page: number) => {
+    setTimelinePage(page);
+    // After state update, scroll the timeline card header into view
+    requestAnimationFrame(() => {
+      timelineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  // Fetch activity when project changes (state resets via key prop on mount)
   useEffect(() => {
-    setActivities([]);
-    setTimelinePage(0);
     if (!project.id) return;
     let cancelled = false;
     fetch(`/api/projects/${project.id}/activity`)
@@ -228,7 +225,7 @@ export function ProjectDetailPane({
 
   const scan = project.scan;
   const rawPath = project.pathDisplay;
-  const framework = project.framework ?? scan?.languages?.primary ?? null;
+  const framework = project.framework ?? project.primaryLanguage ?? null;
   const branchName = project.branchName ?? scan?.branch ?? null;
   const loc = project.locEstimate || null;
   const services = project.services.length > 0 ? project.services : null;
@@ -245,9 +242,9 @@ export function ProjectDetailPane({
   return (
     <div className="flex flex-col h-full">
       {/* Sticky header */}
-      <div className="shrink-0 border-b border-border px-4 py-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold leading-tight truncate">{project.name}</h2>
+      <div className="shrink-0 border-b border-border px-6 py-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold leading-tight truncate">{project.name}</h2>
           <button
             type="button"
             className={cn(
@@ -263,18 +260,38 @@ export function ProjectDetailPane({
           </button>
           <button
             type="button"
-            className="ml-auto flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+            className="ml-auto flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
             onClick={onClose}
             aria-label="Close detail pane"
           >
-            <X className="size-4" />
+            <X className="size-5" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">{rawPath}</p>
+        <div className="flex items-center gap-3 mt-1.5">
+          <p className="text-sm text-muted-foreground font-mono truncate">{rawPath}</p>
+          <span className="text-sm text-muted-foreground">&middot;</span>
+          <span className="text-sm text-muted-foreground">
+            Active {formatRelativeTime(project.lastTouchedAt ?? scan?.lastCommitDate ?? "")}
+          </span>
+          {repoBaseUrl && (
+            <>
+              <span className="text-sm text-muted-foreground">&middot;</span>
+              <a
+                href={repoBaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+              >
+                <ExternalLink className="size-3" />
+                GitHub
+              </a>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
         {/* Status + badges + Quick actions */}
         <div className="flex items-center justify-between gap-2">
@@ -296,7 +313,7 @@ export function ProjectDetailPane({
               </Badge>
             )}
             {project.ahead != null && project.ahead > 0 && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30" title={`${project.ahead} commits ahead of remote`}>
                 ↑{project.ahead}
               </Badge>
             )}
@@ -365,245 +382,212 @@ export function ProjectDetailPane({
 
         {/* Last commit message */}
         {scan?.lastCommitMessage && (
-          <div className="font-mono text-sm bg-muted/50 rounded px-2.5 py-1.5 text-foreground/80">
+          <div className="font-mono text-sm bg-card rounded-lg px-4 py-3 text-foreground/80">
             {scan.lastCommitMessage}
           </div>
         )}
 
-        {/* ── Section 1: GitHub ── */}
+        {/* ── GitHub Card ── */}
         {hasGitHub && (
-          <SectionBox
+          <SectionCard
             title="GitHub"
-            source={{ type: "github", timestamp: project.githubFetchedAt }}
+            sourceLabel={project.githubFetchedAt ? `Synced ${formatRelativeDate(project.githubFetchedAt)}` : undefined}
           >
-            <div className="space-y-3">
-              <div className="flex items-center gap-4 text-sm">
+            <div className="space-y-4">
+              {/* Metric tiles — clickable links */}
+              <div className="grid grid-cols-4 gap-3">
                 {issuesUrl ? (
-                  <a href={issuesUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    {project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}
+                  <a href={issuesUrl} target="_blank" rel="noopener noreferrer" className="group rounded-lg bg-card px-3 py-3 text-center cursor-pointer hover:bg-muted hover:ring-1 hover:ring-ring transition-colors">
+                    <div className="text-xl font-bold">{project.openIssues}</div>
+                    <div className="text-xs text-muted-foreground mt-1 group-hover:underline">Issues</div>
                   </a>
                 ) : (
-                  <span>{project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}</span>
+                  <div className="rounded-lg bg-card px-3 py-3 text-center">
+                    <div className="text-xl font-bold">{project.openIssues}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Issues</div>
+                  </div>
                 )}
                 {prsUrl ? (
-                  <a href={prsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    {project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}
+                  <a href={prsUrl} target="_blank" rel="noopener noreferrer" className="group rounded-lg bg-card px-3 py-3 text-center cursor-pointer hover:bg-muted hover:ring-1 hover:ring-ring transition-colors">
+                    <div className="text-xl font-bold">{project.openPrs}</div>
+                    <div className="text-xs text-muted-foreground mt-1 group-hover:underline">PRs</div>
                   </a>
                 ) : (
-                  <span>{project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}</span>
+                  <div className="rounded-lg bg-card px-3 py-3 text-center">
+                    <div className="text-xl font-bold">{project.openPrs}</div>
+                    <div className="text-xs text-muted-foreground mt-1">PRs</div>
+                  </div>
                 )}
                 {actionsUrl ? (
-                  <a href={actionsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">
-                    CI: <CiStatusLabel status={project.ciStatus} />
+                  <a href={actionsUrl} target="_blank" rel="noopener noreferrer" className="group rounded-lg bg-card px-3 py-3 text-center cursor-pointer hover:bg-muted hover:ring-1 hover:ring-ring transition-colors">
+                    <div className="text-xl font-bold"><CiStatusLabel status={project.ciStatus} /></div>
+                    <div className="text-xs text-muted-foreground mt-1 group-hover:underline">CI Status</div>
                   </a>
                 ) : (
-                  <span className="flex items-center gap-1">CI: <CiStatusLabel status={project.ciStatus} /></span>
+                  <div className="rounded-lg bg-card px-3 py-3 text-center">
+                    <div className="text-xl font-bold"><CiStatusLabel status={project.ciStatus} /></div>
+                    <div className="text-xs text-muted-foreground mt-1">CI Status</div>
+                  </div>
                 )}
-                {project.repoVisibility !== "unknown" && (
-                  <Badge variant="outline" className="text-[10px]">{project.repoVisibility}</Badge>
+                {repoBaseUrl ? (
+                  <a href={repoBaseUrl} target="_blank" rel="noopener noreferrer" className="group rounded-lg bg-card px-3 py-3 text-center cursor-pointer hover:bg-muted hover:ring-1 hover:ring-ring transition-colors">
+                    <div className="text-xl font-bold">
+                      {project.repoVisibility === "public" ? (
+                        <span className="text-emerald-500">Public</span>
+                      ) : project.repoVisibility === "private" ? (
+                        <span className="text-amber-500">Private</span>
+                      ) : (
+                        <span className="text-muted-foreground">{"\u2014"}</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 group-hover:underline">Visibility</div>
+                  </a>
+                ) : (
+                  <div className="rounded-lg bg-card px-3 py-3 text-center">
+                    <div className="text-xl font-bold text-muted-foreground">{"\u2014"}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Visibility</div>
+                  </div>
                 )}
               </div>
 
+              {/* Issue links */}
               {issues.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Top Issues</span>
-                  <ul className="mt-0.5 space-y-0.5">
-                    {issues.map((issue) => (
-                      <li key={issue.number} className="text-sm flex items-center gap-1.5">
-                        <span className="text-muted-foreground font-mono text-xs">#{issue.number}</span>
-                        {repoBaseUrl ? (
-                          <a
-                            href={`${repoBaseUrl}/issues/${issue.number}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate hover:underline"
-                          >
-                            {issue.title}
-                          </a>
-                        ) : (
-                          <span className="truncate">{issue.title}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="space-y-1.5">
+                  {issues.map((issue) => (
+                    <div key={issue.number} className="flex items-center gap-2 text-sm">
+                      <span className="font-mono text-xs shrink-0 text-muted-foreground">#{issue.number}</span>
+                      {repoBaseUrl ? (
+                        <a
+                          href={`${repoBaseUrl}/issues/${issue.number}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {issue.title}
+                        </a>
+                      ) : (
+                        <span className="truncate">{issue.title}</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 
+              {/* PR links */}
               {prs.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Open PRs</span>
-                  <ul className="mt-0.5 space-y-0.5">
-                    {prs.map((pr) => (
-                      <li key={pr.number} className="text-sm flex items-center gap-1.5">
-                        <span className="text-muted-foreground font-mono text-xs">#{pr.number}</span>
-                        {repoBaseUrl ? (
-                          <a
-                            href={`${repoBaseUrl}/pull/${pr.number}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate hover:underline"
-                          >
-                            {pr.title}
-                          </a>
-                        ) : (
-                          <span className="truncate">{pr.title}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="space-y-1.5">
+                  {prs.map((pr) => (
+                    <div key={pr.number} className="flex items-center gap-2 text-sm">
+                      <span className="font-mono text-xs shrink-0 text-muted-foreground">PR #{pr.number}</span>
+                      {repoBaseUrl ? (
+                        <a
+                          href={`${repoBaseUrl}/pull/${pr.number}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {pr.title}
+                        </a>
+                      ) : (
+                        <span className="truncate">{pr.title}</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </SectionBox>
+          </SectionCard>
         )}
 
-        {/* ── Section 2: Next Action & Risks ── */}
-        <SectionBox
-          title="Next Action & Risks"
-          source={{ type: "llm", timestamp: project.llmGeneratedAt }}
-          highlight={delta?.newlyEnriched}
+        {/* ── Project Overview Card ── */}
+        <SectionCard
+          title="Project Overview"
+          sourceLabel={[
+            project.llmGeneratedAt ? `LLM enriched ${formatRelativeDate(project.llmGeneratedAt)}` : null,
+            project.lastScanned ? `Scanned ${formatRelativeDate(project.lastScanned)}` : null,
+          ].filter(Boolean).join(" \u00b7 ") || undefined}
         >
-          {project.nextAction || project.risks.length > 0 || project.recommendations.length > 0 ? (
-            <div className="space-y-3">
-              {project.nextAction && (
-                <div className="rounded-md bg-muted p-2.5">
-                  <span className="text-xs font-medium text-muted-foreground">Next Action</span>
-                  <p className="text-sm font-medium mt-0.5">{project.nextAction}</p>
-                </div>
-              )}
-              {project.risks.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Risks</span>
-                  <ul className="list-disc list-inside text-sm space-y-0.5 mt-0.5">
-                    {project.risks.map((r, i) => (
-                      <li key={i}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {project.recommendations.length > 0 && (
-                <div>
-                  <span className="text-xs font-medium text-muted-foreground">Recommendations</span>
-                  <ul className="list-disc list-inside text-sm space-y-1 mt-0.5">
-                    {project.recommendations.map((r, i) => (
-                      <li key={i}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">
-              Run LLM enrichment to generate insights.
-            </p>
-          )}
-        </SectionBox>
+          <div className="space-y-5">
+            {/* Summary — LLM one-liner */}
+            {project.summary && (
+              <p className="text-sm leading-relaxed text-muted-foreground">{project.summary}</p>
+            )}
 
-        {/* ── Section 3: Summary ── */}
-        <SectionBox
-          title="Summary"
-          source={{ type: "llm", timestamp: project.llmGeneratedAt }}
-          highlight={delta?.newlyEnriched}
-        >
-          {project.summary ? (
-            <div className="space-y-3">
-              <p className="text-sm leading-relaxed">{project.summary}</p>
-              {project.llmStatus && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px]">{project.llmStatus}</Badge>
-                  {project.statusReason && (
-                    <span className="text-xs text-muted-foreground">{project.statusReason}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">
-              Run LLM enrichment to generate summary.
-            </p>
-          )}
-        </SectionBox>
-
-        {/* ── Section 4: Details ── */}
-        <SectionBox
-          title="Details"
-          source={{ type: "scan", timestamp: project.lastScanned }}
-        >
-          <div className="space-y-3">
-            <div className="grid grid-cols-4 gap-3">
+            {/* Status Insight */}
+            {project.statusReason && (
               <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Framework</span>
-                <p className="text-sm mt-0.5">{framework ?? "\u2014"}</p>
-              </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Languages</span>
-                <div className="flex flex-wrap gap-0.5 mt-0.5">
-                  {scan?.languages?.detected?.length ? scan.languages.detected.map((lang) => (
-                    <Badge key={lang} variant="secondary" className="text-[9px] px-1 py-0">{lang}</Badge>
-                  )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Services</span>
-                <div className="flex flex-wrap gap-0.5 mt-0.5">
-                  {services ? services.map((svc) => (
-                    <Badge key={svc} variant="secondary" className="text-[9px] px-1 py-0">{svc}</Badge>
-                  )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
-                </div>
-              </div>
-              <div>
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">LOC</span>
-                <p className="text-sm font-mono tabular-nums mt-0.5">{loc != null ? loc.toLocaleString() : "\u2014"}</p>
-              </div>
-            </div>
-
-            {(scan?.cicd && Object.values(scan.cicd).some(Boolean)) ||
-             (scan?.deployment && Object.values(scan.deployment).some(Boolean)) ||
-             project.liveUrl ? (
-              <div className="flex flex-wrap gap-3">
-                {scan?.cicd && Object.values(scan.cicd).some(Boolean) && (
-                  <div>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">CI/CD</span>
-                    <div className="flex flex-wrap gap-0.5 mt-0.5">
-                      {Object.entries(scan.cicd).filter(([, v]) => v).map(([k]) => (
-                        <Badge key={k} variant="outline" className="text-[9px] px-1 py-0">{k}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {scan?.deployment && Object.values(scan.deployment).some(Boolean) && (
-                  <div>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Deploy</span>
-                    <div className="flex flex-wrap gap-0.5 mt-0.5">
-                      {Object.entries(scan.deployment).filter(([, v]) => v).map(([k]) => (
-                        <Badge key={k} variant="outline" className="text-[9px] px-1 py-0">{k}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {project.liveUrl && (
-                  <div>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Live</span>
-                    <p className="text-sm mt-0.5">
-                      <a href={project.liveUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">
-                        {project.liveUrl}
-                      </a>
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {scan?.commitCount != null && scan.commitCount > 0 && (
-              <div className="text-[10px] text-muted-foreground pt-1">
-                {scan.commitCount} commits
+                <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Status Insight</div>
+                <p className="text-sm leading-relaxed text-foreground/80">{project.statusReason}</p>
               </div>
             )}
-          </div>
-        </SectionBox>
 
-        {/* ── Section 5: Timeline ── */}
-        <SectionBox title="Timeline">
+            {/* Next Action — de-emphasized */}
+            {project.nextAction && (
+              <div>
+                <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-1.5">Next Action</div>
+                <p className="text-sm">{project.nextAction}</p>
+              </div>
+            )}
+
+            {!project.nextAction && !project.summary && (
+              <p className="text-sm text-muted-foreground italic">
+                Run LLM enrichment to generate insights.
+              </p>
+            )}
+
+            {/* Details grid */}
+            <div className="grid grid-cols-5 gap-4 pt-1">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Framework</div>
+                <div className="text-sm">{framework ?? "\u2014"}</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Languages</div>
+                <div className="flex flex-wrap gap-1">
+                  {scan?.languages?.detected?.length ? scan.languages.detected.map((lang) => (
+                    <span key={lang} className="rounded px-1.5 py-0.5 text-[11px] bg-muted text-muted-foreground">{lang}</span>
+                  )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Services</div>
+                <div className="flex flex-wrap gap-1">
+                  {services ? services.map((svc) => (
+                    <span key={svc} className="rounded px-1.5 py-0.5 text-[11px] bg-muted text-muted-foreground">{svc}</span>
+                  )) : <span className="text-sm text-muted-foreground">{"\u2014"}</span>}
+                </div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">LOC</div>
+                <div className="text-sm font-mono">{loc != null ? loc.toLocaleString() : "\u2014"}</div>
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Commits</div>
+                <div className="text-sm font-mono">{scan?.commitCount != null && scan.commitCount > 0 ? scan.commitCount.toLocaleString() : "\u2014"}</div>
+              </div>
+            </div>
+
+            {/* Insights */}
+            {project.insights.length > 0 && (
+              <div>
+                <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">Insights</div>
+                <ul className="space-y-1.5 text-sm text-muted-foreground">
+                  {project.insights.map((insight, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500" />
+                      {insight}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+          </div>
+        </SectionCard>
+
+        {/* ── Timeline Card ── */}
+        <div ref={timelineRef} />
+        <SectionCard title="Timeline">
           {timeline.length > 0 ? (() => {
             const ITEMS_PER_PAGE = 10;
             const totalPages = Math.ceil(timeline.length / ITEMS_PER_PAGE);
@@ -611,19 +595,19 @@ export function ProjectDetailPane({
 
             return (
               <>
-                <div className="space-y-1">
+                <div>
                   {pageItems.map((entry) => (
-                    <div key={entry.key} className="flex items-center gap-2 text-sm py-0.5">
+                    <div key={entry.key} className="flex items-center gap-3 py-2.5 border-b border-border last:border-b-0">
                       <span
                         className={cn(
-                          "text-[10px] font-medium rounded px-1.5 py-0.5 shrink-0",
-                          TIMELINE_BADGE_CLASSES[entry.type] ?? "bg-zinc-100 text-zinc-600"
+                          "text-[10px] font-mono w-8 shrink-0",
+                          TIMELINE_TYPE_CLASSES[entry.type] ?? "text-muted-foreground"
                         )}
                       >
                         {entry.type}
                       </span>
-                      <span className="text-foreground/80 truncate">{entry.description}</span>
-                      <span className="text-muted-foreground shrink-0 ml-auto tabular-nums text-xs">
+                      <span className="text-sm text-muted-foreground truncate">{entry.description}</span>
+                      <span className="text-xs text-muted-foreground shrink-0 ml-auto tabular-nums">
                         {formatRelativeDate(entry.date)}
                       </span>
                     </div>
@@ -635,7 +619,7 @@ export function ProjectDetailPane({
                       type="button"
                       className="text-xs px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
                       disabled={timelinePage === 0}
-                      onClick={() => setTimelinePage((p) => p - 1)}
+                      onClick={() => changeTimelinePage(timelinePage - 1)}
                     >
                       &lt;
                     </button>
@@ -649,7 +633,7 @@ export function ProjectDetailPane({
                             ? "bg-foreground text-background font-semibold"
                             : "text-muted-foreground hover:bg-muted"
                         )}
-                        onClick={() => setTimelinePage(i)}
+                        onClick={() => changeTimelinePage(i)}
                       >
                         {i + 1}
                       </button>
@@ -658,7 +642,7 @@ export function ProjectDetailPane({
                       type="button"
                       className="text-xs px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted disabled:opacity-30"
                       disabled={timelinePage === totalPages - 1}
-                      onClick={() => setTimelinePage((p) => p + 1)}
+                      onClick={() => changeTimelinePage(timelinePage + 1)}
                     >
                       &gt;
                     </button>
@@ -669,7 +653,7 @@ export function ProjectDetailPane({
           })() : (
             <p className="text-sm text-muted-foreground italic">No activity yet.</p>
           )}
-        </SectionBox>
+        </SectionCard>
 
       </div>
     </div>

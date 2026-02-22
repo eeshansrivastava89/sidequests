@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppConfig } from "@/hooks/use-config";
@@ -248,6 +248,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl" aria-describedby="onboarding-wizard-description">
+        <DialogTitle className="sr-only">Setup Wizard</DialogTitle>
         <p id="onboarding-wizard-description" className="sr-only">
           Setup wizard to configure Sidequests
         </p>

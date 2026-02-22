@@ -66,6 +66,9 @@ const SCHEMA_SQL = [
     "risksJson"              TEXT,
     "tagsJson"               TEXT,
     "recommendationsJson"    TEXT,
+    "insightsJson"           TEXT,
+    "framework"              TEXT,
+    "primaryLanguage"        TEXT,
     "purpose"                TEXT,
     "notableFeaturesJson"    TEXT,
     "pitch"                  TEXT,
@@ -141,6 +144,21 @@ const MIGRATIONS = [
   `ALTER TABLE "Llm" ADD COLUMN "llmStatus" TEXT`,
   `ALTER TABLE "Llm" ADD COLUMN "statusReason" TEXT`,
   `ALTER TABLE "Llm" ADD COLUMN "risksJson" TEXT`,
+  // Phase 61W: LLM-sourced framework/language + consolidated insights
+  `ALTER TABLE "Llm" ADD COLUMN "framework" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "primaryLanguage" TEXT`,
+  `ALTER TABLE "Llm" ADD COLUMN "insightsJson" TEXT`,
+];
+
+/**
+ * One-time data fixes keyed by name. Each runs at most once; a tracking table
+ * records which fixes have already been applied.
+ */
+const DATA_FIXES = [
+  {
+    name: "61w-clear-polluted-lastTouchedAt",
+    sql: `UPDATE "Project" SET "lastTouchedAt" = NULL WHERE "lastTouchedAt" IS NOT NULL`,
+  },
 ];
 
 /**
@@ -160,6 +178,16 @@ export async function bootstrapDb(dbPath) {
       await client.execute(sql);
     } catch (err) {
       if (!String(err).includes("duplicate column")) throw err;
+    }
+  }
+
+  // One-time data fixes (tracked so they only run once)
+  await client.execute(`CREATE TABLE IF NOT EXISTS "_DataFix" ("name" TEXT NOT NULL PRIMARY KEY, "appliedAt" TEXT NOT NULL DEFAULT (datetime('now')))`);
+  for (const fix of DATA_FIXES) {
+    const row = await client.execute({ sql: `SELECT 1 FROM "_DataFix" WHERE "name" = ?`, args: [fix.name] });
+    if (row.rows.length === 0) {
+      await client.execute(fix.sql);
+      await client.execute({ sql: `INSERT INTO "_DataFix" ("name") VALUES (?)`, args: [fix.name] });
     }
   }
 

@@ -31,13 +31,13 @@ npx @eeshans/sidequests
 
 That's it. No install, no config files, no accounts. The onboarding wizard handles the rest.
 
-**Requirements:** Node.js 20.9+ and git. For full functionality: [GitHub CLI](https://cli.github.com/) (`gh`) and an LLM provider.
+> **Requirements:** [Node.js 20.9+](https://nodejs.org/) and [git](https://git-scm.com/). For GitHub integration: [GitHub CLI](https://cli.github.com/) (`gh auth login`). For LLM enrichment: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex).
 
 ## What it does
 
 Sidequests scans your dev directory, discovers every git repo, and builds a dashboard with:
 
-- **Actionable next steps** — LLM-powered summaries, next actions, risks, and recommendations for every project
+- **Actionable next steps** — LLM-powered summaries, next actions, and insights for every project
 - **GitHub at a glance** — open issues, PRs, and CI status pulled from `gh` CLI
 - **Status tracking** — active, paused, stale, or archived based on commit history
 - **Git state** — dirty files, unpushed commits, current branch
@@ -48,7 +48,7 @@ Everything runs locally. Your code never leaves your machine.
 
 | | |
 |---|---|
-| **LLM Enrichment** | AI-powered summaries, next actions, risks — the core value of the tool |
+| **LLM Enrichment** | AI-powered summaries, next actions, insights — the core value of the tool |
 | **GitHub Integration** | Open issues, PRs, CI status via `gh` CLI |
 | **Smart Status** | Classifies projects as active, paused, stale, or archived |
 | **Git Aware** | Dirty state, ahead/behind, branch tracking |
@@ -59,15 +59,15 @@ Everything runs locally. Your code never leaves your machine.
 
 ## LLM providers
 
-LLM enrichment powers the core experience — summaries, next actions, risks, and recommendations. Configure a provider in Settings to unlock these features:
+LLM enrichment powers the core experience — summaries, next actions, and insights. Configure a provider in Settings to unlock these features:
 
 | Provider | What you need |
 |---|---|
-| **Claude CLI** | [Claude CLI](https://docs.anthropic.com/en/docs/claude-cli) installed and authenticated |
+| **Claude Code** | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated |
 | **Codex CLI** | [Codex CLI](https://github.com/openai/codex) installed, "Allow Unsafe" enabled |
-| **OpenRouter** | API key |
-| **Ollama** | Ollama running locally |
-| **MLX** | mlx-lm-server running locally |
+| **OpenRouter** | Coming soon |
+| **Ollama** | Coming soon |
+| **MLX** | Coming soon |
 
 ## CLI options
 
@@ -104,15 +104,6 @@ npm run dev      # http://localhost:3000
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
-
-### Scripts
-
-| Command | Description |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm test` | Unit tests (Vitest) |
-| `npm run test:integration` | Integration tests |
-| `npm run build:npx` | Build standalone bundle |
 
 ### Architecture
 

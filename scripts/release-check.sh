@@ -204,6 +204,7 @@ else
   add_summary "npm ci" "SKIP" "--skip-install"
   print_warn "Skipping npm ci (--skip-install)"
 fi
+run_check "Lint" npm run lint
 run_check "Build" npm run build
 run_check "Unit tests" npm test
 run_check "Integration tests" npm run test:integration
@@ -302,10 +303,20 @@ if [[ "$SKIP_MANUAL" -eq 0 ]] && [[ -t 0 ]]; then
 
 Manual checks:
   [ ] Open http://127.0.0.1:${PORT_NPX}
-  [ ] Dashboard loads (empty state is OK on fresh data dir)
-  [ ] Click Refresh and verify projects appear
-  [ ] Open project drawer and verify CI/GitHub badges
-  [ ] Open Settings/Onboarding and verify flow
+  [ ] Dashboard loads (full-width scrollable page, empty state is OK on fresh data dir)
+  [ ] Click Refresh — projects appear with row-level shimmer (blue scan → mauve enrich → green done)
+  [ ] Click a project row — right slide-over panel opens with project details
+  [ ] Escape closes the slide-over panel
+  [ ] Verify inline GitHub link on project rows (blue "GitHub" text with external link icon)
+  [ ] Verify "Last Active" column shows relative times
+  [ ] In slide-over: verify Project Overview card (next action, summary, details grid, risks/recs)
+  [ ] In slide-over: verify GitHub card (4 metric tiles + blue issue/PR links)
+  [ ] In slide-over: verify Timeline card (monospace colored type labels, border separators)
+  [ ] Verify stats cards (large text-3xl numbers, rounded-xl cards)
+  [ ] Verify filter chips + stats filters work, click "Projects" card to clear all filters
+  [ ] Keyboard flow: j/k navigates selection, Escape clears detail selection
+  [ ] Open Settings — verify section headings with horizontal rules, system status card with dots, Cancel button
+  [ ] Toggle dark/light mode — verify both themes render correctly
 
 Type 'yes' to mark manual checks as passed:
 EOF

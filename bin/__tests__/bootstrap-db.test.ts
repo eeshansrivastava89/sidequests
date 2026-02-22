@@ -16,6 +16,7 @@ const EXPECTED_TABLES = [
   "Metadata",
   "Activity",
   "GitHub",
+  "_DataFix",
 ];
 
 /** Expected columns per table (name → type). Derived from prisma/schema.prisma. */
@@ -65,6 +66,9 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     risksJson: "TEXT",
     tagsJson: "TEXT",
     recommendationsJson: "TEXT",
+    insightsJson: "TEXT",
+    framework: "TEXT",
+    primaryLanguage: "TEXT",
     purpose: "TEXT",
     notableFeaturesJson: "TEXT",
     pitch: "TEXT",
@@ -107,6 +111,10 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     prsJson: "TEXT",
     repoVisibility: "TEXT",
     fetchedAt: "TEXT",
+  },
+  _DataFix: {
+    name: "TEXT",
+    appliedAt: "TEXT",
   },
 };
 

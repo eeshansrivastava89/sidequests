@@ -15,9 +15,10 @@ export const SYSTEM_PROMPT = `You are a developer project analyst. Given a proje
   - "stale": no recent activity, needs attention or archiving decision
   - "idea": early stage, minimal code, exploration phase
 - "statusReason": A short explanation of why you chose this status.
-- "risks": An array of 1-3 risks or concerns about the project.
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
-- "recommendations": An array of 2-4 actionable next steps to improve the project.
+- "insights": An array of 3-5 distinct observations. Each should state the concern AND the suggested action in a single sentence. Do not repeat the same issue in multiple bullets. Combine risks and recommendations into unified insights.
+- "framework": The primary framework or meta-framework (e.g. "Next.js", "Astro", "FastAPI", "Axum"). null if none detected.
+- "primaryLanguage": The dominant programming language (e.g. "TypeScript", "Python", "Rust", "HTML/CSS"). null if unclear.
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
@@ -44,9 +45,10 @@ export function buildPrompt(input: LlmInput): string {
   "nextAction": "single most important next step",
   "status": "building|shipping|maintaining|blocked|stale|idea",
   "statusReason": "why this status",
-  "risks": ["1-3 risks or concerns"],
   "tags": ["3-8 descriptive tags"],
-  "recommendations": ["2-4 actionable next steps"]
+  "insights": ["3-5 distinct observations combining concern + action"],
+  "framework": "primary framework or null",
+  "primaryLanguage": "dominant language or null"
 }
 
 Project data:
@@ -118,15 +120,15 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   const rawStatus = typeof obj?.status === "string" ? obj.status as LlmStatus : "idea";
   const status: LlmStatus = VALID_STATUSES.has(rawStatus) ? rawStatus : "idea";
   const statusReason = typeof obj?.statusReason === "string" ? obj.statusReason : "";
-  const risks = Array.isArray(obj?.risks)
-    ? obj.risks.filter((r): r is string => typeof r === "string")
-    : [];
   const tags = Array.isArray(obj?.tags)
     ? obj.tags.filter((t): t is string => typeof t === "string")
     : [];
-  const recommendations = Array.isArray(obj?.recommendations)
-    ? obj.recommendations.filter((r): r is string => typeof r === "string")
+  const insights = Array.isArray(obj?.insights)
+    ? obj.insights.filter((r): r is string => typeof r === "string")
     : [];
 
-  return { summary, nextAction, status, statusReason, risks, tags, recommendations };
+  const framework = typeof obj?.framework === "string" ? obj.framework : null;
+  const primaryLanguage = typeof obj?.primaryLanguage === "string" ? obj.primaryLanguage : null;
+
+  return { summary, nextAction, status, statusReason, tags, insights, framework, primaryLanguage };
 }

@@ -52,6 +52,18 @@ export function formatRelativeTime(iso: string): string {
  * Format "last touched" time with "Opened" prefix (e.g. "Opened 5m ago").
  * Used in project-list rows.
  */
+/**
+ * Parse a GitHub remote URL (SSH or HTTPS) into owner/repo.
+ */
+export function parseGitHubOwnerRepo(remoteUrl: string | null | undefined): { owner: string; repo: string } | null {
+  if (!remoteUrl) return null;
+  const sshMatch = remoteUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+  const httpsMatch = remoteUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+  return null;
+}
+
 export function formatLastTouched(iso: string | null): string | null {
   if (!iso) return null;
   const diff = Date.now() - new Date(iso).getTime();

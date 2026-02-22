@@ -15,9 +15,8 @@ describe("parseEnrichment", () => {
       nextAction: "Add tests",
       status: "building",
       statusReason: "Active development",
-      risks: ["No CI"],
       tags: ["typescript"],
-      recommendations: ["Add CI/CD"],
+      insights: ["Set up CI to catch regressions early"],
     });
 
     const result = parseEnrichment(raw);
@@ -25,9 +24,10 @@ describe("parseEnrichment", () => {
     expect(result.nextAction).toBe("Add tests");
     expect(result.status).toBe("building");
     expect(result.statusReason).toBe("Active development");
-    expect(result.risks).toEqual(["No CI"]);
     expect(result.tags).toEqual(["typescript"]);
-    expect(result.recommendations).toEqual(["Add CI/CD"]);
+    expect(result.insights).toEqual(["Set up CI to catch regressions early"]);
+    expect(result.framework).toBeNull();
+    expect(result.primaryLanguage).toBeNull();
   });
 
   it("invalid status → defaults to 'idea'", () => {
@@ -59,7 +59,7 @@ describe("parseEnrichment", () => {
   });
 
   it("JSON in markdown fences → extracted", () => {
-    const raw = '```json\n{"summary":"Fenced","nextAction":"Do thing","status":"shipping","statusReason":"Ready","risks":[],"tags":[],"recommendations":[]}\n```';
+    const raw = '```json\n{"summary":"Fenced","nextAction":"Do thing","status":"shipping","statusReason":"Ready","tags":[],"insights":[]}\n```';
     const result = parseEnrichment(raw);
     expect(result.summary).toBe("Fenced");
     expect(result.status).toBe("shipping");
@@ -71,9 +71,36 @@ describe("parseEnrichment", () => {
     expect(result.nextAction).toBe("Review project and decide next step");
     expect(result.status).toBe("idea");
     expect(result.statusReason).toBe("");
-    expect(result.risks).toEqual([]);
     expect(result.tags).toEqual([]);
-    expect(result.recommendations).toEqual([]);
+    expect(result.insights).toEqual([]);
+    expect(result.framework).toBeNull();
+    expect(result.primaryLanguage).toBeNull();
+  });
+
+  it("valid framework and primaryLanguage parsed correctly", () => {
+    const raw = JSON.stringify({
+      summary: "A Next.js app",
+      nextAction: "Deploy",
+      status: "shipping",
+      statusReason: "Ready",
+      tags: ["nextjs"],
+      insights: [],
+      framework: "Next.js",
+      primaryLanguage: "TypeScript",
+    });
+    const result = parseEnrichment(raw);
+    expect(result.framework).toBe("Next.js");
+    expect(result.primaryLanguage).toBe("TypeScript");
+  });
+
+  it("missing framework/primaryLanguage defaults to null", () => {
+    const raw = JSON.stringify({
+      summary: "A project",
+      status: "building",
+    });
+    const result = parseEnrichment(raw);
+    expect(result.framework).toBeNull();
+    expect(result.primaryLanguage).toBeNull();
   });
 
   it("old-format output (purpose/pitch/aiInsight) → does NOT populate new fields", () => {
@@ -96,11 +123,11 @@ describe("parseEnrichment", () => {
     const raw = JSON.stringify({
       summary: "A project",
       status: "building",
-      risks: ["Real risk", 42, null, "Another risk"],
+      insights: ["Real insight", 42, null, "Another insight"],
       tags: ["valid", true, "also-valid"],
     });
     const result = parseEnrichment(raw);
-    expect(result.risks).toEqual(["Real risk", "Another risk"]);
+    expect(result.insights).toEqual(["Real insight", "Another insight"]);
     expect(result.tags).toEqual(["valid", "also-valid"]);
   });
 
@@ -110,9 +137,8 @@ describe("parseEnrichment", () => {
       nextAction: "Test it",
       status: "maintaining",
       statusReason: "Stable",
-      risks: [],
       tags: ["test"],
-      recommendations: [],
+      insights: [],
     };
     const result = parseEnrichment(obj);
     expect(result.summary).toBe("Object input");

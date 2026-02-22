@@ -8,12 +8,13 @@ import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import type { Project, WorkflowView, SortKey } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
-import { ProjectDrawer } from "@/components/project-drawer";
+import { STATUS_COLORS } from "@/lib/status-colors";
+import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
 
 import type { SignalFilter } from "@/components/stats-bar";
 import { SettingsModal } from "@/components/settings-modal";
-import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -155,7 +156,6 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [signalFilter, setSignalFilter] = useState<SignalFilter>(null);
-  const [wizardDismissed, setWizardDismissed] = useState(false);
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
@@ -190,13 +190,6 @@ export default function DashboardPage() {
     }
   }, [refreshHook.state]);
 
-  // Derive wizard open state — no effects, no render-phase setState
-  const wizardOpen = !wizardDismissed && !loading && configReady && !config.hasCompletedOnboarding && projects.length === 0;
-  const setWizardOpen = useCallback((open: boolean) => {
-    if (!open) setWizardDismissed(true);
-  }, []);
-
-
   const handleRefresh = useCallback(() => {
     deltaHook.snapshot();
     refreshHook.start();
@@ -221,10 +214,46 @@ export default function DashboardPage() {
     [touchProject]
   );
 
+  const filteredRef = useRef<Project[]>([]);
+
   const filtered = useMemo(
     () => sortProjects(filterBySignal(filterBySearch(filterByView(projects, view), search), signalFilter), sortKey),
     [projects, view, search, signalFilter, sortKey]
   );
+
+  // Sync ref for keyboard shortcut closure
+  useEffect(() => {
+    filteredRef.current = filtered;
+  }, [filtered]);
+
+  // Keyboard shortcuts: j/k navigate projects, Escape closes detail pane
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+
+      if (e.key === "Escape") {
+        setSelectedId(null);
+        return;
+      }
+
+      if (e.key === "j" || e.key === "k") {
+        e.preventDefault();
+        const ids = filteredRef.current.map((p) => p.id);
+        if (ids.length === 0) return;
+        const curIdx = selectedId ? ids.indexOf(selectedId) : -1;
+        let nextIdx: number;
+        if (e.key === "j") {
+          nextIdx = curIdx < ids.length - 1 ? curIdx + 1 : curIdx;
+        } else {
+          nextIdx = curIdx > 0 ? curIdx - 1 : 0;
+        }
+        setSelectedId(ids[nextIdx]);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedId]);
 
   const pinnedProjects = useMemo(
     () => filtered.filter((p) => p.pinned),
@@ -272,12 +301,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
-      <header className="shrink-0 z-10 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="sticky top-0 z-10 border-b border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold tracking-tight">Sidequests</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-xl font-bold tracking-tight">Sidequests</h1>
               {lastRefreshed && (
                 <span className="text-xs text-muted-foreground">
                   Last refreshed {formatRelativeTime(lastRefreshed)}
@@ -328,12 +357,15 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Split workspace: left list + right detail pane */}
-      <div className="flex-1 overflow-hidden lg:grid lg:grid-cols-[1fr_420px] lg:divide-x lg:divide-border">
-        {/* LEFT: scrollable list pane */}
-        <div className="overflow-y-auto">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-            <StatsBar projects={projects} activeFilter={signalFilter} onFilter={setSignalFilter} />
+      {/* Full-width scrollable content */}
+      <main className="flex-1">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            <StatsBar
+              projects={projects}
+              activeFilter={signalFilter}
+              onFilter={setSignalFilter}
+              onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
+            />
 
             {/* Filter tabs + Sort + Search */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -345,14 +377,14 @@ export default function DashboardPage() {
                     <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
                     <TabsTrigger value="active">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-emerald-500" />
+                        <span className={cn("size-2 rounded-full", STATUS_COLORS.active)} />
                         Active ({tabCounts.active})
                       </span>
                     </TabsTrigger>
                     {tabCounts.paused > 0 && (
                       <TabsTrigger value="paused">
                         <span className="inline-flex items-center gap-1.5">
-                          <span className="size-2 rounded-full bg-blue-500" />
+                          <span className={cn("size-2 rounded-full", STATUS_COLORS.paused)} />
                           Paused ({tabCounts.paused})
                         </span>
                       </TabsTrigger>
@@ -365,13 +397,13 @@ export default function DashboardPage() {
                     </TabsTrigger>
                     <TabsTrigger value="stale">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-amber-500" />
+                        <span className={cn("size-2 rounded-full", STATUS_COLORS.stale)} />
                         Stale ({tabCounts.stale})
                       </span>
                     </TabsTrigger>
                     <TabsTrigger value="archived">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-zinc-400" />
+                        <span className={cn("size-2 rounded-full", STATUS_COLORS.archived)} />
                         Archived ({tabCounts.archived})
                       </span>
                     </TabsTrigger>
@@ -404,11 +436,11 @@ export default function DashboardPage() {
             {(view !== "all" || search || signalFilter) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {view !== "all" && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
                     {view === "needs-attention" ? "Needs Attention" : view.charAt(0).toUpperCase() + view.slice(1)}
                     <button
                       type="button"
-                      className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                      className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
                       onClick={() => setView("all")}
                       aria-label="Clear tab filter"
                     >
@@ -534,32 +566,12 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
+      </main>
 
-        {/* RIGHT: desktop detail pane */}
-        <div className="hidden lg:flex lg:flex-col bg-background">
-          {selectedProject ? (
-            <ProjectDetailPane
-              project={selectedProject}
-              onClose={() => setSelectedId(null)}
-              onUpdateOverride={updateOverride}
-              onTogglePin={handleTogglePin}
-              onTouch={handleTouch}
-              sanitizePaths={config.sanitizePaths}
-              delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Select a project to view details</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <footer className="shrink-0 border-t border-border">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-muted-foreground">
+      <footer className="border-t border-border mt-8 bg-card">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between text-sm text-muted-foreground">
           <span>&copy; 2026 Eeshan Srivastava</span>
-          <span className="italic">Personal project &middot; MIT License &middot; Non-commercial</span>
+          <span className="italic">Personal project &middot; MIT License</span>
           <div className="flex items-center gap-4">
             <a href="https://github.com/eeshansrivastava89/sidequests" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
               <svg className="size-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
@@ -573,16 +585,24 @@ export default function DashboardPage() {
         </div>
       </footer>
 
-      <ProjectDrawer
-        project={selectedProject}
-        open={!!selectedId}
-        onClose={() => setSelectedId(null)}
-        onUpdateOverride={updateOverride}
-        onTogglePin={handleTogglePin}
-        onTouch={handleTouch}
-        sanitizePaths={config.sanitizePaths}
-        delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
-      />
+      {/* Slide-over detail panel */}
+      <Sheet open={!!selectedId} onOpenChange={(open) => { if (!open) setSelectedId(null); }}>
+        <SheetContent>
+          <SheetTitle className="sr-only">{selectedProject?.name ?? "Project Details"}</SheetTitle>
+          {selectedProject && (
+            <ProjectDetailPane
+              key={selectedProject.id}
+              project={selectedProject}
+              onClose={() => setSelectedId(null)}
+              onUpdateOverride={updateOverride}
+              onTogglePin={handleTogglePin}
+              onTouch={handleTouch}
+              sanitizePaths={config.sanitizePaths}
+              delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
 
       <SettingsModal
         open={settingsOpen}
@@ -591,14 +611,6 @@ export default function DashboardPage() {
         onSaved={refetch}
       />
 
-      <OnboardingWizard
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        config={config}
-        onSaved={refetch}
-        onStartScan={handleRefresh}
-        scanState={refreshHook.state}
-      />
     </div>
   );
 }
