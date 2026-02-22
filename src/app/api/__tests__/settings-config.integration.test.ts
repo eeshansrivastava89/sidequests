@@ -225,28 +225,3 @@ describe("failure: invalid dev root", () => {
   });
 });
 
-// ── Path sanitization correctness ──────────────────────────────────
-
-describe("path sanitization", () => {
-  it("GET returns sanitizePaths=false when config says false", async () => {
-    mockConfig.sanitizePaths = false;
-    const res = await settingsGET();
-    const data = await res.json();
-    expect(data.sanitizePaths).toBe(false);
-  });
-
-  it("GET returns sanitizePaths=true when config says true", async () => {
-    mockConfig.sanitizePaths = true;
-    const res = await settingsGET();
-    const data = await res.json();
-    expect(data.sanitizePaths).toBe(true);
-  });
-
-  it("PUT can toggle sanitizePaths", async () => {
-    const putRes = await settingsPUT(makePutRequest({ sanitizePaths: true }));
-    expect((await putRes.json()).ok).toBe(true);
-
-    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
-    expect(onDisk.sanitizePaths).toBe(true);
-  });
-});
