@@ -64,14 +64,3 @@ export function parseGitHubOwnerRepo(remoteUrl: string | null | undefined): { ow
   return null;
 }
 
-export function formatLastTouched(iso: string | null): string | null {
-  if (!iso) return null;
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Opened just now";
-  if (mins < 60) return `Opened ${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Opened ${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `Opened ${days}d ago`;
-}

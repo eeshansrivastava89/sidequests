@@ -5,7 +5,6 @@ import { paths } from "./app-paths";
 export interface AppSettings {
   devRoot?: string;
   excludeDirs?: string;
-  sanitizePaths?: boolean;
   llmProvider?: string;
   llmConcurrency?: number;
   llmOverwriteMetadata?: boolean;

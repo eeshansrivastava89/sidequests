@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 
 export interface AppConfig {
-  sanitizePaths: boolean;
   devRoot: string;
   excludeDirs: string;
   llmProvider: string;
@@ -23,7 +22,6 @@ export interface AppConfig {
 }
 
 const DEFAULT: AppConfig = {
-  sanitizePaths: false,
   devRoot: "~/dev",
   excludeDirs: "",
   llmProvider: "claude-cli",

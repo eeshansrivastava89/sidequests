@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppConfig } from "@/hooks/use-config";
+import type { PreflightCheck } from "@/lib/types";
 import { toast } from "sonner";
 import { Field, SwitchRow, ProviderFields } from "@/components/settings-fields";
 
@@ -13,12 +14,6 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   config: AppConfig;
   onSaved: () => void;
-}
-
-interface PreflightCheck {
-  name: string;
-  ok: boolean;
-  message: string;
 }
 
 export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {

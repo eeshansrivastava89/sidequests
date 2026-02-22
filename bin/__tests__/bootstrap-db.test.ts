@@ -4,7 +4,6 @@ import path from "node:path";
 import fs from "node:fs";
 import { createClient } from "@libsql/client";
 
-// @ts-expect-error — .mjs import from TS test
 import { bootstrapDb } from "../bootstrap-db.mjs";
 
 const EXPECTED_TABLES = [

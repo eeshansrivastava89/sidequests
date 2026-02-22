@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// @ts-expect-error — .mjs import from TS test
 import { parseArgs } from "../cli-helpers.mjs";
 
 // ── parseArgs ─────────────────────────────────────────────────────────

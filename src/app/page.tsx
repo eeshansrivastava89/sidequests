@@ -540,7 +540,6 @@ export default function DashboardPage() {
                       onSelect={(p) => setSelectedId(p.id)}
                       onTogglePin={handleTogglePin}
                       onTouch={handleTouch}
-                      sanitizePaths={config.sanitizePaths}
                       refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                     />
                   </div>
@@ -558,7 +557,6 @@ export default function DashboardPage() {
                       onSelect={(p) => setSelectedId(p.id)}
                       onTogglePin={handleTogglePin}
                       onTouch={handleTouch}
-                      sanitizePaths={config.sanitizePaths}
                       refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                     />
                   </div>
@@ -597,7 +595,6 @@ export default function DashboardPage() {
               onUpdateOverride={updateOverride}
               onTogglePin={handleTogglePin}
               onTouch={handleTouch}
-              sanitizePaths={config.sanitizePaths}
               delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
             />
           )}

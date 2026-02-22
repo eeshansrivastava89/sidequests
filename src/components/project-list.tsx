@@ -15,8 +15,6 @@ interface ProjectListProps {
   onSelect: (project: Project) => void;
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
-  /** @deprecated sanitizePaths no longer gates action buttons */
-  sanitizePaths?: boolean;
   refreshProgress?: Map<string, ProjectProgress>;
 }
 

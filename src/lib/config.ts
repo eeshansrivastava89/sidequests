@@ -42,10 +42,6 @@ export const config = {
   get llmAllowUnsafe(): boolean {
     return settingBool("llmAllowUnsafe", "LLM_ALLOW_UNSAFE", false);
   },
-  /** @deprecated Defaults to false — action buttons always visible now. */
-  get sanitizePaths(): boolean {
-    return settingBool("sanitizePaths", "SANITIZE_PATHS", false);
-  },
   get claudeCliModel(): string | undefined {
     const s = getSettings().claudeCliModel;
     if (s) return s;

@@ -6,15 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppConfig } from "@/hooks/use-config";
 import type { RefreshState } from "@/hooks/use-refresh";
+import type { PreflightCheck } from "@/lib/types";
+export type { PreflightCheck };
 import { Field, ProviderFields } from "@/components/settings-fields";
 import { toast } from "sonner";
-
-export interface PreflightCheck {
-  name: string;
-  ok: boolean;
-  message: string;
-  tier?: "required" | "optional";
-}
 
 /** Sort preflight checks: required first, then optional. */
 export function sortPreflightChecks(checks: PreflightCheck[]): PreflightCheck[] {

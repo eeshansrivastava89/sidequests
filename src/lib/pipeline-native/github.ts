@@ -7,6 +7,8 @@
  */
 
 import { execFileSync } from "child_process";
+import { parseGitHubOwnerRepo } from "@/lib/project-helpers";
+export { parseGitHubOwnerRepo };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,11 +31,6 @@ export interface GitHubSyncResult {
   projects: Array<{ pathHash: string; data: GitHubProjectData }>;
   skipped: number;
   errors: number;
-}
-
-interface OwnerRepo {
-  owner: string;
-  repo: string;
 }
 
 interface GitHubSyncInput {
@@ -62,29 +59,6 @@ function runGh(...args: string[]): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract owner/repo from a GitHub remote URL.
- * Supports SSH (git@github.com:owner/repo.git) and HTTPS formats.
- * Returns null for non-GitHub remotes or malformed URLs.
- */
-export function parseGitHubOwnerRepo(remoteUrl: string): OwnerRepo | null {
-  if (!remoteUrl) return null;
-
-  // SSH: git@github.com:owner/repo.git
-  const sshMatch = remoteUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (sshMatch) {
-    return { owner: sshMatch[1], repo: sshMatch[2] };
-  }
-
-  // HTTPS: https://github.com/owner/repo.git (or without .git)
-  const httpsMatch = remoteUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
-  if (httpsMatch) {
-    return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  }
-
-  return null;
-}
-
-/**
  * Check if `gh` CLI is installed and authenticated.
  */
 export function isGhAvailable(): boolean {
@@ -94,7 +68,7 @@ export function isGhAvailable(): boolean {
 /**
  * Fetch GitHub data for a single repo using GraphQL + REST.
  */
-export function fetchGitHubData(ownerRepo: OwnerRepo): GitHubProjectData {
+export function fetchGitHubData(ownerRepo: { owner: string; repo: string }): GitHubProjectData {
   const { owner, repo } = ownerRepo;
 
   // GraphQL: issues, PRs, visibility in one call

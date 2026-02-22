@@ -6,7 +6,6 @@ export async function GET() {
   return NextResponse.json({
     devRoot: config.devRoot,
     excludeDirs: config.excludeDirs.join(", "),
-    sanitizePaths: config.sanitizePaths,
     llmProvider: config.llmProvider,
     llmConcurrency: config.llmConcurrency,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
@@ -26,7 +25,6 @@ export async function GET() {
 }
 
 const BOOL_KEYS: (keyof AppSettings)[] = [
-  "sanitizePaths",
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
   "hasCompletedOnboarding",
 ];

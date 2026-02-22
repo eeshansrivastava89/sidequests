@@ -14,6 +14,11 @@ import { X, ExternalLink } from "lucide-react";
 
 const VALID_STATUSES = ["active", "paused", "stale", "archived"] as const;
 
+function parseJsonList(json: string | null): Array<{ title: string; number: number }> {
+  if (!json) return [];
+  try { return JSON.parse(json); } catch { return []; }
+}
+
 /* ── Components ────────────────────────────────────────── */
 
 function StatusSelect({
@@ -164,17 +169,6 @@ function CiStatusLabel({ status }: { status: string }) {
   }
 }
 
-function parseJsonList(json: string | null): Array<{ title: string; number: number }> {
-  if (!json) return [];
-  try {
-    const parsed = JSON.parse(json);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-
 /* ── Props ─────────────────────────────────────────────── */
 
 export interface ProjectDetailPaneProps {
@@ -183,7 +177,6 @@ export interface ProjectDetailPaneProps {
   onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
-  sanitizePaths?: boolean;
   delta?: { newlyEnriched?: boolean } | null;
 }
 
@@ -195,7 +188,6 @@ export function ProjectDetailPane({
   onUpdateOverride,
   onTogglePin,
   onTouch,
-  sanitizePaths,
   delta,
 }: ProjectDetailPaneProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);

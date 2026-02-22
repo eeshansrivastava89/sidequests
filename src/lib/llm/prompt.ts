@@ -1,4 +1,3 @@
-import { config } from "../config";
 import type { LlmInput, LlmEnrichment, LlmStatus } from "./provider";
 
 const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "stale", "idea"]);
@@ -22,21 +21,6 @@ export const SYSTEM_PROMPT = `You are a developer project analyst. Given a proje
 
 Respond ONLY with valid JSON, no markdown fences or commentary.`;
 
-export function sanitizePath(p: string): string {
-  if (!config.sanitizePaths) return p;
-  const parts = p.split("/");
-  if (parts.length > 2) return "~/" + parts.slice(-2).join("/");
-  return p;
-}
-
-export function sanitizeScan(scan: Record<string, unknown>): Record<string, unknown> {
-  if (!config.sanitizePaths) return scan;
-  const copy = { ...scan };
-  delete copy.path;
-  delete copy.pathDisplay;
-  return copy;
-}
-
 export function buildPrompt(input: LlmInput): string {
   let prompt = `Analyze this project and respond with ONLY a JSON object (no markdown fences, no commentary):
 
@@ -54,7 +38,7 @@ export function buildPrompt(input: LlmInput): string {
 Project data:
 
 Name: ${input.name}
-Path: ${sanitizePath(input.path)}
+Path: ${input.path}
 Status: ${input.derived.statusAuto}
 Health Score: ${input.derived.healthScoreAuto}/100
 Hygiene Score: ${input.derived.hygieneScoreAuto}/100
@@ -62,7 +46,7 @@ Momentum Score: ${input.derived.momentumScoreAuto}/100
 Derived Tags: ${input.derived.tags.join(", ") || "none"}
 
 Raw scan data:
-${JSON.stringify(sanitizeScan(input.scan), null, 2)}`;
+${JSON.stringify(input.scan, null, 2)}`;
 
   if (input.github) {
     prompt += `

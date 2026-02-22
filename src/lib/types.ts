@@ -50,9 +50,6 @@ export interface Project {
   lastScanned: string | null;
   updatedAt: string;
 
-  // Legacy fields (kept for backward compat)
-  notableFeatures: string[];
-  pitch: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;
 
@@ -100,9 +97,9 @@ export type WorkflowView = "all" | "active" | "paused" | "needs-attention" | "st
 
 export type SortKey = "lastCommit" | "name" | "health" | "status" | "daysInactive";
 
-export const STATUS_COLORS: Record<string, string> = {
-  active: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  paused: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  stale: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  archived: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-};
+export interface PreflightCheck {
+  name: string;
+  ok: boolean;
+  message: string;
+  tier?: "required" | "optional";
+}

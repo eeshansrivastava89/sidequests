@@ -1,5 +1,4 @@
 import { db } from "./db";
-import { config } from "./config";
 import type { Project } from "@/generated/prisma/client";
 import type { RawScan } from "./types";
 
@@ -67,8 +66,6 @@ export interface MergedProject {
   publishTarget: string | null;
 
   // Legacy fields (kept for backward compat)
-  notableFeatures: string[];
-  pitch: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;
 
@@ -94,15 +91,6 @@ export function parseJson<T>(json: string | null | undefined, fallback: T): T {
   } catch {
     return fallback;
   }
-}
-
-export function sanitizePath(pathDisplay: string): string {
-  if (!config.sanitizePaths) return pathDisplay;
-  const parts = pathDisplay.split("/");
-  if (parts.length > 2) {
-    return "~/" + parts.slice(-2).join("/");
-  }
-  return pathDisplay;
 }
 
 export async function mergeProjectView(projectId: string): Promise<MergedProject | null> {
@@ -156,7 +144,6 @@ export type ProjectWithRelations = Project & {
     primaryLanguage: string | null;
     // Legacy fields
     purpose: string | null;
-    notableFeaturesJson: string | null;
     pitch: string | null;
     aiInsightJson: string | null;
     generatedAt: Date;
@@ -215,7 +202,6 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     parseJson<string[]>(llm?.tagsJson, null as unknown as string[]) ??
     (Array.isArray(derivedData.tags) ? derivedData.tags as string[] : []);
 
-  const notableFeatures = parseJson<string[]>(llm?.notableFeaturesJson, []);
   // Consolidated insights — fallback to legacy risks+recommendations for old data
   const insights = parseJson<string[]>(llm?.insightsJson, null as unknown as string[])
     ?? [
@@ -232,7 +218,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   return {
     id: project.id,
     name: project.name,
-    pathDisplay: sanitizePath(project.pathDisplay),
+    pathDisplay: project.pathDisplay,
 
     status,
     healthScore,
@@ -278,8 +264,6 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     successMetrics: metadata?.successMetrics ?? null,
     publishTarget: metadata?.publishTarget ?? null,
 
-    notableFeatures,
-    pitch: llm?.pitch ?? null,
     liveUrl: rawScan?.liveUrl ?? null,
     llmGeneratedAt: llm?.generatedAt?.toISOString() ?? null,
 

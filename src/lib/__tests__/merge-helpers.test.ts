@@ -1,11 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { parseJson, sanitizePath } from "@/lib/merge";
-
-vi.mock("@/lib/config", () => ({
-  config: {
-    sanitizePaths: true,
-  },
-}));
+import { describe, it, expect } from "vitest";
+import { parseJson } from "@/lib/merge";
 
 describe("parseJson", () => {
   it("returns parsed object for valid JSON", () => {
@@ -30,29 +24,5 @@ describe("parseJson", () => {
 
   it("returns fallback for empty string", () => {
     expect(parseJson("", 42)).toBe(42);
-  });
-});
-
-describe("sanitizePath", () => {
-  it("truncates long paths to ~/parent/project when sanitizePaths is true", async () => {
-    const { config } = await import("@/lib/config");
-    (config as Record<string, unknown>).sanitizePaths = true;
-
-    expect(sanitizePath("/Users/john/dev/my-project")).toBe("~/dev/my-project");
-  });
-
-  it("preserves short paths (2 segments or fewer)", async () => {
-    const { config } = await import("@/lib/config");
-    (config as Record<string, unknown>).sanitizePaths = true;
-
-    expect(sanitizePath("dev/project")).toBe("dev/project");
-  });
-
-  it("returns path unchanged when sanitizePaths is false", async () => {
-    const { config } = await import("@/lib/config");
-    (config as Record<string, unknown>).sanitizePaths = false;
-
-    const longPath = "/Users/john/dev/my-project";
-    expect(sanitizePath(longPath)).toBe(longPath);
   });
 });
