@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import type { AppConfig } from "@/hooks/use-config";
 
 /** Active providers shown in UI. See GitHub issue #2 for re-enabling openrouter/ollama/mlx. */
-export const PROVIDERS = ["claude-cli", "codex-cli", "none"] as const;
+export const PROVIDERS = ["claude-cli", "codex-cli"] as const;
 
 export const CLAUDE_CLI_MODELS = [
   { value: "", label: "Default" },
@@ -125,7 +125,7 @@ export function ProviderFields({
   draft: AppConfig;
   set: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
 }) {
-  const provider = !draft.llmProvider || draft.llmProvider === "none" ? "claude-cli" : draft.llmProvider;
+  const provider = PROVIDERS.includes(draft.llmProvider as typeof PROVIDERS[number]) ? draft.llmProvider : "claude-cli";
 
   return (
     <>

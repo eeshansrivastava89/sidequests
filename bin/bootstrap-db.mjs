@@ -45,6 +45,7 @@ const SCHEMA_SQL = [
     "scoreBreakdownJson" TEXT NOT NULL DEFAULT '{}',
     "derivedJson"        TEXT NOT NULL,
     "isDirty"            INTEGER NOT NULL DEFAULT 0,
+    "dirtyFileCount"     INTEGER NOT NULL DEFAULT 0,
     "ahead"              INTEGER NOT NULL DEFAULT 0,
     "behind"             INTEGER NOT NULL DEFAULT 0,
     "framework"          TEXT,
@@ -148,6 +149,10 @@ const MIGRATIONS = [
   `ALTER TABLE "Llm" ADD COLUMN "framework" TEXT`,
   `ALTER TABLE "Llm" ADD COLUMN "primaryLanguage" TEXT`,
   `ALTER TABLE "Llm" ADD COLUMN "insightsJson" TEXT`,
+  // Observability: per-project LLM error tracking
+  `ALTER TABLE "Llm" ADD COLUMN "llmError" TEXT`,
+  // Dirty file count for uncommitted badge
+  `ALTER TABLE "Derived" ADD COLUMN "dirtyFileCount" INTEGER NOT NULL DEFAULT 0`,
 ];
 
 /**

@@ -66,7 +66,7 @@ export type PipelineEvent =
   | { type: "project_error"; name: string; step: string; error: string }
   | { type: "github_start" }
   | { type: "github_complete"; synced: number; skipped: number; errors: number }
-  | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmSkipped: number; durationMs: number };
+  | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number };
 
 /** Collected info from the store phase, passed to LLM phase. */
 interface StoredProject {
@@ -101,6 +101,7 @@ export async function runRefreshPipeline(
   const startTime = Date.now();
   let llmSucceeded = 0;
   let llmFailed = 0;
+  const llmFailedNames: string[] = [];
   let llmSkipped = 0;
 
   // 1. Scan (TS-native — no Python dependency)
@@ -186,6 +187,7 @@ export async function runRefreshPipeline(
 
       // Extract promoted columns from raw scan data
       const isDirty = (scanned.isDirty as boolean) ?? false;
+      const dirtyFileCount = ((scanned.untrackedCount as number) ?? 0) + ((scanned.modifiedCount as number) ?? 0) + ((scanned.stagedCount as number) ?? 0);
       const ahead = (scanned.ahead as number) ?? 0;
       const behind = (scanned.behind as number) ?? 0;
       const framework = null; // Phase 61W: framework detection moved to LLM enrichment
@@ -205,6 +207,7 @@ export async function runRefreshPipeline(
           scoreBreakdownJson: scoreBreakdownStr,
           derivedJson: derivedJsonStr,
           isDirty,
+          dirtyFileCount,
           ahead,
           behind,
           framework,
@@ -220,6 +223,7 @@ export async function runRefreshPipeline(
           scoreBreakdownJson: scoreBreakdownStr,
           derivedJson: derivedJsonStr,
           isDirty,
+          dirtyFileCount,
           ahead,
           behind,
           framework,
@@ -358,6 +362,7 @@ export async function runRefreshPipeline(
               insightsJson: JSON.stringify(enrichment.insights),
               framework: enrichment.framework,
               primaryLanguage: enrichment.primaryLanguage,
+              llmError: null,
             },
             update: {
               summary: enrichment.summary,
@@ -368,6 +373,7 @@ export async function runRefreshPipeline(
               insightsJson: JSON.stringify(enrichment.insights),
               framework: enrichment.framework,
               primaryLanguage: enrichment.primaryLanguage,
+              llmError: null,
               generatedAt: new Date(),
             },
           });
@@ -392,9 +398,16 @@ export async function runRefreshPipeline(
           const batchIdx = results.indexOf(result);
           const sp = batch[batchIdx];
           const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          llmFailedNames.push(sp.name);
           if (process.env.NODE_ENV !== "test") {
             console.error(`LLM enrichment failed for ${sp.name}:`, result.reason);
           }
+          // Persist error in Llm record
+          await db.llm.upsert({
+            where: { projectId: sp.projectId },
+            create: { projectId: sp.projectId, llmError: message },
+            update: { llmError: message },
+          });
           emit({ type: "project_error", name: sp.name, step: "llm", error: message });
         }
       }
@@ -406,7 +419,7 @@ export async function runRefreshPipeline(
   // 6. Log activity for each project
   for (const sp of storedProjects) {
     if (signal?.aborted) break;
-    const llmResult = !llmProvider ? "skipped" : (!sp.derived ? "skipped" : "attempted");
+    const llmResult = !llmProvider ? "skipped" : (!sp.derived ? "skipped" : (llmFailedNames.includes(sp.name) ? "failed" : "succeeded"));
 
     await db.activity.create({
       data: {
@@ -434,6 +447,7 @@ export async function runRefreshPipeline(
     projectCount: scanData.projectCount,
     llmSucceeded,
     llmFailed,
+    llmFailedNames,
     llmSkipped,
     durationMs,
   });

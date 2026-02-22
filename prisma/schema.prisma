@@ -47,6 +47,7 @@ model Derived {
   scoreBreakdownJson String    @default("{}")
   derivedJson        String    // Full derived output as JSON (tags, etc.)
   isDirty            Boolean   @default(false)
+  dirtyFileCount     Int       @default(0)
   ahead              Int       @default(0)
   behind             Int       @default(0)
   framework          String?
@@ -76,6 +77,7 @@ model Llm {
   pitch                  String?
   aiInsightJson          String?   // JSON: { score, confidence, reasons, risks, nextBestAction }
   aiInsightGeneratedAt   DateTime?
+  llmError               String?   // Last enrichment error message, null on success
   generatedAt            DateTime  @default(now())
 }
 

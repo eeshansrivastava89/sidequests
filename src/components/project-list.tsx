@@ -7,7 +7,7 @@ import { VsCodeIcon, ClaudeIcon, TerminalIcon, PinIcon } from "@/components/proj
 import { copyToClipboard, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
-import { ExternalLink, Check, X as XIcon, Circle, Lock, Globe, Minus } from "lucide-react";
+import { Check, X as XIcon, Circle, Lock, Globe, Minus, AlertCircle, Zap, Sparkles } from "lucide-react";
 
 interface ProjectListProps {
   projects: Project[];
@@ -49,6 +49,7 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   if (!prog) return "";
   if (prog.llmStatus === "running") return "row-enriching";
   if (prog.storeStatus === "running") return "row-scanning";
+  if (prog.llmStatus === "error") return "row-error";
   // Only show "done" when the LLM step completed (not just store)
   if (prog.llmStatus === "done") return "row-done";
   return "";
@@ -142,28 +143,45 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
 
             {/* Project name + line 2 */}
             <div className="min-w-0">
-              {/* Line 1: name + badges + GitHub link */}
+              {/* Line 1: name + badges */}
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-base truncate" title={rawPath}>
                   {project.name}
                 </span>
                 {project.isDirty && (
-                  <span className="shrink-0 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded px-1.5 py-0.5 leading-none">uncommitted</span>
+                  <span className="shrink-0 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded px-1.5 py-0.5 leading-none">
+                    uncommitted{project.dirtyFileCount > 0 ? ` (${project.dirtyFileCount})` : ""}
+                  </span>
                 )}
-                {project.ahead > 0 && (
-                  <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400 font-mono" title={`${project.ahead} ahead of remote`}>↑{project.ahead}</span>
-                )}
-                {hasGitHub && ownerRepo && (
-                  <a
-                    href={`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
+                {project.lastScanned && (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 rounded px-1.5 py-0.5 leading-none"
+                    title={`Scanned ${new Date(project.lastScanned).toLocaleString()}`}
                   >
-                    <ExternalLink className="size-3" />
-                    GitHub
-                  </a>
+                    <Zap className="size-3" />
+                    Scanned {formatRelativeTime(project.lastScanned)}
+                  </span>
+                )}
+                {project.llmError ? (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded px-1.5 py-0.5 leading-none"
+                    title={project.llmError}
+                  >
+                    <AlertCircle className="size-3" />
+                    AI scan failed
+                  </span>
+                ) : project.llmGeneratedAt ? (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded px-1.5 py-0.5 leading-none"
+                    title={`AI scanned ${new Date(project.llmGeneratedAt).toLocaleString()}`}
+                  >
+                    <Sparkles className="size-3" />
+                    AI scanned {formatRelativeTime(project.llmGeneratedAt)}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5 leading-none">
+                    No AI scan
+                  </span>
                 )}
               </div>
               {/* Line 2: summary */}

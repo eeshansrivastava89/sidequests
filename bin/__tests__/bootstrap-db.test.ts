@@ -48,6 +48,7 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     scoreBreakdownJson: "TEXT",
     derivedJson: "TEXT",
     isDirty: "INTEGER",
+    dirtyFileCount: "INTEGER",
     ahead: "INTEGER",
     behind: "INTEGER",
     framework: "TEXT",
@@ -74,6 +75,7 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     aiInsightJson: "TEXT",
     aiInsightGeneratedAt: "TEXT",
     generatedAt: "TEXT",
+    llmError: "TEXT",
   },
   Override: {
     id: "TEXT",

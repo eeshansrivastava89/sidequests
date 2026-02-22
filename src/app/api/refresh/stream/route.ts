@@ -24,7 +24,9 @@ export async function GET(request: Request) {
 
   const encoder = new TextEncoder();
   const abort = new AbortController();
-  const skipLlm = getLlmProvider() === null;
+  const url = new URL(request.url);
+  const forceSkipLlm = url.searchParams.get("skipLlm") === "true";
+  const skipLlm = forceSkipLlm || getLlmProvider() === null;
 
   // Wire client disconnect to abort signal
   request.signal.addEventListener("abort", () => abort.abort());

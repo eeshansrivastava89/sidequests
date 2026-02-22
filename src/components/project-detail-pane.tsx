@@ -8,7 +8,7 @@ import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/comp
 import { copyToClipboard, formatRelativeDate, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { X, ExternalLink } from "lucide-react";
+import { X, ExternalLink, Zap, Sparkles, AlertCircle } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -301,7 +301,7 @@ export function ProjectDetailPane({
             />
             {project.isDirty && (
               <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                uncommitted
+                uncommitted{project.dirtyFileCount > 0 ? ` (${project.dirtyFileCount})` : ""}
               </Badge>
             )}
             {project.ahead != null && project.ahead > 0 && (
@@ -317,6 +317,27 @@ export function ProjectDetailPane({
             {branchName && (
               <Badge variant="outline" className="text-[10px] font-mono">
                 {branchName}
+              </Badge>
+            )}
+            {project.lastScanned && (
+              <Badge variant="secondary" className="text-[10px] inline-flex items-center gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" title={`Scanned ${new Date(project.lastScanned).toLocaleString()}`}>
+                <Zap className="size-3" />
+                Scanned {formatRelativeTime(project.lastScanned)}
+              </Badge>
+            )}
+            {project.llmError ? (
+              <Badge variant="secondary" className="text-[10px] inline-flex items-center gap-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" title={project.llmError}>
+                <AlertCircle className="size-3" />
+                AI scan failed
+              </Badge>
+            ) : project.llmGeneratedAt ? (
+              <Badge variant="secondary" className="text-[10px] inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" title={`AI scanned ${new Date(project.llmGeneratedAt).toLocaleString()}`}>
+                <Sparkles className="size-3" />
+                AI scanned {formatRelativeTime(project.llmGeneratedAt)}
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-[10px] text-muted-foreground">
+                No AI scan
               </Badge>
             )}
           </div>
@@ -493,7 +514,7 @@ export function ProjectDetailPane({
         <SectionCard
           title="Project Overview"
           sourceLabel={[
-            project.llmGeneratedAt ? `LLM enriched ${formatRelativeDate(project.llmGeneratedAt)}` : null,
+            project.llmGeneratedAt ? `AI scanned ${formatRelativeDate(project.llmGeneratedAt)}` : null,
             project.lastScanned ? `Scanned ${formatRelativeDate(project.lastScanned)}` : null,
           ].filter(Boolean).join(" \u00b7 ") || undefined}
         >
@@ -521,7 +542,7 @@ export function ProjectDetailPane({
 
             {!project.nextAction && !project.summary && (
               <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate insights.
+                Run an AI Scan to generate insights.
               </p>
             )}
 

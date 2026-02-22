@@ -63,6 +63,7 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
       scoreBreakdownJson: JSON.stringify({ hygiene: { readme: 15 }, momentum: { recency: 25 } }),
       derivedJson: JSON.stringify({ tags: ["typescript", "next"] }),
       isDirty: false,
+      dirtyFileCount: 0,
       ahead: 0,
       behind: 0,
       framework: "next",
@@ -78,6 +79,7 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
       risksJson: JSON.stringify(["No tests"]),
       tagsJson: JSON.stringify(["typescript", "next", "fullstack"]),
       recommendationsJson: JSON.stringify(["Add tests"]),
+      llmError: null,
       // Legacy
       purpose: "LLM purpose",
       notableFeaturesJson: JSON.stringify(["SSR", "API routes"]),
@@ -206,6 +208,28 @@ describe("buildMergedView — priority logic", () => {
     const merged = buildMergedView(makeFixture());
     expect(merged.goal).toBe("Ship v1");
     expect(merged.nextAction).toBe("Write docs");
+  });
+
+  it("llmError is null when no error", () => {
+    const merged = buildMergedView(makeFixture());
+    expect(merged.llmError).toBeNull();
+  });
+
+  it("llmError is surfaced from Llm record", () => {
+    const fixture = makeFixture({
+      llm: {
+        ...makeFixture().llm!,
+        llmError: "Request timed out after 30s",
+      },
+    });
+    const merged = buildMergedView(fixture);
+    expect(merged.llmError).toBe("Request timed out after 30s");
+  });
+
+  it("llmError is null when no Llm record", () => {
+    const fixture = makeFixture({ llm: null });
+    const merged = buildMergedView(fixture);
+    expect(merged.llmError).toBeNull();
   });
 
   it("missing layers cascade correctly (no override → falls through)", () => {

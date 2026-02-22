@@ -14,6 +14,7 @@ export interface RefreshEvent {
   projectCount?: number;
   llmSucceeded?: number;
   llmFailed?: number;
+  llmFailedNames?: string[];
   llmSkipped?: number;
   durationMs?: number;
 }
@@ -84,7 +85,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       return {
         ...state,
         deterministicReady: true,
-        phase: "Core scan complete. LLM enrichment continues in background...",
+        phase: "Fast scan complete. AI scan in progress...",
       };
     case "project_start": {
       const d: RefreshEvent = JSON.parse(raw);
@@ -98,7 +99,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       else if (d.step === "llm") existing.llmStatus = "running";
       projects.set(d.name!, existing);
       const phase = d.step === "llm"
-        ? `Enriching ${d.name} (${d.index! + 1}/${d.total})`
+        ? `AI scanning ${d.name} (${d.index! + 1}/${d.total})`
         : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
       const deterministicReady = d.step === "llm" ? true : state.deterministicReady;
       return { ...state, projects, phase, deterministicReady };
@@ -166,7 +167,7 @@ export function useRefresh(onComplete: () => void) {
     }
   }, [onComplete]);
 
-  const start = useCallback(() => {
+  const start = useCallback((options?: { skipLlm?: boolean }) => {
     if (state.active) return;
 
     const abort = new AbortController();
@@ -184,7 +185,8 @@ export function useRefresh(onComplete: () => void) {
 
     (async () => {
       let response: Response;
-      const connect = async () => fetch("/api/refresh/stream", { signal: abort.signal });
+      const qs = options?.skipLlm ? "?skipLlm=true" : "";
+      const connect = async () => fetch(`/api/refresh/stream${qs}`, { signal: abort.signal });
       try {
         response = await connect();
       } catch {

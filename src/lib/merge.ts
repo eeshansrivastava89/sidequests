@@ -35,6 +35,7 @@ export interface MergedProject {
 
   // Promoted derived columns
   isDirty: boolean;
+  dirtyFileCount: number;
   ahead: number;
   behind: number;
   framework: string | null;
@@ -64,6 +65,9 @@ export interface MergedProject {
   audience: string | null;
   successMetrics: string | null;
   publishTarget: string | null;
+
+  // LLM error (null = success or never enriched)
+  llmError: string | null;
 
   // Legacy fields (kept for backward compat)
   liveUrl: string | null;
@@ -123,6 +127,7 @@ export type ProjectWithRelations = Project & {
     scoreBreakdownJson: string;
     derivedJson: string;
     isDirty: boolean;
+    dirtyFileCount: number;
     ahead: number;
     behind: number;
     framework: string | null;
@@ -142,6 +147,7 @@ export type ProjectWithRelations = Project & {
     insightsJson: string | null;
     framework: string | null;
     primaryLanguage: string | null;
+    llmError: string | null;
     // Legacy fields
     purpose: string | null;
     pitch: string | null;
@@ -236,6 +242,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
 
     // Promoted derived columns
     isDirty: derived?.isDirty ?? rawScan?.isDirty ?? false,
+    dirtyFileCount: derived?.dirtyFileCount ?? 0,
     ahead: derived?.ahead ?? rawScan?.ahead ?? 0,
     behind: derived?.behind ?? rawScan?.behind ?? 0,
     framework: llm?.framework ?? null,
@@ -264,6 +271,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     successMetrics: metadata?.successMetrics ?? null,
     publishTarget: metadata?.publishTarget ?? null,
 
+    llmError: llm?.llmError ?? null,
     liveUrl: rawScan?.liveUrl ?? null,
     llmGeneratedAt: llm?.generatedAt?.toISOString() ?? null,
 

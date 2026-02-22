@@ -56,7 +56,7 @@ describe("reduceRefreshEvent — state transitions", () => {
 
     const next = reduceRefreshEvent(state, "github_complete", '{"durationMs":1200}');
     expect(next.deterministicReady).toBe(true);
-    expect(next.phase).toContain("Core scan complete");
+    expect(next.phase).toContain("Fast scan complete");
   });
 
   it("project_start with step=llm sets deterministicReady to true", () => {
@@ -65,7 +65,7 @@ describe("reduceRefreshEvent — state transitions", () => {
 
     const next = reduceRefreshEvent(state, "project_start", raw);
     expect(next.deterministicReady).toBe(true);
-    expect(next.phase).toBe("Enriching my-app (1/5)");
+    expect(next.phase).toBe("AI scanning my-app (1/5)");
   });
 
   it("project_start with step=store does NOT set deterministicReady", () => {

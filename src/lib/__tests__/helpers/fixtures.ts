@@ -192,6 +192,7 @@ interface SeedOverrides {
     scoreBreakdownJson?: string;
     derivedJson?: string;
     isDirty?: boolean;
+    dirtyFileCount?: number;
     ahead?: number;
     behind?: number;
     framework?: string | null;
@@ -269,6 +270,7 @@ export async function seedProject(
         scoreBreakdownJson: overrides.derived?.scoreBreakdownJson ?? "{}",
         derivedJson: overrides.derived?.derivedJson ?? JSON.stringify({ tags: ["typescript"] }),
         isDirty: overrides.derived?.isDirty ?? false,
+        dirtyFileCount: overrides.derived?.dirtyFileCount ?? 0,
         ahead: overrides.derived?.ahead ?? 0,
         behind: overrides.derived?.behind ?? 0,
         framework: overrides.derived?.framework ?? "next",

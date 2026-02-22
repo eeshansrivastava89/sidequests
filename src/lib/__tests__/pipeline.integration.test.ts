@@ -225,6 +225,71 @@ describe("pipeline integration — LLM enrichment", () => {
     expect(doneEvent.llmSucceeded).toBe(2);
   });
 
+  it("persists llmError on failure and clears on success", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    let callCount = 0;
+    mockEnrich.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) throw new Error("Timeout after 30s");
+      return LLM_ENRICHMENT_FIXTURE;
+    });
+
+    await runRefreshPipeline();
+
+    // First project should have llmError set
+    const projects = await db.project.findMany({ orderBy: { name: "asc" } });
+    const llmWithError = await db.llm.findUnique({ where: { projectId: projects[0].id } });
+    expect(llmWithError?.llmError).toBe("Timeout after 30s");
+
+    // Other projects should have null llmError (success)
+    const llmNoError = await db.llm.findUnique({ where: { projectId: projects[1].id } });
+    expect(llmNoError?.llmError).toBeNull();
+
+    // Re-run with all succeeding — error should be cleared
+    callCount = 0;
+    mockEnrich.mockResolvedValue(LLM_ENRICHMENT_FIXTURE);
+    await runRefreshPipeline();
+
+    const llmCleared = await db.llm.findUnique({ where: { projectId: projects[0].id } });
+    expect(llmCleared?.llmError).toBeNull();
+  });
+
+  it("done event includes llmFailedNames", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    let callCount = 0;
+    mockEnrich.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 2) throw new Error("LLM fail");
+      return LLM_ENRICHMENT_FIXTURE;
+    });
+
+    const events: PipelineEvent[] = [];
+    await runRefreshPipeline((e) => events.push(e));
+
+    const doneEvent = events.find((e) => e.type === "done") as Extract<PipelineEvent, { type: "done" }>;
+    expect(doneEvent.llmFailedNames).toHaveLength(1);
+    expect(typeof doneEvent.llmFailedNames[0]).toBe("string");
+  });
+
+  it("activity log records 'succeeded' vs 'failed' for LLM results", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    let callCount = 0;
+    mockEnrich.mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) throw new Error("fail");
+      return LLM_ENRICHMENT_FIXTURE;
+    });
+
+    await runRefreshPipeline();
+
+    const activities = await db.activity.findMany();
+    const payloads = activities.map((a: { payloadJson: string }) => JSON.parse(a.payloadJson));
+    const succeeded = payloads.filter((p: { llmResult: string }) => p.llmResult === "succeeded");
+    const failed = payloads.filter((p: { llmResult: string }) => p.llmResult === "failed");
+    expect(succeeded).toHaveLength(2);
+    expect(failed).toHaveLength(1);
+  });
+
   it("LLM re-run updates existing Llm record (upsert)", async () => {
     mockConfig.llmProvider = "claude-cli";
     await runRefreshPipeline();

@@ -45,6 +45,12 @@ describe("ProviderFields — rendered DOM", () => {
     }
   });
 
+  it("does not include 'none' in provider options", () => {
+    renderProvider("claude-cli");
+    const select = screen.getByDisplayValue("claude-cli");
+    expect(select.querySelector('option[value="none"]')).toBeNull();
+  });
+
   it("renders model selector for claude-cli", () => {
     renderProvider("claude-cli");
     const modelLabels = screen.getAllByText("Model");
@@ -61,8 +67,16 @@ describe("ProviderFields — rendered DOM", () => {
     expect(screen.getByText("Default")).toBeDefined();
   });
 
-  it('falls back to claude-cli when llmProvider is "none"', () => {
+  it('falls back to claude-cli when llmProvider is "none" (stale settings)', () => {
     renderProvider("none");
+    expect(screen.getByDisplayValue("claude-cli")).toBeDefined();
+    const modelLabels = screen.getAllByText("Model");
+    expect(modelLabels.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Default")).toBeDefined();
+  });
+
+  it('falls back to claude-cli when llmProvider is stale "openrouter"', () => {
+    renderProvider("openrouter");
     expect(screen.getByDisplayValue("claude-cli")).toBeDefined();
     const modelLabels = screen.getAllByText("Model");
     expect(modelLabels.length).toBeGreaterThanOrEqual(1);

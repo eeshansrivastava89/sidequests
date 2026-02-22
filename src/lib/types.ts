@@ -20,6 +20,7 @@ export interface Project {
 
   // Promoted derived columns
   isDirty: boolean;
+  dirtyFileCount: number;
   ahead: number;
   behind: number;
   framework: string | null;
@@ -50,6 +51,7 @@ export interface Project {
   lastScanned: string | null;
   updatedAt: string;
 
+  llmError: string | null;
   liveUrl: string | null;
   llmGeneratedAt: string | null;
 

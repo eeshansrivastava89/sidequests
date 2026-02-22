@@ -76,7 +76,7 @@ if (!fs.existsSync(settingsPath)) {
   const defaults = {
     devRoot: path.join(os.homedir(), "dev"),
     theme: "dark",
-    llmProvider: "none",
+    llmProvider: "claude-cli",
   };
   fs.writeFileSync(settingsPath, JSON.stringify(defaults, null, 2));
   console.log(green("Created default settings.json"));

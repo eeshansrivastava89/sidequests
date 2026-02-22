@@ -15,10 +15,12 @@ import { ProjectDetailPane } from "@/components/project-detail-pane";
 
 import type { SignalFilter } from "@/components/stats-bar";
 import { SettingsModal } from "@/components/settings-modal";
+import { ActivityLogPanel } from "@/components/activity-log-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, X, Moon, Sun } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Settings, X, Moon, Sun, Zap, Sparkles } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 import { toast } from "sonner";
@@ -168,7 +170,18 @@ export default function DashboardPage() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Toast on scan/enrich completion or error
+  // Toast: fast scan complete (deterministicReady transition)
+  const prevDeterministicReady = useRef(false);
+  useEffect(() => {
+    const dr = refreshHook.state.deterministicReady;
+    if (dr && !prevDeterministicReady.current && refreshHook.state.active) {
+      const count = refreshHook.state.projects.size;
+      toast.info(`Scanned ${count} projects. Running AI scan...`);
+    }
+    prevDeterministicReady.current = dr;
+  }, [refreshHook.state.deterministicReady, refreshHook.state.active, refreshHook.state.projects.size]);
+
+  // Toast: final completion or error
   const wasActive = useRef(false);
   useEffect(() => {
     if (refreshHook.state.active) {
@@ -181,16 +194,26 @@ export default function DashboardPage() {
       } else if (s.summary) {
         const count = s.summary.projectCount ?? 0;
         const llmOk = s.summary.llmSucceeded ?? 0;
-        if (llmOk > 0) {
-          toast.success(`Refreshed ${count} projects, enriched ${llmOk}`);
+        const llmFail = s.summary.llmFailed ?? 0;
+        if (llmFail > 0 && llmOk === 0) {
+          toast.error(`Scanned ${count} projects. AI scan failed for ${llmFail}`);
+        } else if (llmFail > 0) {
+          toast.warning(`Scanned ${count} projects, AI scanned ${llmOk}, ${llmFail} failed`);
+        } else if (llmOk > 0) {
+          toast.success(`Scanned ${count} projects, AI scanned ${llmOk}`);
         } else {
-          toast.success(`Refreshed ${count} projects`);
+          toast.success(`Scanned ${count} projects`);
         }
       }
     }
   }, [refreshHook.state]);
 
-  const handleRefresh = useCallback(() => {
+  const handleFastScan = useCallback(() => {
+    deltaHook.snapshot();
+    refreshHook.start({ skipLlm: true });
+  }, [deltaHook, refreshHook]);
+
+  const handleAiScan = useCallback(() => {
     deltaHook.snapshot();
     refreshHook.start();
   }, [deltaHook, refreshHook]);
@@ -295,13 +318,14 @@ export default function DashboardPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-destructive">{error}</p>
-        <Button onClick={() => handleRefresh()}>Retry</Button>
+        <Button onClick={handleAiScan}>Retry</Button>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {refreshHook.state.active && <div className="progress-bar" />}
       <header className="sticky top-0 z-10 border-b border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between">
@@ -314,6 +338,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <TooltipProvider delayDuration={300}>
               {refreshHook.state.active ? (
                 <>
                   <span className="text-xs text-muted-foreground max-w-[200px] truncate">
@@ -328,13 +353,41 @@ export default function DashboardPage() {
                   </Button>
                 </>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleRefresh()}
-                >
-                  Refresh
-                </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleFastScan}
+                          className="gap-1.5"
+                        >
+                          <Zap className="size-3.5" />
+                          Fast Scan
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                        <p className="font-semibold mb-1">Deterministic scan</p>
+                        <p>Folders, lines of code, git history, GitHub issues, PRs, CI status, visibility</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          onClick={handleAiScan}
+                          className="gap-1.5"
+                        >
+                          <Sparkles className="size-3.5" />
+                          AI Scan
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[240px] text-xs">
+                        <p className="font-semibold mb-1">Fast scan + LLM analysis</p>
+                        <p>Adds: summary, status reason, next action, health score, tags</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
               )}
               <button
                 type="button"
@@ -344,14 +397,22 @@ export default function DashboardPage() {
               >
                 {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
               </button>
-              <button
-                type="button"
-                className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="Settings"
-              >
-                <Settings className="size-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                    onClick={() => setSettingsOpen(true)}
+                    aria-label="Settings"
+                  >
+                    <Settings className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  <p>Dev root, LLM provider, scan options</p>
+                </TooltipContent>
+              </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </div>
@@ -514,7 +575,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="text-sm font-medium">Run a Scan</p>
                       <p className="text-xs text-muted-foreground mb-1.5">Discover all git projects in your dev root</p>
-                      <Button size="sm" onClick={() => handleRefresh()}>
+                      <Button size="sm" onClick={handleAiScan}>
                         Scan Now
                       </Button>
                     </div>
@@ -607,6 +668,8 @@ export default function DashboardPage() {
         config={config}
         onSaved={refetch}
       />
+
+      <ActivityLogPanel refreshState={refreshHook.state} projects={projects} config={config} />
 
     </div>
   );
