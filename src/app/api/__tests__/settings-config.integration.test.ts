@@ -187,18 +187,18 @@ describe("onboarding completion flow", () => {
 // ── Failure: missing/invalid provider ──────────────────────────────
 
 describe("failure: invalid provider", () => {
-  it("unknown provider produces no provider-specific check (git + gh only)", async () => {
+  it("unknown provider still shows all provider checks (discovery mode)", async () => {
     mockConfig.llmProvider = "nonexistent-provider";
 
     const res = await preflightGET();
     const body = await res.json();
 
-    // Unknown provider falls through the switch — only core checks remain (git + gh + gh-auth)
+    // All providers shown regardless of active provider (discovery/status dashboard)
     const names = body.checks.map((c: { name: string }) => c.name);
     expect(names).toContain("git");
     expect(names).toContain("gh");
-    expect(names).not.toContain("claude");
-    expect(names).not.toContain("openrouter");
+    expect(names).toContain("claude");
+    expect(names).toContain("openrouter");
   });
 
   it("known provider with missing binary fails the check", async () => {
