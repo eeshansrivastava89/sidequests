@@ -21,7 +21,7 @@ Major update — this release rethinks Sidequests from an observation dashboard 
 
 ## UI Redesign
 - Split workspace layout: project list rail on left, persistent detail pane on right
-- Project rows: status dot, name, git state, summary, last active, language badge
+- Project rows: status dot, name, git state, summary, last active, GitHub metrics (issues/PRs/CI/visibility), action buttons (VS Code/Claude/Terminal)
 - Stats cards: Projects, Uncommitted, Open Issues, CI Failing, Not on GitHub — all clickable as filters
 - Detail pane: summary, next action, insights, GitHub block, git details, timeline
 - Mobile: detail pane becomes full-screen sheet
@@ -32,6 +32,9 @@ Major update — this release rethinks Sidequests from an observation dashboard 
 - First scan is two-stage: fast scan + GitHub sync immediately, LLM enrichment continues in background
 - Provider/model selection is deterministic (no missing dropdown states)
 - Preflight tiers: required checks (Node, git) vs optional (gh, LLM provider)
+
+## Deprecations
+- `sanitizePaths` setting deprecated — defaults to false, toggle removed from settings UI
 
 ## Internal
 - 240 unit tests across 23 test files
