@@ -2,12 +2,12 @@
 
 import type { Project } from "@/lib/types";
 import type { ProjectProgress } from "@/hooks/use-refresh";
-import { Badge } from "@/components/ui/badge";
-import { PinIcon } from "@/components/project-icons";
-import { formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
+import { Button } from "@/components/ui/button";
+import { VsCodeIcon, ClaudeIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
+import { copyToClipboard, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Check, X as XIcon, Circle, Lock, Globe, Minus } from "lucide-react";
 
 interface ProjectListProps {
   projects: Project[];
@@ -15,14 +15,35 @@ interface ProjectListProps {
   onSelect: (project: Project) => void;
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
-  sanitizePaths: boolean;
+  /** @deprecated sanitizePaths no longer gates action buttons */
+  sanitizePaths?: boolean;
   refreshProgress?: Map<string, ProjectProgress>;
 }
 
 const STATUS_DOT = STATUS_COLORS;
 
-function getLangLabel(project: Project): string | null {
-  return project.framework ?? project.primaryLanguage ?? null;
+function CiIcon({ status }: { status: string }) {
+  switch (status) {
+    case "success":
+      return <Check className="size-4 text-emerald-500" />;
+    case "failure":
+      return <XIcon className="size-4 text-red-500" />;
+    case "pending":
+      return <Circle className="size-4 text-amber-500 fill-amber-500" />;
+    default:
+      return <Minus className="size-4 text-muted-foreground" />;
+  }
+}
+
+function VisibilityIcon({ visibility }: { visibility: string }) {
+  switch (visibility) {
+    case "private":
+      return <Lock className="size-4 text-amber-500" />;
+    case "public":
+      return <Globe className="size-4 text-emerald-500" />;
+    default:
+      return <Minus className="size-4 text-muted-foreground" />;
+  }
 }
 
 function getRowShimmerClass(project: Project, refreshProgress?: Map<string, ProjectProgress>): string {
@@ -35,8 +56,9 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   return "";
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, sanitizePaths, refreshProgress }: ProjectListProps) {
-  const gridCols = "grid-cols-[auto_1fr_5rem_6rem]";
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, refreshProgress }: ProjectListProps) {
+  // Project ~60% (6fr), right columns ~40% total
+  const gridCols = "grid-cols-[auto_6fr_5rem_3.5rem_3.5rem_2.5rem_3rem_5.5rem]";
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
@@ -47,8 +69,12 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
       )}>
         <div className="w-8" />
         <div>Project</div>
-        <div>Last Active</div>
-        <div>Lang</div>
+        <div className="text-right">Last Active</div>
+        <div className="text-center">Issues</div>
+        <div className="text-center">PRs</div>
+        <div className="text-center">CI</div>
+        <div className="text-center">Visibility</div>
+        <div className="text-center">Actions</div>
       </div>
 
       {/* Rows */}
@@ -80,7 +106,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               }
             }}
             className={cn(
-              "grid items-start gap-x-4 px-5 py-3 border-b border-border border-l-4 border-l-transparent last:border-b-0 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
+              "grid items-center gap-x-4 px-5 py-3 border-b border-border border-l-4 border-l-transparent last:border-b-0 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
               gridCols,
               isSelected
                 ? "bg-accent"
@@ -90,7 +116,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
             )}
           >
             {/* Status dot + pin */}
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2">
               <div
                 className={cn(
                   "w-3 h-3 rounded-full shrink-0",
@@ -149,22 +175,111 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
             </div>
 
             {/* Last active */}
-            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+            <div className="text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">
               {lastActive ? formatRelativeTime(lastActive) : "\u2014"}
             </div>
 
-            {/* Language badge */}
-            <div className="mt-1">
-              {(() => {
-                const label = getLangLabel(project);
-                return label ? (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
-                    {label}
-                  </Badge>
+            {/* Issues */}
+            <div className="text-center">
+              {hasGitHub ? (
+                ownerRepo ? (
+                  <a
+                    href={`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}/issues`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm tabular-nums text-blue-600 dark:text-blue-400 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {project.openIssues}
+                  </a>
                 ) : (
-                  <span className="text-muted-foreground text-xs">{"\u2014"}</span>
-                );
-              })()}
+                  <span className="text-sm tabular-nums text-muted-foreground">{project.openIssues}</span>
+                )
+              ) : (
+                <span className="text-muted-foreground text-sm">{"\u2014"}</span>
+              )}
+            </div>
+
+            {/* PRs */}
+            <div className="text-center">
+              {hasGitHub ? (
+                ownerRepo ? (
+                  <a
+                    href={`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}/pulls`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm tabular-nums text-blue-600 dark:text-blue-400 hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {project.openPrs}
+                  </a>
+                ) : (
+                  <span className="text-sm tabular-nums text-muted-foreground">{project.openPrs}</span>
+                )
+              ) : (
+                <span className="text-muted-foreground text-sm">{"\u2014"}</span>
+              )}
+            </div>
+
+            {/* CI Status */}
+            <div className="flex justify-center">
+              {hasGitHub ? (
+                ownerRepo ? (
+                  <a
+                    href={`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}/actions`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:opacity-70"
+                    onClick={(e) => e.stopPropagation()}
+                    title={project.ciStatus || "No CI"}
+                  >
+                    <CiIcon status={project.ciStatus} />
+                  </a>
+                ) : (
+                  <CiIcon status={project.ciStatus} />
+                )
+              ) : (
+                <Minus className="size-4 text-muted-foreground" />
+              )}
+            </div>
+
+            {/* Visibility */}
+            <div className="flex justify-center" title={project.repoVisibility}>
+              <VisibilityIcon visibility={project.repoVisibility} />
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-center">
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#007ACC] hover:bg-[#007ACC]/10"
+                  title="Open in VS Code"
+                  asChild
+                >
+                  <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
+                    <VsCodeIcon className="size-4" />
+                  </a>
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="text-[#D97757] hover:bg-[#D97757]/10"
+                  title="Copy Claude command"
+                  onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
+                >
+                  <ClaudeIcon className="size-4" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  title="Copy terminal cd command"
+                  onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
+                >
+                  <TerminalIcon className="size-4" />
+                </Button>
+              </div>
             </div>
 
           </div>

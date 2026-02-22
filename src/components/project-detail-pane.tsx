@@ -329,55 +329,53 @@ export function ProjectDetailPane({
             )}
           </div>
 
-          {!sanitizePaths && (
-            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-[#007ACC] hover:bg-[#007ACC]/10"
-                title="Open in VS Code (v)"
-                asChild
-              >
-                <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
-                  <VsCodeIcon className="size-4" />
-                </a>
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-[#D97757] hover:bg-[#D97757]/10"
-                title="Copy Claude command (c)"
-                onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
-              >
-                <ClaudeIcon className="size-4" />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                title="Copy Codex command (x)"
-                onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
-              >
-                <CodexIcon className="size-4" />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                title="Copy terminal cd command (t)"
-                onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
-              >
-                <TerminalIcon className="size-4" />
-              </Button>
-              <Button
-                size="icon-xs"
-                variant="ghost"
-                className="text-muted-foreground"
-                title="Copy path"
-                onClick={() => copyToClipboard(rawPath, "path")}
-              >
-                <span className="text-[10px]">Copy</span>
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              className="text-[#007ACC] hover:bg-[#007ACC]/10"
+              title="Open in VS Code (v)"
+              asChild
+            >
+              <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
+                <VsCodeIcon className="size-4" />
+              </a>
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              className="text-[#D97757] hover:bg-[#D97757]/10"
+              title="Copy Claude command (c)"
+              onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
+            >
+              <ClaudeIcon className="size-4" />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              title="Copy Codex command (x)"
+              onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
+            >
+              <CodexIcon className="size-4" />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              title="Copy terminal cd command (t)"
+              onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
+            >
+              <TerminalIcon className="size-4" />
+            </Button>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              className="text-muted-foreground"
+              title="Copy path"
+              onClick={() => copyToClipboard(rawPath, "path")}
+            >
+              <span className="text-[10px]">Copy</span>
+            </Button>
+          </div>
         </div>
 
         {/* Last commit message */}

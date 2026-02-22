@@ -111,12 +111,6 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
               />
             </Field>
 
-            <SwitchRow
-              label="Sanitize Paths"
-              description="Hide absolute paths (OSS mode)"
-              checked={draft.sanitizePaths}
-              onCheckedChange={(v) => set("sanitizePaths", v)}
-            />
           </section>
 
           {/* ── LLM Provider ── */}

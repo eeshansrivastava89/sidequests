@@ -23,7 +23,7 @@ export interface AppConfig {
 }
 
 const DEFAULT: AppConfig = {
-  sanitizePaths: true,
+  sanitizePaths: false,
   devRoot: "~/dev",
   excludeDirs: "",
   llmProvider: "claude-cli",
