@@ -61,8 +61,16 @@ __pycache__/
 /dist/
 
 # claude code session files
-.claude/*.md
-.claude/projects/
+.claude/
+
+# codex session files
+.codex/
+
+# npm cache
+.npm-cache/
+
+# local tarballs from npm pack / testing
+*.tgz
 
 # archive of internal review logs
 /docs/internal/archive/
