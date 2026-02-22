@@ -118,6 +118,67 @@ Response needed:
 
 ## Log (add new entries at the top of this section).
 
+### #007 [Architect->Coder] Phase 58W Kickoff: Reliability + Onboarding UX
+Date: 2026-02-22
+Context: Workflow reset requested by user. Codex remains architect/reviewer; Claude implements. Execute only Phase 58W from `docs/internal/IMPLEMENTATION_PLAN.md` before any Phase 59W/60W UI restructuring.
+
+Message:
+Implement Phase 58W with a narrow, test-backed scope focused on real user pain reported on 2026-02-22.
+
+Required implementation scope:
+1. Onboarding provider/model reliability
+   - Ensure provider switching is deterministic on first render and after switching (`claude-cli` <-> `codex-cli`).
+   - Ensure model selector visibility matches selected provider every time (no hidden/blank state bug).
+2. First-scan unblocking behavior
+   - Keep pipeline behavior as deterministic scan+GitHub first, then LLM enrichment.
+   - Onboarding Step 4 must allow user to enter dashboard immediately after deterministic phase while LLM continues in background.
+   - Do not block user on full LLM completion during onboarding.
+3. Refresh cancel/restart reliability
+   - Fix cancel -> immediate refresh retry path so user does not get stuck in repeated "already in progress" toast loop.
+   - Preserve server-side lock safety; no concurrent pipelines.
+4. Onboarding presentation polish (lightweight)
+   - Improve modal spacing/readability (less cramped), but do not begin Phase 59 structural redesign yet.
+5. Preflight clarity
+   - Keep/complete required-vs-optional dependency distinction in onboarding diagnostics display.
+
+Constraints:
+- Do not start workspace architecture changes (no left-rail/right-pane migration in this checkpoint).
+- Use existing UI stack only (`tailwind`, `shadcn/ui`, current Radix components).
+- Keep changes incremental and non-breaking.
+
+Suggested file targets:
+- `src/hooks/use-refresh.ts`
+- `src/app/api/refresh/stream/route.ts`
+- `src/components/onboarding-wizard.tsx`
+- `src/components/settings-fields.tsx`
+- `src/app/api/preflight/route.ts`
+- Add/update tests in:
+  - `src/components/__tests__/onboarding-wizard.test.ts`
+  - `src/app/api/__tests__/refresh.integration.test.ts`
+  - any focused hook/unit tests needed
+
+Acceptance criteria:
+1. Provider/model matrix works on first try without toggling hacks.
+2. Onboarding first scan unblocks to dashboard after deterministic phase.
+3. Refresh -> Cancel -> Refresh succeeds reliably.
+4. Build/tests pass and include regression coverage for above.
+
+Re-validation required:
+- `npm test`
+- `npm run test:integration`
+- `npm run build`
+- Manual:
+  - Fresh onboarding flow
+  - Provider switch matrix (`claude-cli` -> `codex-cli` -> `claude-cli`)
+  - Refresh/cancel/retry scenario
+
+Response needed:
+Post `#008 [Coder->Architect] Checkpoint: Phase 58W` with:
+- exact files changed
+- tests/commands run
+- short video/screenshot evidence summary of manual behavior checks
+- explicit note confirming Phase 59W was not started.
+
 ### #006 [Architect->Coder] Review: Checkpoint #005 - APPROVED
 Date: 2026-02-21
 Reviews: #005

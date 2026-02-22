@@ -332,21 +332,46 @@ export default function DashboardPage() {
 
         {/* Filter tabs + Sort + Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Tabs
-            value={view}
-            onValueChange={(v) => setView(v as WorkflowView)}
-          >
-            <TabsList>
-              <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
-              <TabsTrigger value="active">Active ({tabCounts.active})</TabsTrigger>
-              {tabCounts.paused > 0 && (
-                <TabsTrigger value="paused">Paused ({tabCounts.paused})</TabsTrigger>
-              )}
-              <TabsTrigger value="needs-attention">Needs Attention ({tabCounts["needs-attention"]})</TabsTrigger>
-              <TabsTrigger value="stale">Stale ({tabCounts.stale})</TabsTrigger>
-              <TabsTrigger value="archived">Archived ({tabCounts.archived})</TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <Tabs
+              value={view}
+              onValueChange={(v) => setView(v as WorkflowView)}
+            >
+              <TabsList>
+                <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
+                <TabsTrigger value="active">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                    Active ({tabCounts.active})
+                  </span>
+                </TabsTrigger>
+                {tabCounts.paused > 0 && (
+                  <TabsTrigger value="paused">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="size-2 rounded-full bg-blue-500" />
+                      Paused ({tabCounts.paused})
+                    </span>
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="needs-attention">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-red-500" />
+                    Needs Attention ({tabCounts["needs-attention"]})
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="stale">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-amber-500" />
+                    Stale ({tabCounts.stale})
+                  </span>
+                </TabsTrigger>
+                <TabsTrigger value="archived">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-zinc-400" />
+                    Archived ({tabCounts.archived})
+                  </span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
           <div className="flex items-center gap-2">
             <select

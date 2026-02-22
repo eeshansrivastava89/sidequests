@@ -29,6 +29,7 @@ export interface ProjectProgress {
 export interface RefreshState {
   active: boolean;
   phase: string;
+  deterministicReady: boolean;
   projects: Map<string, ProjectProgress>;
   summary: RefreshEvent | null;
   error: string | null;
@@ -37,10 +38,15 @@ export interface RefreshState {
 const INITIAL_STATE: RefreshState = {
   active: false,
   phase: "",
+  deterministicReady: false,
   projects: new Map(),
   summary: null,
   error: null,
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /** Parse a single SSE frame: "event: <type>\ndata: <json>\n\n" */
 function parseSSE(chunk: string): Array<{ type: string; data: string }> {
@@ -62,6 +68,8 @@ function parseSSE(chunk: string): Array<{ type: string; data: string }> {
 export function useRefresh(onComplete: () => void) {
   const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
+  const hydratedCoreRef = useRef(false);
+  const cancelRequestedAtRef = useRef(0);
 
   const handleEvent = useCallback((type: string, raw: string) => {
     switch (type) {
@@ -77,7 +85,21 @@ export function useRefresh(onComplete: () => void) {
         setState((s) => ({ ...s, phase: "Computing status and health scores..." }));
         break;
       case "derive_complete":
-        setState((s) => ({ ...s, phase: "Storing results..." }));
+        setState((s) => ({ ...s, phase: "Saving scan results..." }));
+        break;
+      case "github_start":
+        setState((s) => ({ ...s, phase: "Syncing GitHub data..." }));
+        break;
+      case "github_complete":
+        setState((s) => ({
+          ...s,
+          deterministicReady: true,
+          phase: "Core scan complete. LLM enrichment continues in background...",
+        }));
+        if (!hydratedCoreRef.current) {
+          hydratedCoreRef.current = true;
+          onComplete();
+        }
         break;
       case "project_start": {
         const d: RefreshEvent = JSON.parse(raw);
@@ -94,7 +116,8 @@ export function useRefresh(onComplete: () => void) {
           const phase = d.step === "llm"
             ? `Enriching ${d.name} (${d.index! + 1}/${d.total})`
             : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
-          return { ...s, projects, phase };
+          const deterministicReady = d.step === "llm" ? true : s.deterministicReady;
+          return { ...s, projects, phase, deterministicReady };
         });
         break;
       }
@@ -133,7 +156,13 @@ export function useRefresh(onComplete: () => void) {
       }
       case "done": {
         const d: RefreshEvent = JSON.parse(raw);
-        setState((s) => ({ ...s, active: false, phase: "Complete", summary: d }));
+        setState((s) => ({
+          ...s,
+          active: false,
+          phase: "Complete",
+          deterministicReady: true,
+          summary: d,
+        }));
         break;
       }
       case "pipeline_error": {
@@ -142,17 +171,19 @@ export function useRefresh(onComplete: () => void) {
         break;
       }
     }
-  }, []);
+  }, [onComplete]);
 
   const start = useCallback(() => {
     if (state.active) return;
 
     const abort = new AbortController();
     abortRef.current = abort;
+    hydratedCoreRef.current = false;
 
     setState({
       active: true,
       phase: "Connecting...",
+      deterministicReady: false,
       projects: new Map(),
       summary: null,
       error: null,
@@ -160,8 +191,9 @@ export function useRefresh(onComplete: () => void) {
 
     (async () => {
       let response: Response;
+      const connect = async () => fetch("/api/refresh/stream", { signal: abort.signal });
       try {
-        response = await fetch("/api/refresh/stream", { signal: abort.signal });
+        response = await connect();
       } catch {
         if (abort.signal.aborted) return;
         setState((s) => ({ ...s, active: false, phase: "Error", error: "Connection failed" }));
@@ -169,15 +201,34 @@ export function useRefresh(onComplete: () => void) {
       }
 
       if (response.status === 409) {
-        setState(INITIAL_STATE);
-        toast.info("Refresh already in progress");
-        return;
+        const recentlyCancelled = Date.now() - cancelRequestedAtRef.current < 20_000;
+        if (recentlyCancelled) {
+          setState((s) => ({ ...s, phase: "Waiting for previous refresh to stop..." }));
+          for (let i = 0; i < 40; i++) {
+            await sleep(500);
+            if (abort.signal.aborted) return;
+            try {
+              response = await connect();
+            } catch {
+              if (abort.signal.aborted) return;
+              setState((s) => ({ ...s, active: false, phase: "Error", error: "Connection failed" }));
+              return;
+            }
+            if (response.status !== 409) break;
+          }
+        }
+        if (response.status === 409) {
+          setState(INITIAL_STATE);
+          toast.info("Refresh already in progress");
+          return;
+        }
       }
 
       if (!response.ok || !response.body) {
         setState((s) => ({ ...s, active: false, phase: "Error", error: `Server error (${response.status})` }));
         return;
       }
+      cancelRequestedAtRef.current = 0;
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -233,6 +284,8 @@ export function useRefresh(onComplete: () => void) {
   }, []);
 
   const cancel = useCallback(() => {
+    cancelRequestedAtRef.current = Date.now();
+    setState((s) => ({ ...s, phase: "Cancelling..." }));
     abortRef.current?.abort();
   }, []);
 

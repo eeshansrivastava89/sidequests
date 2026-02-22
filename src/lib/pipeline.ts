@@ -390,7 +390,9 @@ export async function runRefreshPipeline(
           const batchIdx = results.indexOf(result);
           const sp = batch[batchIdx];
           const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
-          console.error(`LLM enrichment failed for ${sp.name}:`, result.reason);
+          if (process.env.NODE_ENV !== "test") {
+            console.error(`LLM enrichment failed for ${sp.name}:`, result.reason);
+          }
           emit({ type: "project_error", name: sp.name, step: "llm", error: message });
         }
       }

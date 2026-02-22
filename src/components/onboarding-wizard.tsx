@@ -25,6 +25,7 @@ interface Props {
 }
 
 const STEPS = ["Welcome", "Configure", "Diagnostics", "First Scan"] as const;
+const DEFAULT_EXCLUDE_DIRS = "node_modules,.venv,__pycache__,.git";
 
 function friendlyError(raw: string): string {
   const lower = raw.toLowerCase();
@@ -37,20 +38,17 @@ function friendlyError(raw: string): string {
   return "Scan failed. See details below.";
 }
 
+function buildDraft(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    devRoot: config.devRoot || "~/dev",
+    excludeDirs: config.excludeDirs || DEFAULT_EXCLUDE_DIRS,
+  };
+}
+
 export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartScan, scanState }: Props) {
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState({
-    devRoot: config.devRoot || "~/dev",
-    excludeDirs: config.excludeDirs || "node_modules,.venv,__pycache__,.git",
-    llmProvider: config.llmProvider,
-    openrouterApiKey: config.openrouterApiKey,
-    openrouterModel: config.openrouterModel,
-    ollamaUrl: config.ollamaUrl,
-    ollamaModel: config.ollamaModel,
-    mlxUrl: config.mlxUrl,
-    mlxModel: config.mlxModel,
-    claudeCliModel: config.claudeCliModel,
-  });
+  const [draft, setDraft] = useState<AppConfig>(() => buildDraft(config));
   const [saving, setSaving] = useState(false);
   const [preflight, setPreflight] = useState<PreflightCheck[] | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
@@ -67,18 +65,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   // Sync draft from config (on open or when config updates)
   useEffect(() => {
     if (open) {
-      setDraft({
-        devRoot: config.devRoot || "~/dev",
-        excludeDirs: config.excludeDirs || "node_modules,.venv,__pycache__,.git",
-        llmProvider: config.llmProvider,
-        openrouterApiKey: config.openrouterApiKey,
-        openrouterModel: config.openrouterModel,
-        ollamaUrl: config.ollamaUrl,
-        ollamaModel: config.ollamaModel,
-        mlxUrl: config.mlxUrl,
-        mlxModel: config.mlxModel,
-        claudeCliModel: config.claudeCliModel,
-      });
+      setDraft(buildDraft(config));
     }
   }, [open, config]);
 
@@ -97,14 +84,9 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
     setDraft((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const setAsConfig = useCallback(<K extends keyof AppConfig>(key: K, value: AppConfig[K]) => {
-    setDraft((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
   const handleSaveAndContinue = async () => {
     setSaving(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { openrouterApiKey, ...nonSecretDraft } = draft;
 
       const res = await fetch("/api/settings", {
@@ -143,20 +125,21 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   };
 
   const allChecksPassed = preflight?.every((c) => c.ok) ?? false;
+  const scanCoreReady = scanStarted && scanState.deterministicReady;
   const scanDone = scanStarted && !scanState.active && scanState.summary;
   const scanError = scanStarted && !scanState.active && scanState.error;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg" aria-describedby="onboarding-wizard-description">
+      <DialogContent className="max-w-2xl" aria-describedby="onboarding-wizard-description">
         <p id="onboarding-wizard-description" className="sr-only">
           Setup wizard to configure Sidequests
         </p>
         {/* Stepper */}
-        <div className="flex items-center justify-center gap-2 pt-2 pb-4">
+        <div className="flex items-center justify-center gap-3 pt-2 pb-5">
           {STEPS.map((label, i) => (
-            <div key={label} className="flex items-center gap-2">
-              <div className={`flex items-center justify-center size-7 rounded-full text-xs font-semibold transition-colors ${
+            <div key={label} className="flex items-center gap-3">
+              <div className={`flex items-center justify-center size-8 rounded-full text-xs font-semibold transition-colors ${
                 i < step
                   ? "bg-emerald-500 text-white"
                   : i === step
@@ -166,13 +149,13 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
                 {i < step ? "\u2713" : i + 1}
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`w-8 h-px ${i < step ? "bg-emerald-500" : "bg-border"}`} />
+                <div className={`w-10 h-px ${i < step ? "bg-emerald-500" : "bg-border"}`} />
               )}
             </div>
           ))}
         </div>
 
-        <div className="px-6 pb-2 space-y-4 max-h-[calc(80vh-10rem)] overflow-y-auto">
+        <div className="px-8 pb-4 space-y-5 max-h-[calc(82vh-10rem)] overflow-y-auto">
           {/* Step 1: Welcome */}
           {step === 0 && (
             <div className="text-center space-y-4 py-4">
@@ -215,8 +198,8 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
                 <p className="text-xs text-muted-foreground mb-3">Configure an LLM provider to generate project summaries and metadata</p>
                 <div className="space-y-4 pl-1">
                   <ProviderFields
-                    draft={{ ...config, ...draft } as AppConfig}
-                    set={setAsConfig}
+                    draft={draft}
+                    set={set}
                   />
                 </div>
               </div>
@@ -313,9 +296,23 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
               )}
 
               {scanStarted && scanState.active && (
-                <div className="flex items-center gap-3 py-4">
-                  <div className="size-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm">{scanState.phase}</span>
+                <div className="space-y-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="size-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">{scanState.phase}</span>
+                  </div>
+                  {scanCoreReady && (
+                    <div className="rounded-md bg-blue-500/10 border border-blue-500/20 p-3">
+                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        Core scan complete. You can open the dashboard now while LLM enrichment continues in the background.
+                      </p>
+                      <div className="pt-2">
+                        <Button onClick={handleComplete}>
+                          Open Dashboard Now
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

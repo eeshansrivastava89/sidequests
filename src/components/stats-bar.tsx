@@ -34,8 +34,8 @@ export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cards.map((c) => {
-        const isActive = activeFilter === c.key;
-        const isClickable = c.key !== null && onFilter;
+        const isActive = c.key !== null && activeFilter === c.key;
+        const isClickable = Boolean(onFilter);
         return (
           <button
             key={c.label}
@@ -43,7 +43,11 @@ export function StatsBar({ projects, activeFilter, onFilter }: StatsBarProps) {
             disabled={!isClickable}
             onClick={() => {
               if (!isClickable) return;
-              onFilter(isActive ? null : c.key);
+              if (c.key === null) {
+                onFilter?.(null);
+              } else {
+                onFilter?.(isActive ? null : c.key);
+              }
             }}
             className={cn(
               "rounded-lg border bg-card px-4 py-3 text-center transition-colors",

@@ -29,7 +29,9 @@
     "build:npx": "node scripts/build-npx.mjs",
     "check:privacy": "node scripts/privacy-gate.mjs",
     "test:smoke:web": "vitest run bin/__tests__/cli-helpers.test.ts bin/__tests__/bootstrap-db.test.ts",
-    "validate:source-web": "npm run lint && npm test && npm run test:integration && npm run build:npx && npm run check:privacy"
+    "validate:source-web": "npm run lint && npm test && npm run test:integration && npm run build:npx && npm run check:privacy",
+    "release:check": "bash scripts/release-check.sh",
+    "release:check:fast": "bash scripts/release-check.sh --skip-install --skip-manual"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",

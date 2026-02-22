@@ -67,48 +67,6 @@ function SectionBox({
   );
 }
 
-function CollapsibleSection({
-  title,
-  source,
-  highlight,
-  defaultOpen = true,
-  children,
-}: {
-  title: string;
-  source?: { type: "scan" | "llm" | "github"; timestamp: string | null };
-  highlight?: boolean;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className={cn("border border-border rounded-lg", highlight && "border-l-2 border-l-amber-400")}>
-      <button
-        type="button"
-        className="flex items-center justify-between w-full px-4 py-3 text-left"
-        onClick={() => setOpen(!open)}
-      >
-        <div className="flex items-center gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
-          {source && (
-            <span className="text-[10px] text-muted-foreground">
-              {source.type} · {source.timestamp ? formatRelativeDate(source.timestamp) : "\u2014"}
-            </span>
-          )}
-        </div>
-        <svg
-          width="12" height="12" viewBox="0 0 12 12"
-          className={cn("text-muted-foreground transition-transform", open && "rotate-180")}
-          fill="none" stroke="currentColor" strokeWidth="1.5"
-        >
-          <path d="M3 4.5l3 3 3-3" />
-        </svg>
-      </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
-    </div>
-  );
-}
-
 /* ── Activity Types & Helpers ──────────────────────────── */
 
 interface ActivityEntry {
@@ -224,6 +182,15 @@ function parseJsonList(json: string | null): Array<{ title: string; number: numb
   }
 }
 
+function parseGitHubOwnerRepo(remoteUrl: string | null | undefined): { owner: string; repo: string } | null {
+  if (!remoteUrl) return null;
+  const sshMatch = remoteUrl.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+  const httpsMatch = remoteUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+  return null;
+}
+
 /* ── Drawer Props ──────────────────────────────────────── */
 
 interface ProjectDrawerProps {
@@ -287,6 +254,11 @@ export function ProjectDrawer({
   const hasGitHub = project.repoVisibility !== "not-on-github";
   const issues = parseJsonList(project.issuesTopJson);
   const prs = parseJsonList(project.prsTopJson);
+  const ownerRepo = parseGitHubOwnerRepo(scan?.remoteUrl);
+  const repoBaseUrl = ownerRepo ? `https://github.com/${ownerRepo.owner}/${ownerRepo.repo}` : null;
+  const issuesUrl = repoBaseUrl ? `${repoBaseUrl}/issues` : null;
+  const prsUrl = repoBaseUrl ? `${repoBaseUrl}/pulls` : null;
+  const actionsUrl = repoBaseUrl ? `${repoBaseUrl}/actions` : null;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -410,30 +382,95 @@ export function ProjectDrawer({
             </div>
           )}
 
-          {/* ── Section 1: Summary ── */}
-          <SectionBox
-            title="Summary"
-            source={{ type: "llm", timestamp: project.llmGeneratedAt }}
-            highlight={delta?.newlyEnriched}
-          >
-            {project.summary ? (
+          {/* ── Section 1: GitHub ── */}
+          {hasGitHub && (
+            <SectionBox
+              title="GitHub"
+              source={{ type: "github", timestamp: project.githubFetchedAt }}
+            >
               <div className="space-y-3">
-                <p className="text-sm leading-relaxed">{project.summary}</p>
-                {project.llmStatus && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-[10px]">{project.llmStatus}</Badge>
-                    {project.statusReason && (
-                      <span className="text-xs text-muted-foreground">{project.statusReason}</span>
-                    )}
+                {/* Summary row */}
+                <div className="flex items-center gap-4 text-sm">
+                  {issuesUrl ? (
+                    <a href={issuesUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                      {project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}
+                    </a>
+                  ) : (
+                    <span>{project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}</span>
+                  )}
+                  {prsUrl ? (
+                    <a href={prsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                      {project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}
+                    </a>
+                  ) : (
+                    <span>{project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}</span>
+                  )}
+                  {actionsUrl ? (
+                    <a href={actionsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">
+                      CI: <CiStatusLabel status={project.ciStatus} />
+                    </a>
+                  ) : (
+                    <span className="flex items-center gap-1">CI: <CiStatusLabel status={project.ciStatus} /></span>
+                  )}
+                  {project.repoVisibility !== "unknown" && (
+                    <Badge variant="outline" className="text-[10px]">{project.repoVisibility}</Badge>
+                  )}
+                </div>
+
+                {/* Top issues */}
+                {issues.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Top Issues</span>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {issues.map((issue) => (
+                        <li key={issue.number} className="text-sm flex items-center gap-1.5">
+                          <span className="text-muted-foreground font-mono text-xs">#{issue.number}</span>
+                          {repoBaseUrl ? (
+                            <a
+                              href={`${repoBaseUrl}/issues/${issue.number}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate hover:underline"
+                            >
+                              {issue.title}
+                            </a>
+                          ) : (
+                            <span className="truncate">{issue.title}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Top PRs */}
+                {prs.length > 0 && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Open PRs</span>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {prs.map((pr) => (
+                        <li key={pr.number} className="text-sm flex items-center gap-1.5">
+                          <span className="text-muted-foreground font-mono text-xs">#{pr.number}</span>
+                          {repoBaseUrl ? (
+                            <a
+                              href={`${repoBaseUrl}/pull/${pr.number}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate hover:underline"
+                            >
+                              {pr.title}
+                            </a>
+                          ) : (
+                            <span className="truncate">{pr.title}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Run LLM enrichment to generate summary.
-              </p>
-            )}
-          </SectionBox>
+            </SectionBox>
+          )}
 
           {/* ── Section 2: Next Action + Risks ── */}
           <SectionBox
@@ -477,61 +514,35 @@ export function ProjectDrawer({
             )}
           </SectionBox>
 
-          {/* ── Section 3: GitHub ── */}
-          {hasGitHub && (
-            <SectionBox
-              title="GitHub"
-              source={{ type: "github", timestamp: project.githubFetchedAt }}
-            >
+          {/* ── Section 3: Summary ── */}
+          <SectionBox
+            title="Summary"
+            source={{ type: "llm", timestamp: project.llmGeneratedAt }}
+            highlight={delta?.newlyEnriched}
+          >
+            {project.summary ? (
               <div className="space-y-3">
-                {/* Summary row */}
-                <div className="flex items-center gap-4 text-sm">
-                  <span>{project.openIssues} {project.openIssues === 1 ? "issue" : "issues"}</span>
-                  <span>{project.openPrs} {project.openPrs === 1 ? "PR" : "PRs"}</span>
-                  <span className="flex items-center gap-1">CI: <CiStatusLabel status={project.ciStatus} /></span>
-                  {project.repoVisibility !== "unknown" && (
-                    <Badge variant="outline" className="text-[10px]">{project.repoVisibility}</Badge>
-                  )}
-                </div>
-
-                {/* Top issues */}
-                {issues.length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Top Issues</span>
-                    <ul className="mt-0.5 space-y-0.5">
-                      {issues.map((issue) => (
-                        <li key={issue.number} className="text-sm flex items-center gap-1.5">
-                          <span className="text-muted-foreground font-mono text-xs">#{issue.number}</span>
-                          <span className="truncate">{issue.title}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Top PRs */}
-                {prs.length > 0 && (
-                  <div>
-                    <span className="text-xs font-medium text-muted-foreground">Open PRs</span>
-                    <ul className="mt-0.5 space-y-0.5">
-                      {prs.map((pr) => (
-                        <li key={pr.number} className="text-sm flex items-center gap-1.5">
-                          <span className="text-muted-foreground font-mono text-xs">#{pr.number}</span>
-                          <span className="truncate">{pr.title}</span>
-                        </li>
-                      ))}
-                    </ul>
+                <p className="text-sm leading-relaxed">{project.summary}</p>
+                {project.llmStatus && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-[10px]">{project.llmStatus}</Badge>
+                    {project.statusReason && (
+                      <span className="text-xs text-muted-foreground">{project.statusReason}</span>
+                    )}
                   </div>
                 )}
               </div>
-            </SectionBox>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                Run LLM enrichment to generate summary.
+              </p>
+            )}
+          </SectionBox>
 
-          {/* ── Section 4: Details (compact) ── */}
-          <CollapsibleSection
+          {/* ── Section 4: Details ── */}
+          <SectionBox
             title="Details"
             source={{ type: "scan", timestamp: project.lastScanned }}
-            defaultOpen={false}
           >
             <div className="space-y-3">
               {/* 4-column grid: Framework, Languages, Services, LOC */}
@@ -606,10 +617,10 @@ export function ProjectDrawer({
                 </div>
               )}
             </div>
-          </CollapsibleSection>
+          </SectionBox>
 
           {/* ── Section 5: Timeline ── */}
-          <CollapsibleSection title="Timeline" defaultOpen={false}>
+          <SectionBox title="Timeline">
             {timeline.length > 0 ? (() => {
               const ITEMS_PER_PAGE = 10;
               const totalPages = Math.ceil(timeline.length / ITEMS_PER_PAGE);
@@ -675,7 +686,7 @@ export function ProjectDrawer({
             })() : (
               <p className="text-sm text-muted-foreground italic">No activity yet.</p>
             )}
-          </CollapsibleSection>
+          </SectionBox>
 
         </div>
       </DialogContent>

@@ -9,6 +9,7 @@
 - [Completed] Phase 55W: Project list row redesign (#009→#010)
 - [Completed] Phase 56W: Stats cards + header redesign (#011→#012)
 - [Completed] Phase 57W: Project drawer cleanup (#013→#014)
+- [Planned] v0.3 UX recovery: phases 58W-60W (onboarding flow, refresh reliability, project detail redesign)
 
 ## v0.2 Vision
 
@@ -123,10 +124,88 @@ Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
 
 ---
 
+## v0.3 UX Recovery (Planned, 3 phases only)
+
+Goal: resolve the current real-world UX friction without a long rewrite. Keep implementation fast by using existing stack only: Tailwind + shadcn/ui + existing Radix primitives already in repo.
+
+Constraints:
+1. No net-new UI dependency unless absolutely required.
+2. Prefer composition of existing components over custom abstractions.
+3. Ship incrementally with user-visible value each phase.
+
+## Phase 58W — Reliability + Onboarding Flow
+
+**What:** Fix blocking/buggy first-run behavior and remove onboarding friction.
+
+**Deliverables:**
+- [ ] Onboarding provider/model state is deterministic (no missing model dropdown on first provider selection)
+- [ ] First scan is two-stage in UI:
+  1) deterministic scan + GitHub sync (fast)
+  2) LLM enrichment continues in background
+- [ ] Onboarding Step 4 allows "Open Dashboard Now" immediately after stage (1), while stage (2) runs
+- [ ] Refresh cancel/restart handshake is robust (no stuck "in progress" toast loop after cancel)
+- [ ] Diagnostics UI shows required vs optional checks clearly
+- [ ] Onboarding modal spacing/typography tightened (less cramped, better scanability)
+
+**Primary files:**
+- `src/hooks/use-refresh.ts`
+- `src/app/api/refresh/stream/route.ts`
+- `src/components/onboarding-wizard.tsx`
+- `src/components/settings-fields.tsx`
+- `src/app/api/preflight/route.ts`
+
+## Phase 59W — Project Workspace Redesign (Replace Current Modal UX)
+
+**What:** Replace text-heavy modal with a more functional project workspace.
+
+**Decision (lock for v0.3):**
+- Use a **split workspace on the main page** (left project list rail + right project detail pane) instead of full-page route migration. This keeps scope smaller and faster than route-level rewrite.
+
+**Deliverables:**
+- [ ] Project click opens persistent right detail pane (not centered modal)
+- [ ] GitHub block is top-priority in detail pane
+- [ ] Issues/PRs/CI actions are clickable (direct GitHub links)
+- [ ] Details section moved higher; all major sections expanded by default
+- [ ] Content density improved: less wall-of-text, more compact action rows/chips
+- [ ] Mobile behavior: pane becomes full-screen sheet with clear close/back affordance
+
+**Primary files:**
+- `src/app/page.tsx`
+- `src/components/project-list.tsx`
+- `src/components/project-drawer.tsx` (migrate to pane/sheet pattern)
+- `src/components/ui/*` (reuse existing shadcn primitives)
+
+## Phase 60W — Signal Clarity + Interaction Polish
+
+**What:** Make status/filter semantics obvious and interaction model predictable.
+
+**Deliverables:**
+- [ ] Status color legend integrated into top filter tabs (dot colors match row status dots)
+- [ ] Stats cards interaction consistency:
+  - Projects card explicitly clears filters
+  - active filter state is visually obvious
+- [ ] "Needs Attention" and other status/filter chips have consistent color language
+- [ ] Improve keyboard and focus behavior for list → detail interactions
+- [ ] Add regression tests for:
+  - cancel then refresh
+  - first-scan unblock behavior
+  - provider/model conditional rendering
+
+**Primary files:**
+- `src/app/page.tsx`
+- `src/components/stats-bar.tsx`
+- `src/components/project-list.tsx`
+- `src/hooks/use-refresh.ts`
+- `src/components/__tests__/onboarding-wizard.test.ts`
+- `src/app/api/__tests__/refresh.integration.test.ts`
+
+---
+
 ## Implementation Order
 
 Phases 52W + 53W can run in parallel (both backend, no UI changes).
 Phases 54W-57W are sequential (each builds on previous).
+Phases 58W-60W are sequential and UX-focused.
 
 ```mermaid
 flowchart LR
@@ -136,6 +215,10 @@ flowchart LR
   D --> E[56W Stats Cards]
   E --> F[57W Drawer Cleanup]
   F --> G[v0.2 Release]
+  G --> H[58W Reliability + Onboarding]
+  H --> I[59W Workspace Redesign]
+  I --> J[60W Signal + Interaction Polish]
+  J --> K[v0.3 UX Release]
 ```
 
 ## Verification (v0.2)
@@ -146,6 +229,25 @@ flowchart LR
 4. Manual: `npm run dev` → click Refresh → fast scan results appear → GitHub data appears → LLM enrichment streams per-row → new row layout → drawer sections → stats cards filter
 5. `npm run build:npx` → `npx @eeshans/sidequests` from clean dir works
 6. User path demo: open dashboard → read one project row → know what to do next in <10s
+
+## Verification (v0.3 UX recovery)
+
+1. Onboarding:
+   - provider switch matrix works on first try (`claude-cli`, `codex-cli`, back to `claude-cli`)
+   - first scan unblocks to dashboard right after deterministic phase
+2. Refresh:
+   - click Refresh → Cancel → Refresh again succeeds within 2 retries
+3. Detail workspace:
+   - GitHub actions (Issues/PRs/CI) are clickable
+   - sections default expanded
+   - mobile sheet behavior is usable
+4. Signals:
+   - status colors in tabs match row status dots
+   - Projects card clears all signal filters
+5. Quality gate:
+   - `npm test`
+   - `npm run test:integration`
+   - `npm run build`
 
 ---
 

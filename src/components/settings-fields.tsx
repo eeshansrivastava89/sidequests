@@ -124,11 +124,13 @@ export function ProviderFields({
   draft: AppConfig;
   set: <K extends keyof AppConfig>(key: K, value: AppConfig[K]) => void;
 }) {
+  const provider = draft.llmProvider || "claude-cli";
+
   return (
     <>
       <Field label="Provider">
         <select
-          value={draft.llmProvider}
+          value={provider}
           onChange={(e) => set("llmProvider", e.target.value)}
           className={selectClass}
         >
@@ -138,7 +140,7 @@ export function ProviderFields({
         </select>
       </Field>
 
-      {draft.llmProvider === "claude-cli" && (
+      {provider === "claude-cli" && (
         <ModelSelect
           value={draft.claudeCliModel}
           onChange={(v) => set("claudeCliModel", v)}
@@ -146,7 +148,7 @@ export function ProviderFields({
         />
       )}
 
-      {draft.llmProvider === "openrouter" && (
+      {provider === "openrouter" && (
         <>
           <Field label="API Key" description="Set OPENROUTER_API_KEY in .env.local">
             <Input
@@ -167,7 +169,7 @@ export function ProviderFields({
         </>
       )}
 
-      {draft.llmProvider === "ollama" && (
+      {provider === "ollama" && (
         <>
           <Field label="URL">
             <Input
@@ -186,7 +188,7 @@ export function ProviderFields({
         </>
       )}
 
-      {draft.llmProvider === "mlx" && (
+      {provider === "mlx" && (
         <>
           <Field label="URL">
             <Input
@@ -205,7 +207,7 @@ export function ProviderFields({
         </>
       )}
 
-      {draft.llmProvider === "codex-cli" && (
+      {provider === "codex-cli" && (
         <ModelSelect
           value={draft.codexCliModel}
           onChange={(v) => set("codexCliModel", v)}
