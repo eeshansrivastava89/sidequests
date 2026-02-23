@@ -164,6 +164,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<AppConfig>(() => buildDraft(config));
   const [saving, setSaving] = useState(false);
+  const [devRootWarning, setDevRootWarning] = useState("");
   const [preflight, setPreflight] = useState<PreflightCheck[] | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
   const [scanStarted, setScanStarted] = useState(false);
@@ -200,6 +201,7 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
 
   const handleSaveAndContinue = async () => {
     setSaving(true);
+    setDevRootWarning("");
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -207,6 +209,12 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
         body: JSON.stringify(draft),
       });
       if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      if (!data.devRootExists) {
+        setDevRootWarning(`Directory not found: ${draft.devRoot}`);
+        setSaving(false);
+        return;
+      }
       toast.success("Settings saved");
       onSaved();
       setStep(2);
@@ -290,9 +298,12 @@ export function OnboardingWizard({ open, onOpenChange, config, onSaved, onStartS
               <Field label="Dev Root" description="Root directory containing your projects">
                 <Input
                   value={draft.devRoot}
-                  onChange={(e) => set("devRoot", e.target.value)}
+                  onChange={(e) => { set("devRoot", e.target.value); setDevRootWarning(""); }}
                   placeholder="~/dev"
                 />
+                {devRootWarning && (
+                  <p className="text-sm text-destructive mt-1">{devRootWarning}</p>
+                )}
               </Field>
 
               <Field label="Exclude Dirs" description="Comma-separated directories to skip during scan">

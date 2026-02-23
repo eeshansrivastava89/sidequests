@@ -26,7 +26,7 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
-  llmConcurrency: 3,
+
   llmDebug: false,
   ollamaUrl: "",
   mlxUrl: "",
@@ -93,7 +93,6 @@ describe("settings persistence round-trip", () => {
     const payload = {
       devRoot: "~/projects",
       llmProvider: "ollama",
-      llmConcurrency: 5,
     };
     const putRes = await settingsPUT(makePutRequest(payload));
     expect((await putRes.json()).ok).toBe(true);
@@ -102,7 +101,6 @@ describe("settings persistence round-trip", () => {
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
     expect(onDisk.devRoot).toBe("~/projects");
     expect(onDisk.llmProvider).toBe("ollama");
-    expect(onDisk.llmConcurrency).toBe(5);
   });
 
   it("PUT preserves existing settings not in payload", async () => {

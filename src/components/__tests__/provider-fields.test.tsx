@@ -12,7 +12,7 @@ function makeDraft(overrides: Partial<AppConfig> = {}): AppConfig {
     devRoot: "~/dev",
     excludeDirs: "",
     llmProvider: "claude-cli",
-    llmConcurrency: 3,
+
     llmOverwriteMetadata: false,
     llmAllowUnsafe: false,
     llmDebug: false,

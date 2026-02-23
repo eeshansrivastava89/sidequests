@@ -13,7 +13,8 @@ const execFileAsync = promisify(execFile);
 export const codexCliProvider: LlmProvider = {
   name: "codex-cli",
 
-  async enrich(input: LlmInput): Promise<LlmEnrichment> {
+  async enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment> {
+    if (signal?.aborted) throw new Error("Aborted");
     const prompt = buildPrompt(input);
 
     const { stdout } = await execFileAsync(
@@ -24,7 +25,7 @@ export const codexCliProvider: LlmProvider = {
         ...(config.codexCliModel ? ["--model", config.codexCliModel] : []),
         prompt,
       ],
-      { timeout: 120_000, maxBuffer: 1024 * 1024 }
+      { timeout: config.llmTimeout, maxBuffer: 1024 * 1024 }
     );
 
     return parseEnrichment(stdout);

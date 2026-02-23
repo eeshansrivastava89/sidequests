@@ -68,14 +68,14 @@ describe("useRefresh — hook-level cancel path", () => {
     // Should be active
     expect(result.current.state.active).toBe(true);
 
-    // Push a scan_start event to confirm stream is working
+    // Push an enumerate_complete event to confirm stream is working
     await act(async () => {
-      pushSSE("scan_start", "{}");
+      pushSSE("enumerate_complete", '{"projectCount":5,"names":["a","b","c","d","e"]}');
       // Give microtask queue time to process
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    expect(result.current.state.phase).toBe("Scanning filesystem...");
+    expect(result.current.state.phase).toBe("Found 5 projects. Scanning...");
 
     // Cancel
     act(() => {
@@ -99,9 +99,10 @@ describe("useRefresh — hook-level cancel path", () => {
       result.current.start();
     });
 
-    // Push events up to github_complete to set deterministicReady
+    // Push a project_complete(store) to set deterministicReady
     await act(async () => {
-      pushSSE("github_complete", '{"durationMs":500}');
+      pushSSE("project_start", JSON.stringify({ name: "app-a", step: "store", index: 0, total: 1 }));
+      pushSSE("project_complete", JSON.stringify({ name: "app-a", step: "store" }));
       await new Promise((r) => setTimeout(r, 10));
     });
 
@@ -147,11 +148,11 @@ describe("useRefresh — hook-level cancel path", () => {
 
     // Verify the new stream works
     await act(async () => {
-      pushSSE2("scan_start", "{}");
+      pushSSE2("enumerate_complete", '{"projectCount":3}');
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    expect(result.current.state.phase).toBe("Scanning filesystem...");
+    expect(result.current.state.phase).toBe("Found 3 projects. Scanning...");
 
     // Cleanup
     act(() => {

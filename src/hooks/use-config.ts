@@ -6,7 +6,8 @@ export interface AppConfig {
   devRoot: string;
   excludeDirs: string;
   llmProvider: string;
-  llmConcurrency: number;
+
+  llmTimeout: number;
   llmOverwriteMetadata: boolean;
   llmAllowUnsafe: boolean;
   llmDebug: boolean;
@@ -25,7 +26,8 @@ const DEFAULT: AppConfig = {
   devRoot: "~/dev",
   excludeDirs: "",
   llmProvider: "claude-cli",
-  llmConcurrency: 3,
+
+  llmTimeout: 90,
   llmOverwriteMetadata: false,
   llmAllowUnsafe: false,
   llmDebug: false,

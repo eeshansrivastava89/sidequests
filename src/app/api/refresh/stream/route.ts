@@ -6,7 +6,21 @@ export const dynamic = "force-dynamic";
 
 let pipelineRunning = false;
 let pipelineStartedAt = 0;
+let pipelineAbort: AbortController | null = null;
 const STALE_MS = 10 * 60 * 1000; // 10 minutes
+
+/** POST — explicit cancel request from the client. */
+export async function POST() {
+  if (pipelineAbort && pipelineRunning) {
+    pipelineAbort.abort();
+    return new Response(JSON.stringify({ ok: true, cancelled: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return new Response(JSON.stringify({ ok: true, cancelled: false }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 export async function GET(request: Request) {
   if (pipelineRunning && (Date.now() - pipelineStartedAt) < STALE_MS) {
@@ -24,6 +38,7 @@ export async function GET(request: Request) {
 
   const encoder = new TextEncoder();
   const abort = new AbortController();
+  pipelineAbort = abort;
   const url = new URL(request.url);
   const forceSkipLlm = url.searchParams.get("skipLlm") === "true";
   const skipLlm = forceSkipLlm || getLlmProvider() === null;
@@ -55,6 +70,7 @@ export async function GET(request: Request) {
         }
       } finally {
         pipelineRunning = false;
+        pipelineAbort = null;
         try {
           controller.close();
         } catch {

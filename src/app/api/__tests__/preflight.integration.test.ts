@@ -7,7 +7,7 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "none",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
-  llmConcurrency: 3,
+
   llmDebug: false,
   ollamaUrl: "",
   mlxUrl: "",

@@ -40,5 +40,5 @@ export interface LlmInput {
 
 export interface LlmProvider {
   name: string;
-  enrich(input: LlmInput): Promise<LlmEnrichment>;
+  enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment>;
 }

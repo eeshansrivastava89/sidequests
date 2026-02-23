@@ -9,7 +9,7 @@ import { config } from "../config";
 export const ollamaProvider: LlmProvider = {
   name: "ollama",
 
-  async enrich(input: LlmInput): Promise<LlmEnrichment> {
+  async enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment> {
     const baseUrl = config.ollamaUrl;
     const model = config.ollamaModel;
 
@@ -24,7 +24,7 @@ export const ollamaProvider: LlmProvider = {
           { role: "user", content: buildPrompt(input) },
         ],
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout),
     });
 
     if (!res.ok) {

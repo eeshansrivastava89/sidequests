@@ -8,6 +8,16 @@
 [![npm](https://img.shields.io/npm/v/@eeshans/sidequests)](https://www.npmjs.com/package/@eeshans/sidequests)
 [![license](https://img.shields.io/github/license/eeshansrivastava89/sidequests)](LICENSE)
 [![node](https://img.shields.io/node/v/@eeshans/sidequests)](package.json)
+[![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-blue)]()
+</div>
+
+<div align="center">
+
+```bash
+npx @eeshans/sidequests
+```
+> **Requirements:** [Node.js 20.9+](https://nodejs.org/) and [git](https://git-scm.com/). For GitHub integration: [GitHub CLI](https://cli.github.com/) (`gh auth login`). For LLM enrichment: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex). Local models & OpenRouter coming soon. 
+
 
 </div>
 
@@ -21,17 +31,6 @@
   <img src="docs/sidequest-modal.png" alt="Project detail drawer" width="500">
 </p>
 
-<br>
-
-## Get started
-
-```bash
-npx @eeshans/sidequests
-```
-
-That's it. No install, no config files, no accounts. The onboarding wizard handles the rest.
-
-> **Requirements:** [Node.js 20.9+](https://nodejs.org/) and [git](https://git-scm.com/). For GitHub integration: [GitHub CLI](https://cli.github.com/) (`gh auth login`). For LLM enrichment: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex).
 
 ## What it does
 

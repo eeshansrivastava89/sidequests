@@ -9,7 +9,6 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
-  llmConcurrency: 3,
   llmDebug: false,
 }));
 
@@ -19,18 +18,27 @@ vi.mock("@/lib/settings", () => ({
   clearSettingsCache: () => {},
 }));
 
-// Mock TS-native pipeline modules
-const mockPipeline = vi.hoisted(() => ({
-  scanResult: {} as Record<string, unknown>,
-  deriveResult: {} as Record<string, unknown>,
+// Mutable mock state — initialized in beforeEach (can't use fixtures in hoisted)
+const mockScanProjects = vi.hoisted(() => ({
+  dirs: [] as Array<{ name: string; absPath: string; pathHash: string }>,
+  projectMap: new Map<string, Record<string, unknown>>(),
+  deriveMap: new Map<string, Record<string, unknown>>(),
 }));
 
 vi.mock("@/lib/pipeline-native/scan", () => ({
-  scanAll: () => mockPipeline.scanResult,
+  listProjectDirs: () => mockScanProjects.dirs,
+  scanProject: (absPath: string) => mockScanProjects.projectMap.get(absPath) ?? {},
 }));
 
 vi.mock("@/lib/pipeline-native/derive", () => ({
-  deriveAll: () => mockPipeline.deriveResult,
+  deriveProject: (scanned: Record<string, unknown>) =>
+    mockScanProjects.deriveMap.get(scanned.pathHash as string) ?? null,
+}));
+
+vi.mock("@/lib/pipeline-native/github", () => ({
+  isGhAvailable: () => false,
+  fetchGitHubData: () => ({}),
+  parseGitHubOwnerRepo: () => null,
 }));
 
 vi.mock("@/lib/llm", () => ({
@@ -56,8 +64,13 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   mockConfig.llmProvider = "none";
-  mockPipeline.scanResult = SCAN_FIXTURE;
-  mockPipeline.deriveResult = DERIVE_FIXTURE;
+  mockScanProjects.dirs = SCAN_FIXTURE.projects.map((p) => ({
+    name: p.name,
+    absPath: p.path,
+    pathHash: p.pathHash,
+  }));
+  mockScanProjects.projectMap = new Map(SCAN_FIXTURE.projects.map((p) => [p.path, p]));
+  mockScanProjects.deriveMap = new Map(DERIVE_FIXTURE.projects.map((d) => [d.pathHash, d]));
   await cleanDb(db);
 });
 
@@ -71,8 +84,8 @@ describe("POST /api/refresh", () => {
   });
 
   it("catches pipeline errors → 500", async () => {
-    // Make scanAll throw to simulate a pipeline failure
-    mockPipeline.scanResult = null as unknown as Record<string, unknown>;
+    // Make listProjectDirs throw to simulate a pipeline failure
+    mockScanProjects.dirs = null as unknown as typeof mockScanProjects.dirs;
 
     const res = await refreshPOST();
     const body = await res.json();

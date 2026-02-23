@@ -2,12 +2,12 @@ import { createHash } from "crypto";
 import { config } from "./config";
 import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
-import { scanAll, type ScanOutput } from "./pipeline-native/scan";
-import { deriveAll, type DeriveOutput, type ScanProject as DeriveInput } from "./pipeline-native/derive";
-import { syncAllGitHub } from "./pipeline-native/github";
+import { listProjectDirs, scanProject } from "./pipeline-native/scan";
+import { deriveProject, type ScanProject as DeriveInput } from "./pipeline-native/derive";
+import { fetchGitHubData, isGhAvailable, parseGitHubOwnerRepo } from "./pipeline-native/github";
 
 /** Validate scan output shape. */
-export function validateScanOutput(data: unknown): ScanOutput {
+export function validateScanOutput(data: unknown): { scannedAt: string; projectCount: number; projects: Array<Record<string, unknown>> } {
   if (!data || typeof data !== "object") {
     throw new Error("scan: output is not an object");
   }
@@ -27,11 +27,11 @@ export function validateScanOutput(data: unknown): ScanOutput {
     if (typeof p.path !== "string") throw new Error(`scan: projects[${i}] missing 'path'`);
     if (typeof p.pathHash !== "string") throw new Error(`scan: projects[${i}] missing 'pathHash'`);
   }
-  return data as ScanOutput;
+  return data as { scannedAt: string; projectCount: number; projects: Array<Record<string, unknown>> };
 }
 
 /** Validate derive output shape. */
-export function validateDeriveOutput(data: unknown): DeriveOutput {
+export function validateDeriveOutput(data: unknown): { derivedAt: string; projects: Array<Record<string, unknown>> } {
   if (!data || typeof data !== "object") {
     throw new Error("derive: output is not an object");
   }
@@ -52,46 +52,24 @@ export function validateDeriveOutput(data: unknown): DeriveOutput {
     if (typeof p.scoreBreakdownJson !== "object" || p.scoreBreakdownJson === null) throw new Error(`derive: projects[${i}] missing 'scoreBreakdownJson'`);
     if (!Array.isArray(p.tags)) throw new Error(`derive: projects[${i}] missing 'tags'`);
   }
-  return data as DeriveOutput;
+  return data as { derivedAt: string; projects: Array<Record<string, unknown>> };
 }
 
 /** Events emitted during the refresh pipeline. */
 export type PipelineEvent =
-  | { type: "scan_start" }
-  | { type: "scan_complete"; projectCount: number }
-  | { type: "derive_start" }
-  | { type: "derive_complete" }
+  | { type: "enumerate_complete"; projectCount: number; names: string[] }
   | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm" }
   | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown> }
   | { type: "project_error"; name: string; step: string; error: string }
-  | { type: "github_start" }
-  | { type: "github_complete"; synced: number; skipped: number; errors: number }
   | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number };
-
-/** Collected info from the store phase, passed to LLM phase. */
-interface StoredProject {
-  projectId: string;
-  name: string;
-  scanned: Record<string, unknown>;
-  derived: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] } | undefined;
-  path: string;
-  github?: {
-    openIssues: number;
-    openPrs: number;
-    ciStatus: string;
-    repoVisibility: string;
-    topIssues?: string;
-    topPrs?: string;
-  };
-}
 
 function hashRawJson(rawJson: string): string {
   return createHash("sha256").update(rawJson).digest("hex");
 }
 
 /**
- * Executes the full pipeline: scan → derive → store (sequential) → optional LLM enrichment (parallel) → cleanup.
- * Calls `emit` with progress events for each step.
+ * Executes the full pipeline: enumerate → per-project (scan → derive → store → optional GitHub + LLM) → cleanup.
+ * Each project completes fully before the next starts.
  */
 export async function runRefreshPipeline(
   emit: (event: PipelineEvent) => void = () => {},
@@ -104,25 +82,28 @@ export async function runRefreshPipeline(
   const llmFailedNames: string[] = [];
   let llmSkipped = 0;
 
-  // 1. Scan (TS-native — no Python dependency)
-  emit({ type: "scan_start" });
-  const scanData = scanAll(config.devRoot, config.excludeDirs);
-  emit({ type: "scan_complete", projectCount: scanData.projectCount });
+  // 1. Lightweight directory enumeration
+  const projectDirs = listProjectDirs(config.devRoot, config.excludeDirs);
 
-  // 2. Derive (TS-native — no Python dependency)
-  emit({ type: "derive_start" });
-  const deriveData = deriveAll({
-    scannedAt: scanData.scannedAt,
-    projects: scanData.projects as unknown as DeriveInput[],
+  // Sort by existing lastTouchedAt (most recently active first) — uses DB data from prior scans
+  const existingProjects = await db.project.findMany({
+    where: { pathHash: { in: projectDirs.map((d) => d.pathHash) } },
+    select: { pathHash: true, lastTouchedAt: true },
   });
-  emit({ type: "derive_complete" });
+  const lastTouchedMap = new Map(existingProjects.map((p) => [p.pathHash, p.lastTouchedAt]));
+  projectDirs.sort((a, b) => {
+    const aDate = lastTouchedMap.get(a.pathHash);
+    const bDate = lastTouchedMap.get(b.pathHash);
+    if (!aDate && !bDate) return a.name.localeCompare(b.name);
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  });
 
-  const derivedByHash = new Map(
-    deriveData.projects.map((d) => [d.pathHash, d])
-  );
+  emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name) });
 
-  // Soft-prune missing projects and restore returning ones
-  const scannedHashes = new Set(scanData.projects.map((p) => p.pathHash as string));
+  // 2. Soft-prune missing projects and restore returning ones
+  const scannedHashes = new Set(projectDirs.map((d) => d.pathHash));
   await db.project.updateMany({
     where: { pathHash: { notIn: [...scannedHashes] }, prunedAt: null },
     data: { prunedAt: new Date() },
@@ -132,34 +113,50 @@ export async function runRefreshPipeline(
     data: { prunedAt: null },
   });
 
+  const total = projectDirs.length;
+  const llmProvider = options?.skipLlm ? null : getLlmProvider();
+  const ghAvailable = isGhAvailable();
+  const scannedAt = new Date().toISOString();
 
-  const total = scanData.projects.length;
+  // Track per-project info for activity log
+  const projectLog: Array<{
+    projectId: string;
+    name: string;
+    derived?: { statusAuto: string; healthScoreAuto: number };
+    llmResult: "succeeded" | "failed" | "skipped";
+  }> = [];
 
-  // 3. Store phase (sequential) — upsert Project, Scan, Derived for each project
-  const storedProjects: StoredProject[] = [];
-
+  // 3. Per-project pipeline
   for (let i = 0; i < total; i++) {
     if (signal?.aborted) break;
 
-    const scanned = scanData.projects[i];
-    const name = scanned.name as string;
-    const projPath = scanned.path as string;
-    const hash = scanned.pathHash as string;
-    const derived = derivedByHash.get(hash);
+    const dir = projectDirs[i];
+    const name = dir.name;
 
     emit({ type: "project_start", name, index: i, total, step: "store" });
 
+    // 3a. Scan
+    const scanned = scanProject(dir.absPath);
+
+    // 3b. Derive
+    const derived = deriveProject(scanned as unknown as DeriveInput);
+
+    // 3c. DB upsert (Project, Scan, Derived)
+    const lastCommitDateStr = scanned.lastCommitDate as string | null;
+    const lastTouchedAt = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
+
     const project = await db.project.upsert({
-      where: { pathHash: hash },
+      where: { pathHash: dir.pathHash },
       create: {
         name,
-        pathHash: hash,
-        pathDisplay: projPath,
-        lastTouchedAt: new Date(),
+        pathHash: dir.pathHash,
+        pathDisplay: dir.absPath,
+        lastTouchedAt,
       },
       update: {
         name,
-        pathDisplay: projPath,
+        pathDisplay: dir.absPath,
+        lastTouchedAt,
       },
     });
 
@@ -172,12 +169,12 @@ export async function runRefreshPipeline(
         projectId: project.id,
         rawJson,
         rawJsonHash: newHash,
-        scannedAt: new Date(scanData.scannedAt),
+        scannedAt: new Date(scannedAt),
       },
       update: {
         rawJson,
         rawJsonHash: newHash,
-        scannedAt: new Date(scanData.scannedAt),
+        scannedAt: new Date(scannedAt),
       },
     });
 
@@ -185,14 +182,12 @@ export async function runRefreshPipeline(
       const derivedJsonStr = JSON.stringify({ tags: derived.tags });
       const scoreBreakdownStr = JSON.stringify(derived.scoreBreakdownJson);
 
-      // Extract promoted columns from raw scan data
       const isDirty = (scanned.isDirty as boolean) ?? false;
       const dirtyFileCount = ((scanned.untrackedCount as number) ?? 0) + ((scanned.modifiedCount as number) ?? 0) + ((scanned.stagedCount as number) ?? 0);
       const ahead = (scanned.ahead as number) ?? 0;
       const behind = (scanned.behind as number) ?? 0;
-      const framework = null; // Phase 61W: framework detection moved to LLM enrichment
+      const framework = null;
       const branchName = (scanned.branch as string) ?? null;
-      const lastCommitDateStr = scanned.lastCommitDate as string | null;
       const lastCommitDate = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
       const locEstimate = (scanned.locEstimate as number) ?? 0;
 
@@ -234,6 +229,57 @@ export async function runRefreshPipeline(
       });
     }
 
+    // 3d. GitHub fetch (part of fast scan — not gated behind LLM)
+    let github: {
+      openIssues: number;
+      openPrs: number;
+      ciStatus: string;
+      repoVisibility: string;
+      topIssues?: string;
+      topPrs?: string;
+    } | undefined;
+
+    if (ghAvailable) {
+      const remoteUrl = scanned.remoteUrl as string | null;
+      const ownerRepo = remoteUrl ? parseGitHubOwnerRepo(remoteUrl) : null;
+      if (ownerRepo) {
+        const ghData = fetchGitHubData(ownerRepo);
+        await db.gitHub.upsert({
+          where: { projectId: project.id },
+          create: {
+            projectId: project.id,
+            openIssues: ghData.openIssues,
+            openPrs: ghData.openPrs,
+            ciStatus: ghData.ciStatus,
+            issuesJson: ghData.issuesJson,
+            prsJson: ghData.prsJson,
+            repoVisibility: ghData.repoVisibility,
+            fetchedAt: new Date(),
+          },
+          update: {
+            openIssues: ghData.openIssues,
+            openPrs: ghData.openPrs,
+            ciStatus: ghData.ciStatus,
+            issuesJson: ghData.issuesJson,
+            prsJson: ghData.prsJson,
+            repoVisibility: ghData.repoVisibility,
+            fetchedAt: new Date(),
+          },
+        });
+        if (ghData.repoVisibility !== "not-on-github") {
+          github = {
+            openIssues: ghData.openIssues,
+            openPrs: ghData.openPrs,
+            ciStatus: ghData.ciStatus,
+            repoVisibility: ghData.repoVisibility,
+            topIssues: ghData.issuesJson ?? undefined,
+            topPrs: ghData.prsJson ?? undefined,
+          };
+        }
+      }
+    }
+
+    // 3e. Emit project_complete(store) → UI refetches
     emit({
       type: "project_complete",
       name,
@@ -241,201 +287,117 @@ export async function runRefreshPipeline(
       detail: { status: derived?.statusAuto, healthScore: derived?.healthScoreAuto },
     });
 
-    storedProjects.push({
-      projectId: project.id,
-      name,
-      scanned: scanned as Record<string, unknown>,
-      derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto, hygieneScoreAuto: derived.hygieneScoreAuto, momentumScoreAuto: derived.momentumScoreAuto, tags: derived.tags } : undefined,
-      path: projPath,
-    });
-  }
+    // 3f. LLM enrichment
+    if (llmProvider && !signal?.aborted && derived) {
+      emit({ type: "project_start", name, index: i, total, step: "llm" });
+      const llmStartTime = Date.now();
 
-  // 4. GitHub sync phase
-  if (!signal?.aborted) {
-    emit({ type: "github_start" });
-    const ghInput = storedProjects.map((sp) => ({
-      pathHash: sp.scanned.pathHash as string,
-      remoteUrl: (sp.scanned.remoteUrl as string) ?? null,
-    }));
-    const ghResult = syncAllGitHub(ghInput);
-    for (const ghProject of ghResult.projects) {
-      const sp = storedProjects.find(
-        (s) => (s.scanned.pathHash as string) === ghProject.pathHash
-      );
-      if (!sp) continue;
-      await db.gitHub.upsert({
-        where: { projectId: sp.projectId },
-        create: {
-          projectId: sp.projectId,
-          openIssues: ghProject.data.openIssues,
-          openPrs: ghProject.data.openPrs,
-          ciStatus: ghProject.data.ciStatus,
-          issuesJson: ghProject.data.issuesJson,
-          prsJson: ghProject.data.prsJson,
-          repoVisibility: ghProject.data.repoVisibility,
-          fetchedAt: new Date(ghResult.fetchedAt),
-        },
-        update: {
-          openIssues: ghProject.data.openIssues,
-          openPrs: ghProject.data.openPrs,
-          ciStatus: ghProject.data.ciStatus,
-          issuesJson: ghProject.data.issuesJson,
-          prsJson: ghProject.data.prsJson,
-          repoVisibility: ghProject.data.repoVisibility,
-          fetchedAt: new Date(ghResult.fetchedAt),
-        },
+      try {
+        // Fetch previous summary for continuity
+        const existingLlm = await db.llm.findUnique({
+          where: { projectId: project.id },
+          select: { summary: true, purpose: true },
+        });
+        const previousSummary = existingLlm?.summary ?? existingLlm?.purpose ?? undefined;
+
+        const enrichment: LlmEnrichment = await llmProvider.enrich({
+          name,
+          path: dir.absPath,
+          scan: scanned as Record<string, unknown>,
+          derived: {
+            statusAuto: derived.statusAuto,
+            healthScoreAuto: derived.healthScoreAuto,
+            hygieneScoreAuto: derived.hygieneScoreAuto,
+            momentumScoreAuto: derived.momentumScoreAuto,
+            tags: derived.tags,
+          },
+          github,
+          previousSummary,
+        }, signal);
+
+        await db.llm.upsert({
+          where: { projectId: project.id },
+          create: {
+            projectId: project.id,
+            summary: enrichment.summary,
+            nextAction: enrichment.nextAction,
+            llmStatus: enrichment.status,
+            statusReason: enrichment.statusReason,
+            tagsJson: JSON.stringify(enrichment.tags),
+            insightsJson: JSON.stringify(enrichment.insights),
+            framework: enrichment.framework,
+            primaryLanguage: enrichment.primaryLanguage,
+            llmError: null,
+          },
+          update: {
+            summary: enrichment.summary,
+            nextAction: enrichment.nextAction,
+            llmStatus: enrichment.status,
+            statusReason: enrichment.statusReason,
+            tagsJson: JSON.stringify(enrichment.tags),
+            insightsJson: JSON.stringify(enrichment.insights),
+            framework: enrichment.framework,
+            primaryLanguage: enrichment.primaryLanguage,
+            llmError: null,
+            generatedAt: new Date(),
+          },
+        });
+
+        llmSucceeded++;
+        emit({
+          type: "project_complete",
+          name,
+          step: "llm",
+          detail: { summary: enrichment.summary, durationMs: Date.now() - llmStartTime },
+        });
+
+        projectLog.push({ projectId: project.id, name, derived: { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto }, llmResult: "succeeded" });
+      } catch (err) {
+        llmFailed++;
+        llmFailedNames.push(name);
+        const message = err instanceof Error ? err.message : String(err);
+        if (process.env.NODE_ENV !== "test") {
+          console.error(`LLM enrichment failed for ${name}:`, err);
+        }
+        await db.llm.upsert({
+          where: { projectId: project.id },
+          create: { projectId: project.id, llmError: message },
+          update: { llmError: message },
+        });
+        emit({ type: "project_error", name, step: "llm", error: message });
+
+        projectLog.push({ projectId: project.id, name, derived: { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto }, llmResult: "failed" });
+      }
+    } else {
+      // No LLM for this project
+      llmSkipped++;
+      projectLog.push({
+        projectId: project.id,
+        name,
+        derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto } : undefined,
+        llmResult: "skipped",
       });
     }
-    // Attach GitHub data to stored projects for LLM input
-    for (const ghProject of ghResult.projects) {
-      const sp = storedProjects.find(
-        (s) => (s.scanned.pathHash as string) === ghProject.pathHash
-      );
-      if (!sp || ghProject.data.repoVisibility === "not-on-github") continue;
-      sp.github = {
-        openIssues: ghProject.data.openIssues,
-        openPrs: ghProject.data.openPrs,
-        ciStatus: ghProject.data.ciStatus,
-        repoVisibility: ghProject.data.repoVisibility,
-        topIssues: ghProject.data.issuesJson ?? undefined,
-        topPrs: ghProject.data.prsJson ?? undefined,
-      };
-    }
-
-    emit({
-      type: "github_complete",
-      synced: ghResult.projects.length - ghResult.skipped - ghResult.errors,
-      skipped: ghResult.skipped,
-      errors: ghResult.errors,
-    });
   }
 
-  // 5. LLM phase (batched parallel with concurrency limit)
-  const llmProvider = options?.skipLlm ? null : getLlmProvider();
-
-  if (llmProvider && !signal?.aborted) {
-    // All projects with derived data are LLM candidates
-    const llmCandidates = storedProjects.filter((sp) => sp.derived);
-    const noDerivedCount = storedProjects.length - llmCandidates.length;
-    llmSkipped += noDerivedCount;
-
-    const concurrency = config.llmConcurrency;
-
-    // Process LLM candidates in batches
-    for (let batchStart = 0; batchStart < llmCandidates.length; batchStart += concurrency) {
-      if (signal?.aborted) break;
-
-      const batch = llmCandidates.slice(batchStart, batchStart + concurrency);
-
-      const results = await Promise.allSettled(
-        batch.map(async (sp) => {
-          if (signal?.aborted) throw new Error("Aborted");
-
-          const idx = storedProjects.indexOf(sp);
-          emit({ type: "project_start", name: sp.name, index: idx, total, step: "llm" });
-
-          // Fetch previous summary for continuity
-          const existingLlm = await db.llm.findUnique({
-            where: { projectId: sp.projectId },
-            select: { summary: true, purpose: true },
-          });
-          const previousSummary = existingLlm?.summary ?? existingLlm?.purpose ?? undefined;
-
-          const enrichment: LlmEnrichment = await llmProvider.enrich({
-            name: sp.name,
-            path: sp.path,
-            scan: sp.scanned,
-            derived: sp.derived!,
-            github: sp.github,
-            previousSummary,
-          });
-
-          await db.llm.upsert({
-            where: { projectId: sp.projectId },
-            create: {
-              projectId: sp.projectId,
-              summary: enrichment.summary,
-              nextAction: enrichment.nextAction,
-              llmStatus: enrichment.status,
-              statusReason: enrichment.statusReason,
-              tagsJson: JSON.stringify(enrichment.tags),
-              insightsJson: JSON.stringify(enrichment.insights),
-              framework: enrichment.framework,
-              primaryLanguage: enrichment.primaryLanguage,
-              llmError: null,
-            },
-            update: {
-              summary: enrichment.summary,
-              nextAction: enrichment.nextAction,
-              llmStatus: enrichment.status,
-              statusReason: enrichment.statusReason,
-              tagsJson: JSON.stringify(enrichment.tags),
-              insightsJson: JSON.stringify(enrichment.insights),
-              framework: enrichment.framework,
-              primaryLanguage: enrichment.primaryLanguage,
-              llmError: null,
-              generatedAt: new Date(),
-            },
-          });
-
-          return { sp, enrichment };
-        })
-      );
-
-      // Process results
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          llmSucceeded++;
-          emit({
-            type: "project_complete",
-            name: result.value.sp.name,
-            step: "llm",
-            detail: { summary: result.value.enrichment.summary },
-          });
-        } else {
-          llmFailed++;
-          // Extract project name from the error context
-          const batchIdx = results.indexOf(result);
-          const sp = batch[batchIdx];
-          const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
-          llmFailedNames.push(sp.name);
-          if (process.env.NODE_ENV !== "test") {
-            console.error(`LLM enrichment failed for ${sp.name}:`, result.reason);
-          }
-          // Persist error in Llm record
-          await db.llm.upsert({
-            where: { projectId: sp.projectId },
-            create: { projectId: sp.projectId, llmError: message },
-            update: { llmError: message },
-          });
-          emit({ type: "project_error", name: sp.name, step: "llm", error: message });
-        }
-      }
-    }
-  } else if (!llmProvider) {
-    llmSkipped += storedProjects.length;
-  }
-
-  // 6. Log activity for each project
-  for (const sp of storedProjects) {
+  // 4. Log activity for each project
+  for (const entry of projectLog) {
     if (signal?.aborted) break;
-    const llmResult = !llmProvider ? "skipped" : (!sp.derived ? "skipped" : (llmFailedNames.includes(sp.name) ? "failed" : "succeeded"));
-
     await db.activity.create({
       data: {
-        projectId: sp.projectId,
+        projectId: entry.projectId,
         type: llmProvider ? "scan+llm" : "scan",
         payloadJson: JSON.stringify({
-          scannedAt: scanData.scannedAt,
-          status: sp.derived?.statusAuto,
-          healthScore: sp.derived?.healthScoreAuto,
-          llmResult,
+          scannedAt,
+          status: entry.derived?.statusAuto,
+          healthScore: entry.derived?.healthScoreAuto,
+          llmResult: entry.llmResult,
         }),
       },
     });
   }
 
-  // 7. Cleanup: delete Activity records older than 90 days
+  // 5. Cleanup: delete Activity records older than 90 days
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   await db.activity.deleteMany({
     where: { createdAt: { lt: ninetyDaysAgo } },
@@ -444,7 +406,7 @@ export async function runRefreshPipeline(
   const durationMs = Date.now() - startTime;
   emit({
     type: "done",
-    projectCount: scanData.projectCount,
+    projectCount: projectDirs.length,
     llmSucceeded,
     llmFailed,
     llmFailedNames,
@@ -452,5 +414,5 @@ export async function runRefreshPipeline(
     durationMs,
   });
 
-  return { projectCount: scanData.projectCount };
+  return { projectCount: projectDirs.length };
 }

@@ -239,6 +239,11 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
                     )}
                   >
                     {statusLabel(status)}
+                    {status === "done" && prog?.llmDurationMs != null && (
+                      <span className="text-muted-foreground ml-1">
+                        {(prog.llmDurationMs / 1000).toFixed(1)}s
+                      </span>
+                    )}
                   </span>
                 </div>
               );

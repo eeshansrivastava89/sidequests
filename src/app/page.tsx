@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, X, Moon, Sun, Zap, Sparkles } from "lucide-react";
+import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 import { toast } from "sonner";
@@ -176,7 +176,11 @@ export default function DashboardPage() {
     const dr = refreshHook.state.deterministicReady;
     if (dr && !prevDeterministicReady.current && refreshHook.state.active) {
       const count = refreshHook.state.projects.size;
-      toast.info(`Scanned ${count} projects. Running AI scan...`);
+      if (refreshHook.state.skipLlm) {
+        toast.info(`Scanned ${count} projects.`);
+      } else {
+        toast.info(`Scanned ${count} projects. Running AI scan...`);
+      }
     }
     prevDeterministicReady.current = dr;
   }, [refreshHook.state.deterministicReady, refreshHook.state.active, refreshHook.state.projects.size]);
@@ -627,7 +631,11 @@ export default function DashboardPage() {
           </div>
       </main>
 
-      <footer className="border-t border-border mt-8 bg-card">
+      <div className="flex items-center justify-center gap-2 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200 dark:border-amber-900/50 mt-8">
+        <TriangleAlert className="size-3.5 shrink-0" />
+        <span>Alpha — AI scans use LLM tokens. Point dev root only at code directories you intend to scan.</span>
+      </div>
+      <footer className="border-t border-border bg-card">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between text-sm text-muted-foreground">
           <span>&copy; 2026 Eeshan Srivastava</span>
           <span className="italic">Personal project &middot; MIT License</span>

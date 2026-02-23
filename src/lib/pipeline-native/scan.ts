@@ -440,6 +440,43 @@ function hasLanguageIndicators(projectPath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Lightweight directory enumeration (no deep scan)
+// ---------------------------------------------------------------------------
+
+export interface ProjectDir {
+  name: string;
+  absPath: string;
+  pathHash: string;
+}
+
+export function listProjectDirs(devRoot: string, excludeDirs: string[]): ProjectDir[] {
+  if (!fs.existsSync(devRoot) || !fs.statSync(devRoot).isDirectory()) {
+    throw new Error(`Scan root not found: ${devRoot}`);
+  }
+
+  const excludeSet = new Set(excludeDirs.filter(Boolean));
+  const dirs: ProjectDir[] = [];
+  const entries = fs.readdirSync(devRoot, { withFileTypes: true });
+
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith(".")) continue;
+    if (excludeSet.has(entry.name)) continue;
+
+    const absPath = path.join(devRoot, entry.name);
+    if (!fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
+      continue;
+    }
+
+    dirs.push({ name: entry.name, absPath, pathHash: pathHash(absPath) });
+  }
+
+  return dirs;
+}
+
+// ---------------------------------------------------------------------------
 // Main scan function
 // ---------------------------------------------------------------------------
 

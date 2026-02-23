@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
   devRoot: "~/dev",
   excludeDirs: "",
   llmProvider: "claude-cli",
-  llmConcurrency: 3,
+
   llmOverwriteMetadata: false,
   llmAllowUnsafe: false,
   llmDebug: false,

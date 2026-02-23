@@ -90,10 +90,10 @@ describe("useRefresh — cancel→restart flow", () => {
 
     // Verify stream works
     await act(async () => {
-      pushSSE2("scan_start", "{}");
+      pushSSE2("enumerate_complete", '{"projectCount":3,"names":["a","b","c"]}');
       await new Promise((r) => setTimeout(r, 10));
     });
-    expect(result.current.state.phase).toBe("Scanning filesystem...");
+    expect(result.current.state.phase).toBe("Found 3 projects. Scanning...");
 
     act(() => {
       result.current.cancel();

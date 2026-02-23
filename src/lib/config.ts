@@ -21,7 +21,7 @@ export const config = {
     return getSettings().llmProvider ?? "claude-cli";
   },
   get llmAllowUnsafe(): boolean {
-    return getSettings().llmAllowUnsafe ?? false;
+    return getSettings().llmAllowUnsafe ?? true;
   },
   get claudeCliModel(): string | undefined {
     return getSettings().claudeCliModel || undefined;
@@ -30,15 +30,16 @@ export const config = {
     return getSettings().codexCliModel || undefined;
   },
   get llmDebug(): boolean {
-    return getSettings().llmDebug ?? false;
+    return getSettings().llmDebug ?? true;
   },
   get llmOverwriteMetadata(): boolean {
-    return getSettings().llmOverwriteMetadata ?? false;
+    return getSettings().llmOverwriteMetadata ?? true;
   },
-  get llmConcurrency(): number {
-    const s = getSettings().llmConcurrency;
-    return typeof s === "number" && s > 0 ? s : 3;
+  get llmTimeout(): number {
+    const s = getSettings().llmTimeout;
+    return typeof s === "number" && s > 0 ? s * 1000 : 90_000;
   },
+
   get openrouterApiKey(): string | undefined {
     return getSettings().openrouterApiKey || undefined;
   },

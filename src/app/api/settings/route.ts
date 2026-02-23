@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import fs from "node:fs";
+import os from "node:os";
 import { config } from "@/lib/config";
 import { type AppSettings, getSettings, writeSettings, clearSettingsCache } from "@/lib/settings";
 /** GET — returns all effective config (settings.json defaults). Masks API keys for UI display. */
@@ -7,7 +9,8 @@ export async function GET() {
     devRoot: config.devRoot,
     excludeDirs: config.excludeDirs.join(", "),
     llmProvider: config.llmProvider,
-    llmConcurrency: config.llmConcurrency,
+
+    llmTimeout: config.llmTimeout / 1000,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
     llmAllowUnsafe: config.llmAllowUnsafe,
     llmDebug: config.llmDebug,
@@ -32,7 +35,7 @@ const STR_KEYS: (keyof AppSettings)[] = [
   "openrouterApiKey", "openrouterModel",
   "ollamaUrl", "ollamaModel", "mlxUrl", "mlxModel",
 ];
-const NUM_KEYS: (keyof AppSettings)[] = ["llmConcurrency"];
+const NUM_KEYS: (keyof AppSettings)[] = ["llmTimeout"];
 
 /** PUT — merge incoming fields into settings.json. */
 export async function PUT(req: Request) {
@@ -61,7 +64,9 @@ export async function PUT(req: Request) {
     }
 
     writeSettings(updated);
-    return NextResponse.json({ ok: true });
+    const resolvedRoot = (updated.devRoot ?? "~/dev").replace(/^~(?=$|\/)/, os.homedir());
+    const devRootExists = fs.existsSync(resolvedRoot) && fs.statSync(resolvedRoot).isDirectory();
+    return NextResponse.json({ ok: true, devRootExists });
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }

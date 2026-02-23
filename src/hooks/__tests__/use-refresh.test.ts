@@ -4,7 +4,7 @@ import { parseSSE, reduceRefreshEvent, type RefreshState } from "@/hooks/use-ref
 function makeActiveState(overrides: Partial<RefreshState> = {}): RefreshState {
   return {
     active: true,
-    phase: "Scanning filesystem...",
+    phase: "Scanning...",
     deterministicReady: false,
     projects: new Map(),
     summary: null,
@@ -15,18 +15,18 @@ function makeActiveState(overrides: Partial<RefreshState> = {}): RefreshState {
 
 describe("parseSSE", () => {
   it("should parse a single SSE frame", () => {
-    const result = parseSSE("event: scan_start\ndata: {}\n\n");
-    expect(result).toEqual([{ type: "scan_start", data: "{}" }]);
+    const result = parseSSE("event: enumerate_complete\ndata: {}\n\n");
+    expect(result).toEqual([{ type: "enumerate_complete", data: "{}" }]);
   });
 
   it("should parse multiple SSE frames in one chunk", () => {
     const chunk =
-      "event: scan_start\ndata: {}\n\n" +
-      'event: scan_complete\ndata: {"projectCount":5}\n\n';
+      'event: enumerate_complete\ndata: {"projectCount":5}\n\n' +
+      'event: project_start\ndata: {"name":"a","step":"store","index":0,"total":5}\n\n';
     const result = parseSSE(chunk);
     expect(result).toHaveLength(2);
-    expect(result[0].type).toBe("scan_start");
-    expect(result[1].type).toBe("scan_complete");
+    expect(result[0].type).toBe("enumerate_complete");
+    expect(result[1].type).toBe("project_start");
   });
 
   it("should default event type to 'message' when missing", () => {
@@ -50,31 +50,41 @@ describe("parseSSE", () => {
 });
 
 describe("reduceRefreshEvent — state transitions", () => {
-  it("github_complete sets deterministicReady to true", () => {
+  it("enumerate_complete shows project count and pre-populates projects", () => {
     const state = makeActiveState();
-    expect(state.deterministicReady).toBe(false);
-
-    const next = reduceRefreshEvent(state, "github_complete", '{"durationMs":1200}');
-    expect(next.deterministicReady).toBe(true);
-    expect(next.phase).toContain("Fast scan complete");
+    const next = reduceRefreshEvent(state, "enumerate_complete", '{"projectCount":3,"names":["a","b","c"]}');
+    expect(next.phase).toBe("Found 3 projects. Scanning...");
+    expect(next.projects.size).toBe(3);
+    expect(next.projects.get("a")?.storeStatus).toBe("pending");
   });
 
-  it("project_start with step=llm sets deterministicReady to true", () => {
+  it("project_complete with step=store sets deterministicReady to true", () => {
+    let state = makeActiveState();
+    state = reduceRefreshEvent(state, "project_start", JSON.stringify({
+      name: "my-app", step: "store", index: 0, total: 5,
+    }));
+    expect(state.deterministicReady).toBe(false);
+
+    state = reduceRefreshEvent(state, "project_complete", JSON.stringify({
+      name: "my-app", step: "store", detail: { status: "active" },
+    }));
+    expect(state.deterministicReady).toBe(true);
+  });
+
+  it("project_start with step=llm shows AI scanning phase", () => {
     const state = makeActiveState();
     const raw = JSON.stringify({ name: "my-app", step: "llm", index: 0, total: 5 });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.deterministicReady).toBe(true);
     expect(next.phase).toBe("AI scanning my-app (1/5)");
   });
 
-  it("project_start with step=store does NOT set deterministicReady", () => {
+  it("project_start with step=store shows Scanning phase", () => {
     const state = makeActiveState();
     const raw = JSON.stringify({ name: "my-app", step: "store", index: 0, total: 5 });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.deterministicReady).toBe(false);
-    expect(next.phase).toBe("Processing my-app (1/5)");
+    expect(next.phase).toBe("Scanning my-app (1/5)");
   });
 
   it("done event finalizes state: active=false, deterministicReady=true, summary set", () => {
@@ -99,20 +109,16 @@ describe("reduceRefreshEvent — state transitions", () => {
     expect(next.error).toBe("Connection lost");
   });
 
-  it("scan_start → scan_complete → derive_start follows expected phase progression", () => {
+  it("enumerate_complete → project_start follows expected phase progression", () => {
     let state = makeActiveState();
 
-    state = reduceRefreshEvent(state, "scan_start", "{}");
-    expect(state.phase).toBe("Scanning filesystem...");
+    state = reduceRefreshEvent(state, "enumerate_complete", '{"projectCount":3,"names":["app-a","app-b","app-c"]}');
+    expect(state.phase).toBe("Found 3 projects. Scanning...");
 
-    state = reduceRefreshEvent(state, "scan_complete", '{"projectCount":3}');
-    expect(state.phase).toBe("Found 3 projects. Deriving...");
-
-    state = reduceRefreshEvent(state, "derive_start", "{}");
-    expect(state.phase).toBe("Computing status and health scores...");
-
-    state = reduceRefreshEvent(state, "derive_complete", "{}");
-    expect(state.phase).toBe("Saving scan results...");
+    state = reduceRefreshEvent(state, "project_start", JSON.stringify({
+      name: "app-a", step: "store", index: 0, total: 3,
+    }));
+    expect(state.phase).toBe("Scanning app-a (1/3)");
   });
 
   it("project_complete updates project status correctly", () => {

@@ -3,8 +3,6 @@ import { getTestDb, cleanDb } from "./helpers/test-db";
 import {
   SCAN_FIXTURE,
   DERIVE_FIXTURE,
-  SCAN_FIXTURE_REDUCED,
-  DERIVE_FIXTURE_REDUCED,
   LLM_ENRICHMENT_FIXTURE,
 } from "./helpers/fixtures";
 import type { PipelineEvent } from "@/lib/pipeline";
@@ -18,7 +16,6 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
-  llmConcurrency: 3,
   llmDebug: false,
 }));
 
@@ -28,18 +25,28 @@ vi.mock("@/lib/settings", () => ({
   clearSettingsCache: () => {},
 }));
 
-// Hoisted mutable mock return values for TS-native pipeline modules
-const mockPipeline = vi.hoisted(() => ({
-  scanResult: {} as Record<string, unknown>,
-  deriveResult: {} as Record<string, unknown>,
+// Mutable mock state — initialized in beforeEach (can't use SCAN_FIXTURE in hoisted)
+const mockScanProjects = vi.hoisted(() => ({
+  dirs: [] as Array<{ name: string; absPath: string; pathHash: string }>,
+  projectMap: new Map<string, Record<string, unknown>>(),
+  deriveMap: new Map<string, Record<string, unknown>>(),
 }));
 
 vi.mock("@/lib/pipeline-native/scan", () => ({
-  scanAll: () => mockPipeline.scanResult,
+  listProjectDirs: () => mockScanProjects.dirs,
+  scanProject: (absPath: string) => mockScanProjects.projectMap.get(absPath) ?? {},
 }));
 
 vi.mock("@/lib/pipeline-native/derive", () => ({
-  deriveAll: () => mockPipeline.deriveResult,
+  deriveProject: (scanned: Record<string, unknown>) =>
+    mockScanProjects.deriveMap.get(scanned.pathHash as string) ?? null,
+}));
+
+// Mock GitHub — not on github during tests
+vi.mock("@/lib/pipeline-native/github", () => ({
+  isGhAvailable: () => false,
+  fetchGitHubData: () => ({}),
+  parseGitHubOwnerRepo: () => null,
 }));
 
 // Mock LLM provider
@@ -67,8 +74,14 @@ beforeAll(async () => {
 beforeEach(async () => {
   mockConfig.llmProvider = "none";
   mockConfig.llmOverwriteMetadata = false;
-  mockPipeline.scanResult = SCAN_FIXTURE;
-  mockPipeline.deriveResult = DERIVE_FIXTURE;
+  // Reset scan data to full 3-project set
+  mockScanProjects.dirs = SCAN_FIXTURE.projects.map((p) => ({
+    name: p.name,
+    absPath: p.path,
+    pathHash: p.pathHash,
+  }));
+  mockScanProjects.projectMap = new Map(SCAN_FIXTURE.projects.map((p) => [p.path, p]));
+  mockScanProjects.deriveMap = new Map(DERIVE_FIXTURE.projects.map((d) => [d.pathHash, d]));
   mockEnrich.mockClear();
   mockEnrich.mockResolvedValue(LLM_ENRICHMENT_FIXTURE);
   await cleanDb(db);
@@ -159,8 +172,10 @@ describe("pipeline integration — soft-prune", () => {
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     // Second run: only 2 projects (proj-b missing)
-    mockPipeline.scanResult = SCAN_FIXTURE_REDUCED;
-    mockPipeline.deriveResult = DERIVE_FIXTURE_REDUCED;
+    mockScanProjects.dirs = [
+      { name: "proj-a", absPath: "/Users/test/dev/proj-a", pathHash: "hash-aaa" },
+      { name: "proj-c", absPath: "/Users/test/dev/proj-c", pathHash: "hash-ccc" },
+    ];
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const pruned = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });
@@ -172,16 +187,21 @@ describe("pipeline integration — soft-prune", () => {
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     // Second run: only 2 (prune proj-b)
-    mockPipeline.scanResult = SCAN_FIXTURE_REDUCED;
-    mockPipeline.deriveResult = DERIVE_FIXTURE_REDUCED;
+    mockScanProjects.dirs = [
+      { name: "proj-a", absPath: "/Users/test/dev/proj-a", pathHash: "hash-aaa" },
+      { name: "proj-c", absPath: "/Users/test/dev/proj-c", pathHash: "hash-ccc" },
+    ];
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const pruned = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });
     expect(pruned.prunedAt).not.toBeNull();
 
     // Third run: all 3 again
-    mockPipeline.scanResult = SCAN_FIXTURE;
-    mockPipeline.deriveResult = DERIVE_FIXTURE;
+    mockScanProjects.dirs = SCAN_FIXTURE.projects.map((p) => ({
+      name: p.name,
+      absPath: p.path,
+      pathHash: p.pathHash,
+    }));
     await runRefreshPipeline(() => {}, undefined, { skipLlm: true });
 
     const restored = await db.project.findFirst({ where: { pathHash: "hash-bbb" } });
@@ -346,10 +366,7 @@ describe("pipeline integration — events", () => {
     await runRefreshPipeline((e) => events.push(e), undefined, { skipLlm: true });
 
     const types = events.map((e) => e.type);
-    expect(types[0]).toBe("scan_start");
-    expect(types[1]).toBe("scan_complete");
-    expect(types[2]).toBe("derive_start");
-    expect(types[3]).toBe("derive_complete");
+    expect(types[0]).toBe("enumerate_complete");
 
     // project_start/project_complete pairs for 3 projects
     const projectStarts = events.filter((e) => e.type === "project_start");

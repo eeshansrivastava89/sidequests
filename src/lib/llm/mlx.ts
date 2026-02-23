@@ -9,7 +9,7 @@ import { config } from "../config";
 export const mlxProvider: LlmProvider = {
   name: "mlx",
 
-  async enrich(input: LlmInput): Promise<LlmEnrichment> {
+  async enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment> {
     const baseUrl = config.mlxUrl;
     const model = config.mlxModel;
 
@@ -24,7 +24,7 @@ export const mlxProvider: LlmProvider = {
         ],
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout),
     });
 
     if (!res.ok) {

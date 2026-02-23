@@ -8,6 +8,7 @@ import type { AppConfig } from "@/hooks/use-config";
 import type { PreflightCheck } from "@/lib/types";
 import { toast } from "sonner";
 import { Field, SwitchRow, ProviderFields } from "@/components/settings-fields";
+import { TriangleAlert } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -19,6 +20,7 @@ interface Props {
 export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
   const [draft, setDraft] = useState<AppConfig>(config);
   const [saving, setSaving] = useState(false);
+  const [devRootWarning, setDevRootWarning] = useState("");
   const [preflight, setPreflight] = useState<PreflightCheck[] | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
 
@@ -47,6 +49,7 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
   const handleSave = async () => {
     setSaving(true);
+    setDevRootWarning("");
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -54,6 +57,12 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
         body: JSON.stringify(draft),
       });
       if (!res.ok) throw new Error("Save failed");
+      const data = await res.json();
+      if (!data.devRootExists) {
+        setDevRootWarning(`Directory not found: ${draft.devRoot}`);
+        setSaving(false);
+        return;
+      }
       toast.success("Settings saved");
       onSaved();
       onOpenChange(false);
@@ -71,6 +80,11 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
 
+        <div className="flex items-start gap-2 px-6 py-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 rounded-md mx-6">
+          <TriangleAlert className="size-3.5 shrink-0 mt-0.5" />
+          <span>Alpha software — LLM provider settings affect token usage. Ensure dev root points only at directories you intend to scan.</span>
+        </div>
+
         <div className="overflow-y-auto scrollbar-hide px-6 space-y-8 max-h-[calc(80vh-8rem)]">
           {/* ── General ── */}
           <section className="space-y-4">
@@ -84,9 +98,12 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
             <Field label="Dev Root" description="Root directory to scan for projects">
               <Input
                 value={draft.devRoot}
-                onChange={(e) => set("devRoot", e.target.value)}
+                onChange={(e) => { set("devRoot", e.target.value); setDevRootWarning(""); }}
                 placeholder="~/dev"
               />
+              {devRootWarning && (
+                <p className="text-sm text-destructive mt-1">{devRootWarning}</p>
+              )}
             </Field>
 
             <Field label="Exclude Dirs" description="Comma-separated directories to skip">
@@ -110,13 +127,13 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
             <ProviderFields draft={draft} set={set} />
 
-            <Field label="Concurrency" description="Parallel LLM tasks (1-10)">
+            <Field label="Timeout" description="Seconds per project before LLM call is killed">
               <Input
                 type="number"
-                min={1}
-                max={10}
-                value={draft.llmConcurrency}
-                onChange={(e) => set("llmConcurrency", Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                min={30}
+                max={300}
+                value={draft.llmTimeout}
+                onChange={(e) => set("llmTimeout", Math.max(30, Math.min(300, parseInt(e.target.value) || 90)))}
               />
             </Field>
 

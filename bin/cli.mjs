@@ -110,7 +110,10 @@ const serverProcess = fork(serverPath, [], {
   stdio: "pipe",
 });
 
-// Forward server stderr (for debugging)
+// Forward server stdout and stderr (for debugging)
+serverProcess.stdout?.on("data", (chunk) => {
+  process.stdout.write(chunk);
+});
 serverProcess.stderr?.on("data", (chunk) => {
   process.stderr.write(chunk);
 });

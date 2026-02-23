@@ -9,7 +9,7 @@ import { config } from "../config";
 export const openrouterProvider: LlmProvider = {
   name: "openrouter",
 
-  async enrich(input: LlmInput): Promise<LlmEnrichment> {
+  async enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment> {
     const apiKey = config.openrouterApiKey;
     if (!apiKey) {
       throw new Error("openrouterApiKey is required — set it in Settings");
@@ -30,7 +30,7 @@ export const openrouterProvider: LlmProvider = {
         ],
         temperature: 0.3,
       }),
-      signal: AbortSignal.timeout(60_000),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout),
     });
 
     if (!res.ok) {

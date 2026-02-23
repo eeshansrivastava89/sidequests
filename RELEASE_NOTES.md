@@ -1,42 +1,33 @@
-UX polish release — clearer scan controls, real-time activity tracking, and better project status visibility.
+Sequential per-project pipeline, GitHub in fast scan, and alpha disclaimers.
 
-## Fast Scan vs AI Scan
-- Single "Refresh" button replaced with two distinct actions: **Fast Scan** (deterministic only) and **AI Scan** (fast + LLM)
-- Tooltips on each button explain what they do — Fast Scan covers folders, LOC, git history, GitHub data; AI Scan adds summary, status reason, next action, health score, tags
-- API supports `?skipLlm=true` query param for programmatic fast-scan-only requests
+## Sequential Per-Project Pipeline
+- Each project now flows through scan → derive → store → GitHub → (LLM) before the next starts
+- Replaces bulk batch phases — projects appear in the dashboard as they complete, not all at once
+- Projects sorted by most-recently-active first (using DB `lastTouchedAt` from prior scans)
 
-## Activity Log Panel
-- New floating panel at bottom-right showing real-time scan progress
-- Lists all projects with live status icons: waiting, scanning, AI scanning, done, failed
-- Shows LLM provider and model info (e.g. "Codex CLI · codex-5.3") during scan
-- Progress counter and summary bar on completion
-- Correctly differentiates fast-scan-only vs AI scan results
-- Always visible with friendly empty state; auto-expands when scan starts
+## GitHub Data in Fast Scan
+- GitHub fetch (issues, PRs, CI status, visibility) is now part of the fast scan path
+- Previously gated behind LLM — fast scan now delivers on its tooltip promise
+- GitHub data still feeds into LLM prompt when running AI scan
 
-## Scan Status Badges
-- Project rows now show **"Scanned X ago"** (blue) and **"AI scanned X ago"** (green) badges with relative timestamps
-- Red "AI scan failed" badge with error tooltip, grey "No AI scan" for unenriched projects
-- Same badges added to project detail pane header
-- Removed GitHub link from table rows to reduce visual clutter (stays in detail pane)
+## Activity Log Improvements
+- All projects pre-populated immediately from directory enumeration
+- Per-project LLM timing shown in activity log ("Done 12.3s")
+- Stagger animation restored for project list rows (150ms delay per project)
 
-## Dirty File Count
-- New `dirtyFileCount` field tracks untracked + modified + staged files per project
-- Uncommitted badge now shows file count: **"uncommitted (7)"**
-- Visible in both project list rows and detail pane
+## Alpha Disclaimers
+- Dashboard: amber banner above footer warning about token usage and dev root targeting
+- Settings modal: matching disclaimer about LLM provider and scan scope
 
-## Visual Enhancements
-- Progress bar: thicker (4px), slower animation (2.5s), peach/gold glow effect
-- Row enriching shimmer: stronger purple inset glow with deliberate left-to-right sweep
-- Settings button gets a tooltip ("Dev root, LLM provider, scan options")
+## Toast Fix
+- Fast scan toast now says "Scanned N projects." instead of incorrectly saying "Running AI scan..."
 
-## Terminology
-- "LLM enrichment" simplified to "AI scan" across all UI text, toasts, and status messages
-
-## Per-Project LLM Error Tracking
-- New `llmError` column on Llm model tracks per-project enrichment failures
-- Surfaced as red badge on project rows and in activity log
+## Config Cleanup
+- Removed `llmConcurrency` from entire config chain (settings, API, UI, types)
+- Sequential pipeline makes concurrency setting obsolete
 
 ## Internal
-- 237 unit tests across 23 files
-- Bootstrap SQL updated with additive migrations for new columns
-- shadcn Tooltip component added
+- 238 unit tests across 23 files
+- New `listProjectDirs()` lightweight enumeration in scan.ts
+- SSE protocol change: `enumerate_complete` now carries `names[]` array
+- `skipLlm` tracked in RefreshState for conditional UI behavior

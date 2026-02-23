@@ -43,12 +43,10 @@ describe("settings — openrouterApiKey persistence", () => {
     const { writeSettings } = await loadFresh();
     writeSettings({
       devRoot: "~/projects",
-      llmConcurrency: 5,
       ollamaUrl: "http://localhost:11434",
     });
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
     expect(onDisk.devRoot).toBe("~/projects");
-    expect(onDisk.llmConcurrency).toBe(5);
     expect(onDisk.ollamaUrl).toBe("http://localhost:11434");
   });
 

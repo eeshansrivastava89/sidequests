@@ -25,12 +25,15 @@ export interface ProjectProgress {
   llmStatus: "pending" | "running" | "done" | "error" | "skipped";
   llmError?: string;
   detail?: Record<string, unknown>;
+  storeOrder?: number; // completion order for staggered animation
+  llmDurationMs?: number; // how long the LLM call took
 }
 
 export interface RefreshState {
   active: boolean;
   phase: string;
   deterministicReady: boolean;
+  skipLlm: boolean;
   projects: Map<string, ProjectProgress>;
   summary: RefreshEvent | null;
   error: string | null;
@@ -40,6 +43,7 @@ const INITIAL_STATE: RefreshState = {
   active: false,
   phase: "",
   deterministicReady: false,
+  skipLlm: false,
   projects: new Map(),
   summary: null,
   error: null,
@@ -69,24 +73,18 @@ export function parseSSE(chunk: string): Array<{ type: string; data: string }> {
 /** Pure state reducer for SSE events — testable without React. */
 export function reduceRefreshEvent(state: RefreshState, type: string, raw: string): RefreshState {
   switch (type) {
-    case "scan_start":
-      return { ...state, phase: "Scanning filesystem..." };
-    case "scan_complete": {
+    case "enumerate_complete": {
       const d = JSON.parse(raw);
-      return { ...state, phase: `Found ${d.projectCount} projects. Deriving...` };
+      // Pre-populate all projects as "pending" so the activity log shows the full list
+      const projects = new Map(state.projects);
+      const names: string[] = d.names ?? [];
+      for (const name of names) {
+        if (!projects.has(name)) {
+          projects.set(name, { name, storeStatus: "pending", llmStatus: "pending" });
+        }
+      }
+      return { ...state, projects, phase: `Found ${d.projectCount} projects. Scanning...` };
     }
-    case "derive_start":
-      return { ...state, phase: "Computing status and health scores..." };
-    case "derive_complete":
-      return { ...state, phase: "Saving scan results..." };
-    case "github_start":
-      return { ...state, phase: "Syncing GitHub data..." };
-    case "github_complete":
-      return {
-        ...state,
-        deterministicReady: true,
-        phase: "Fast scan complete. AI scan in progress...",
-      };
     case "project_start": {
       const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
@@ -100,9 +98,8 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       projects.set(d.name!, existing);
       const phase = d.step === "llm"
         ? `AI scanning ${d.name} (${d.index! + 1}/${d.total})`
-        : `Processing ${d.name} (${d.index! + 1}/${d.total})`;
-      const deterministicReady = d.step === "llm" ? true : state.deterministicReady;
-      return { ...state, projects, phase, deterministicReady };
+        : `Scanning ${d.name} (${d.index! + 1}/${d.total})`;
+      return { ...state, projects, phase };
     }
     case "project_complete": {
       const d: RefreshEvent = JSON.parse(raw);
@@ -112,13 +109,19 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
         if (d.step === "store") {
           existing.storeStatus = "done";
           existing.detail = d.detail;
+          // Track completion order for staggered animation
+          const doneCount = [...projects.values()].filter(p => p.storeStatus === "done").length;
+          existing.storeOrder = doneCount;
         } else if (d.step === "llm") {
           existing.llmStatus = "done";
           if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
+          existing.llmDurationMs = (d.detail?.durationMs as number) ?? undefined;
         }
         projects.set(d.name!, existing);
       }
-      return { ...state, projects };
+      // Set deterministicReady on first project_complete(store)
+      const deterministicReady = d.step === "store" ? true : state.deterministicReady;
+      return { ...state, projects, deterministicReady };
     }
     case "project_error": {
       const d: RefreshEvent = JSON.parse(raw);
@@ -157,13 +160,14 @@ export function useRefresh(onComplete: () => void) {
   const cancelRequestedAtRef = useRef(0);
 
   const handleEvent = useCallback((type: string, raw: string) => {
-    setState((s) => {
-      const next = reduceRefreshEvent(s, type, raw);
-      return next;
-    });
-    if (type === "github_complete" && !hydratedCoreRef.current) {
-      hydratedCoreRef.current = true;
+    setState((s) => reduceRefreshEvent(s, type, raw));
+    // Refetch on every project_complete — natural stagger, no debounce needed
+    if (type === "project_complete") {
       onComplete();
+    }
+    // Also refetch on first enumerate_complete for initial data
+    if (type === "enumerate_complete" && !hydratedCoreRef.current) {
+      hydratedCoreRef.current = true;
     }
   }, [onComplete]);
 
@@ -178,6 +182,7 @@ export function useRefresh(onComplete: () => void) {
       active: true,
       phase: "Connecting...",
       deterministicReady: false,
+      skipLlm: !!options?.skipLlm,
       projects: new Map(),
       summary: null,
       error: null,
@@ -281,6 +286,9 @@ export function useRefresh(onComplete: () => void) {
   const cancel = useCallback(() => {
     cancelRequestedAtRef.current = Date.now();
     setState((s) => ({ ...s, phase: "Cancelling..." }));
+    // Explicitly tell the server to abort the pipeline
+    fetch("/api/refresh/stream", { method: "POST" }).catch(() => {});
+    // Immediately abort the client-side stream
     abortRef.current?.abort();
   }, []);
 
