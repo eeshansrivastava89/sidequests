@@ -118,6 +118,24 @@ export async function runRefreshPipeline(
   const ghAvailable = isGhAvailable();
   const scannedAt = new Date().toISOString();
 
+  // Track per-project data from pass 1 for use in pass 2 (LLM)
+  interface ProjectData {
+    dir: typeof projectDirs[number];
+    projectId: string;
+    name: string;
+    scanned: Record<string, unknown>;
+    derived?: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] };
+    github?: {
+      openIssues: number;
+      openPrs: number;
+      ciStatus: string;
+      repoVisibility: string;
+      topIssues?: string;
+      topPrs?: string;
+    };
+  }
+  const projectDataList: ProjectData[] = [];
+
   // Track per-project info for activity log
   const projectLog: Array<{
     projectId: string;
@@ -126,7 +144,7 @@ export async function runRefreshPipeline(
     llmResult: "succeeded" | "failed" | "skipped";
   }> = [];
 
-  // 3. Per-project pipeline
+  // ── Pass 1: Fast scan all projects (scan → derive → store → GitHub) ──
   for (let i = 0; i < total; i++) {
     if (signal?.aborted) break;
 
@@ -230,14 +248,7 @@ export async function runRefreshPipeline(
     }
 
     // 3d. GitHub fetch (part of fast scan — not gated behind LLM)
-    let github: {
-      openIssues: number;
-      openPrs: number;
-      ciStatus: string;
-      repoVisibility: string;
-      topIssues?: string;
-      topPrs?: string;
-    } | undefined;
+    let github: ProjectData["github"];
 
     if (ghAvailable) {
       const remoteUrl = scanned.remoteUrl as string | null;
@@ -287,38 +298,60 @@ export async function runRefreshPipeline(
       detail: { status: derived?.statusAuto, healthScore: derived?.healthScoreAuto },
     });
 
-    // 3f. LLM enrichment
-    if (llmProvider && !signal?.aborted && derived) {
-      emit({ type: "project_start", name, index: i, total, step: "llm" });
+    // Stash data for pass 2
+    projectDataList.push({
+      dir,
+      projectId: project.id,
+      name,
+      scanned: scanned as Record<string, unknown>,
+      derived: derived ? {
+        statusAuto: derived.statusAuto,
+        healthScoreAuto: derived.healthScoreAuto,
+        hygieneScoreAuto: derived.hygieneScoreAuto,
+        momentumScoreAuto: derived.momentumScoreAuto,
+        tags: derived.tags,
+      } : undefined,
+      github,
+    });
+  }
+
+  // ── Pass 2: LLM enrichment one-by-one ──
+  for (let i = 0; i < projectDataList.length; i++) {
+    if (signal?.aborted) break;
+
+    const pd = projectDataList[i];
+
+    if (llmProvider && pd.derived) {
+      emit({ type: "project_start", name: pd.name, index: i, total, step: "llm" });
       const llmStartTime = Date.now();
 
       try {
         // Fetch previous summary for continuity
         const existingLlm = await db.llm.findUnique({
-          where: { projectId: project.id },
+          where: { projectId: pd.projectId },
           select: { summary: true, purpose: true },
         });
         const previousSummary = existingLlm?.summary ?? existingLlm?.purpose ?? undefined;
 
         const enrichment: LlmEnrichment = await llmProvider.enrich({
-          name,
-          path: dir.absPath,
-          scan: scanned as Record<string, unknown>,
+          name: pd.name,
+          path: pd.dir.absPath,
+          scan: pd.scanned,
           derived: {
-            statusAuto: derived.statusAuto,
-            healthScoreAuto: derived.healthScoreAuto,
-            hygieneScoreAuto: derived.hygieneScoreAuto,
-            momentumScoreAuto: derived.momentumScoreAuto,
-            tags: derived.tags,
+            statusAuto: pd.derived.statusAuto,
+            healthScoreAuto: pd.derived.healthScoreAuto,
+            hygieneScoreAuto: pd.derived.hygieneScoreAuto,
+            momentumScoreAuto: pd.derived.momentumScoreAuto,
+            tags: pd.derived.tags,
           },
-          github,
+          github: pd.github,
           previousSummary,
         }, signal);
 
         await db.llm.upsert({
-          where: { projectId: project.id },
+          where: { projectId: pd.projectId },
           create: {
-            projectId: project.id,
+            projectId: pd.projectId,
             summary: enrichment.summary,
             nextAction: enrichment.nextAction,
             llmStatus: enrichment.status,
@@ -346,35 +379,35 @@ export async function runRefreshPipeline(
         llmSucceeded++;
         emit({
           type: "project_complete",
-          name,
+          name: pd.name,
           step: "llm",
           detail: { summary: enrichment.summary, durationMs: Date.now() - llmStartTime },
         });
 
-        projectLog.push({ projectId: project.id, name, derived: { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto }, llmResult: "succeeded" });
+        projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "succeeded" });
       } catch (err) {
         llmFailed++;
-        llmFailedNames.push(name);
+        llmFailedNames.push(pd.name);
         const message = err instanceof Error ? err.message : String(err);
         if (process.env.NODE_ENV !== "test") {
-          console.error(`LLM enrichment failed for ${name}:`, err);
+          console.error(`LLM enrichment failed for ${pd.name}:`, err);
         }
         await db.llm.upsert({
-          where: { projectId: project.id },
-          create: { projectId: project.id, llmError: message },
+          where: { projectId: pd.projectId },
+          create: { projectId: pd.projectId, llmError: message },
           update: { llmError: message },
         });
-        emit({ type: "project_error", name, step: "llm", error: message });
+        emit({ type: "project_error", name: pd.name, step: "llm", error: message });
 
-        projectLog.push({ projectId: project.id, name, derived: { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto }, llmResult: "failed" });
+        projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "failed" });
       }
     } else {
       // No LLM for this project
       llmSkipped++;
       projectLog.push({
-        projectId: project.id,
-        name,
-        derived: derived ? { statusAuto: derived.statusAuto, healthScoreAuto: derived.healthScoreAuto } : undefined,
+        projectId: pd.projectId,
+        name: pd.name,
+        derived: pd.derived ? { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto } : undefined,
         llmResult: "skipped",
       });
     }
