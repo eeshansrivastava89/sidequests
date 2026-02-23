@@ -21,7 +21,7 @@ Transform Sidequests from an observation dashboard into a hands-off action recom
 
 Design principles:
 1. LLM enrichment is the product — not optional, not secondary
-2. Single view, single Refresh button — one page, one action
+2. Single view, two scan modes — Fast Scan (deterministic) and AI Scan (fast + LLM)
 3. Hands-off — system figures everything out from code, git, GitHub, and LLM
 4. Show actions, not metrics — replace scores with verbs
 
@@ -62,8 +62,8 @@ Design principles:
 **Status:** Complete (reviewed #005→#006→#007→#008, approved 2026-02-21)
 
 **Deliverables:**
-- [x] Single "Refresh" button replaces Scan + Enrich buttons
-- [x] Unified pipeline: fast scan → GitHub sync → stream results → LLM enrichment in background
+- [x] ~~Single "Refresh" button~~ → replaced by Fast Scan + AI Scan buttons (v0.3.0)
+- [x] Two-pass pipeline: pass 1 fast scans all projects (scan → derive → store → GitHub), pass 2 LLM one-by-one (v0.3.1)
 - [x] **Server-side pipeline mutex:** module-level lock in `/api/refresh/stream` with 409 rejection + timestamp-based staleness guard (10-min auto-recovery)
 - [x] Per-row progress indicators (spinner during scan, sparkle during LLM enrichment)
 - [x] Rows update in-place as each project completes (no overlay list)

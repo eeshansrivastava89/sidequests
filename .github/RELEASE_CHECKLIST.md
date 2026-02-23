@@ -13,8 +13,9 @@
 - [ ] `npm run build:npx` succeeds
 - [ ] `npm pack --dry-run` shows only `bin/*.mjs`, `.next/standalone/`, `public/`
 - [ ] `npx @eeshans/sidequests --no-open` starts server and `/api/preflight` returns 200
-- [ ] Onboarding wizard works on fresh config
-- [ ] Scan completes successfully
+- [ ] New-user flow: Settings → configure dev root → Scan Now works on fresh config
+- [ ] Fast Scan completes successfully
+- [ ] AI Scan completes successfully
 - [ ] Settings persist across restart
 
 ## Privacy Gate
@@ -38,4 +39,4 @@ git push --tags      # triggers publish workflow
 ## Post-Release
 
 - [ ] Clean-machine validation: `npx @eeshans/sidequests` on fresh environment
-- [ ] Smoke test: configure > scan > enrich flow works
+- [ ] Smoke test: configure → Fast Scan → AI Scan flow works

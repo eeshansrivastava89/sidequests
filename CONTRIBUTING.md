@@ -14,7 +14,7 @@ Thank you for your interest in contributing! This guide will help you get starte
    ```bash
    npm run dev
    ```
-4. Open http://localhost:3000 — the onboarding wizard will guide you through initial configuration.
+4. Open http://localhost:3000 — configure your dev root in Settings, then run a scan.
 
 ## Development Workflow
 
@@ -55,9 +55,9 @@ prisma/             Database schema
 
 ## Key Architecture
 
-- **Pipeline:** TypeScript-native scan + derive (no Python dependency)
+- **Pipeline:** Two-pass — pass 1 fast scans all projects (scan → derive → store → GitHub), pass 2 does LLM one-by-one
 - **Database:** Prisma 7 + SQLite with LibSQL adapter
-- **Merge model:** Override > Metadata > Derived > LLM > Scan
+- **Merge model:** Override > LLM > Derived > Scan
 - **Distribution:** Web/CLI via NPX (`npx @eeshans/sidequests`)
 - **Config:** Settings UI > settings.json > env vars > defaults
 

@@ -47,14 +47,14 @@ Everything runs locally. Your code never leaves your machine.
 
 | | |
 |---|---|
-| **LLM Enrichment** | AI-powered summaries, next actions, insights — the core value of the tool |
-| **GitHub Integration** | Open issues, PRs, CI status via `gh` CLI |
+| **Fast Scan** | Folders, LOC, git history, GitHub issues/PRs/CI — completes in seconds |
+| **AI Scan** | Fast scan + LLM-powered summaries, next actions, insights, tags |
+| **GitHub Integration** | Open issues, PRs, CI status, repo visibility via `gh` CLI |
 | **Smart Status** | Classifies projects as active, paused, stale, or archived |
 | **Git Aware** | Dirty state, ahead/behind, branch tracking |
-| **Live Refresh** | SSE-based streaming progress as projects are scanned |
+| **Live Refresh** | SSE-based streaming progress with real-time activity log |
 | **Pin & Override** | Pin favorites, manually override any metadata |
 | **Dark Mode** | Automatic or manual theme switching |
-| **Onboarding Wizard** | First-run setup that walks you through configuration |
 
 ## LLM providers
 
@@ -107,7 +107,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 ### Architecture
 
 ```
-~/dev repos ➜ scan ➜ derive ➜ pipeline ➜ SQLite ➜ API ➜ dashboard
+~/dev repos ➜ enumerate ➜ [scan ➜ derive ➜ store ➜ GitHub] ➜ [LLM one-by-one] ➜ API ➜ dashboard
+              pass 1: all projects (fast)             pass 2: sequential
 ```
 
 Built with Next.js 16, Prisma 7 + SQLite, React 19, shadcn/ui, and Tailwind CSS.
