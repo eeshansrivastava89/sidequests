@@ -52,8 +52,6 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   if (prog.llmStatus === "error") return "row-error";
   // Only show "done" when the LLM step completed (not just store)
   if (prog.llmStatus === "done") return "row-done";
-  // Fast scan complete — bottom border sweep (before LLM starts)
-  if (prog.storeStatus === "done" && prog.llmStatus === "pending") return "row-scan-complete";
   return "";
 }
 

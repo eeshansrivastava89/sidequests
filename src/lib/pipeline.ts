@@ -315,7 +315,17 @@ export async function runRefreshPipeline(
     });
   }
 
-  // ── Pass 2: LLM enrichment one-by-one ──
+  // Sort pass 2 by most-recently-active first (lastCommitDate from scan data)
+  projectDataList.sort((a, b) => {
+    const aDate = a.scanned.lastCommitDate as string | null;
+    const bDate = b.scanned.lastCommitDate as string | null;
+    if (!aDate && !bDate) return a.name.localeCompare(b.name);
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return new Date(bDate).getTime() - new Date(aDate).getTime();
+  });
+
+  // ── Pass 2: LLM enrichment one-by-one (most recent first) ──
   for (let i = 0; i < projectDataList.length; i++) {
     if (signal?.aborted) break;
 
