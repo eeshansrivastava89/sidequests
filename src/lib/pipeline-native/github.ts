@@ -62,7 +62,7 @@ function runGh(...args: string[]): string | null {
  * Check if `gh` CLI is installed and authenticated.
  */
 export function isGhAvailable(): boolean {
-  return runGh("auth", "status") !== null;
+  return runGh("auth", "token") !== null;
 }
 
 /**

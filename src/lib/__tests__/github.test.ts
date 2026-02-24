@@ -69,17 +69,17 @@ describe("parseGitHubOwnerRepo", () => {
 // ---------------------------------------------------------------------------
 
 describe("isGhAvailable", () => {
-  it("returns true when gh auth status succeeds", () => {
-    mockExecFileSync.mockReturnValueOnce("Logged in to github.com");
+  it("returns true when gh auth token succeeds", () => {
+    mockExecFileSync.mockReturnValueOnce("gho_abc123");
     expect(isGhAvailable()).toBe(true);
     expect(mockExecFileSync).toHaveBeenCalledWith(
       "gh",
-      ["auth", "status"],
+      ["auth", "token"],
       expect.objectContaining({ timeout: 10_000 })
     );
   });
 
-  it("returns false when gh auth status throws", () => {
+  it("returns false when gh auth token throws", () => {
     mockExecFileSync.mockImplementationOnce(() => {
       throw new Error("not authenticated");
     });

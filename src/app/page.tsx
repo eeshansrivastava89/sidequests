@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert } from "lucide-react";
+import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert, Info } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 import { evaluateAttention } from "@/lib/attention";
 import { toast } from "sonner";
@@ -163,6 +163,22 @@ export default function DashboardPage() {
     return localStorage.getItem("theme") === "dark" ||
       (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
+
+  const [ghStatus, setGhStatus] = useState<"ok" | "no-auth" | "no-gh" | null>(null);
+
+  // Check gh auth status on mount
+  useEffect(() => {
+    fetch("/api/preflight")
+      .then((res) => res.json())
+      .then((data) => {
+        const checks: { name: string; ok: boolean }[] = data.checks ?? [];
+        const gh = checks.find((c) => c.name === "gh");
+        if (!gh || !gh.ok) { setGhStatus("no-gh"); return; }
+        const ghAuth = checks.find((c) => c.name === "gh-auth");
+        setGhStatus(ghAuth?.ok ? "ok" : "no-auth");
+      })
+      .catch(() => {});
+  }, []);
 
   // Apply dark class to <html>
   useEffect(() => {
@@ -425,6 +441,24 @@ export default function DashboardPage() {
       {/* Full-width scrollable content */}
       <main className="flex-1">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+            {ghStatus === "no-auth" && (
+              <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-sm text-muted-foreground">
+                <Info className="size-4 shrink-0 text-amber-500" />
+                <span>
+                  GitHub features disabled — <code className="text-xs bg-muted px-1 py-0.5 rounded">gh</code> is not authenticated.
+                  Run <code className="text-xs bg-muted px-1 py-0.5 rounded">gh auth login</code> to enable issues, PRs, and CI status.
+                </span>
+              </div>
+            )}
+            {ghStatus === "no-gh" && (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
+                <Info className="size-4 shrink-0" />
+                <span>
+                  GitHub features unavailable — install <code className="text-xs bg-muted px-1 py-0.5 rounded">gh</code> CLI
+                  to see issues, PRs, and CI status.
+                </span>
+              </div>
+            )}
             <StatsBar
               projects={projects}
               activeFilter={signalFilter}

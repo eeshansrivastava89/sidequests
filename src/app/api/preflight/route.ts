@@ -47,7 +47,7 @@ export async function GET() {
   checks.push(ghCheck);
   if (ghCheck.ok) {
     try {
-      execSync("gh auth status", { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] });
+      execSync("gh auth token", { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] });
       checks.push({ name: "gh-auth", ok: true, message: "Authenticated with GitHub", tier: "optional" });
     } catch {
       checks.push({ name: "gh-auth", ok: false, message: "gh is not authenticated. Run: gh auth login", tier: "optional" });
