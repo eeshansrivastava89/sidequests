@@ -131,6 +131,33 @@ try {
 
 console.log(`\n${bold("Sidequests")} is running at ${green(serverUrl)}\n`);
 
+// Non-blocking version check
+(async () => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(
+      "https://registry.npmjs.org/@eeshans/sidequests/latest",
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    if (!res.ok) return;
+    const data = await res.json();
+    const latest = data.version;
+    if (latest && latest !== pkg.version) {
+      const l = latest.split(".").map(Number);
+      const c = pkg.version.split(".").map(Number);
+      const newer = l[0] > c[0] || (l[0] === c[0] && l[1] > c[1]) || (l[0] === c[0] && l[1] === c[1] && l[2] > c[2]);
+      if (newer) {
+        console.log(`  ${yellow("Update available:")} ${pkg.version} → ${green(latest)}`);
+        console.log(`  Run: ${bold("npx @eeshans/sidequests@latest")}\n`);
+      }
+    }
+  } catch {
+    // Silent on failure
+  }
+})();
+
 if (!noOpen) {
   openBrowser(serverUrl);
 }

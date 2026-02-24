@@ -165,6 +165,7 @@ export default function DashboardPage() {
   });
 
   const [ghStatus, setGhStatus] = useState<"ok" | "no-auth" | "no-gh" | null>(null);
+  const [versionInfo, setVersionInfo] = useState<{ current: string; latest: string | null; updateAvailable: boolean } | null>(null);
 
   // Check gh auth status on mount
   useEffect(() => {
@@ -177,6 +178,14 @@ export default function DashboardPage() {
         const ghAuth = checks.find((c) => c.name === "gh-auth");
         setGhStatus(ghAuth?.ok ? "ok" : "no-auth");
       })
+      .catch(() => {});
+  }, []);
+
+  // Check for version updates on mount
+  useEffect(() => {
+    fetch("/api/version")
+      .then((res) => res.json())
+      .then((data) => setVersionInfo(data))
       .catch(() => {});
   }, []);
 
@@ -355,6 +364,20 @@ export default function DashboardPage() {
                 <span className="text-xs text-muted-foreground">
                   Last refreshed {formatRelativeTime(lastRefreshed)}
                 </span>
+              )}
+              {versionInfo?.updateAvailable && versionInfo.latest && (
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs font-medium text-amber-600 dark:text-amber-400 cursor-default">
+                        v{versionInfo.latest} available
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      <p>Run: npx @eeshans/sidequests@latest</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             <div className="flex items-center gap-2">
