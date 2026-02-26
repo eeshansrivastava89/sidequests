@@ -1,5 +1,11 @@
 # Release Notes
 
+## v0.3.7
+
+- Insight bullets are now color-coded by severity: green (strength), amber (at-risk), red (critical)
+- LLM prompt returns `{text, severity}` objects instead of plain strings — old data gracefully defaults to amber
+- Markdown files (`.md`) now count toward LOC, TODO, and FIXME totals — fixes blank stats for docs-only projects
+
 ## v0.3.6
 
 - Scan all subdirectories of devRoot by default, not just git repos or recognized projects
