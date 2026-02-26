@@ -20,6 +20,7 @@ export interface AppSettings {
   mlxUrl?: string;
   mlxModel?: string;
   hasCompletedOnboarding?: boolean;
+  includeNonGitDirs?: boolean;
 }
 
 let cache: AppSettings | null = null;

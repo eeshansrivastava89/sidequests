@@ -449,7 +449,7 @@ export interface ProjectDir {
   pathHash: string;
 }
 
-export function listProjectDirs(devRoot: string, excludeDirs: string[]): ProjectDir[] {
+export function listProjectDirs(devRoot: string, excludeDirs: string[], includeNonGitDirs = true): ProjectDir[] {
   if (!fs.existsSync(devRoot) || !fs.statSync(devRoot).isDirectory()) {
     throw new Error(`Scan root not found: ${devRoot}`);
   }
@@ -466,7 +466,7 @@ export function listProjectDirs(devRoot: string, excludeDirs: string[]): Project
     if (excludeSet.has(entry.name)) continue;
 
     const absPath = path.join(devRoot, entry.name);
-    if (!fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
+    if (!includeNonGitDirs && !fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
       continue;
     }
 
@@ -533,7 +533,7 @@ export function scanProject(absPath: string): Record<string, unknown> {
   };
 }
 
-export function scanAll(devRoot: string, excludeDirs: string[]): ScanOutput {
+export function scanAll(devRoot: string, excludeDirs: string[], includeNonGitDirs = true): ScanOutput {
   if (!fs.existsSync(devRoot) || !fs.statSync(devRoot).isDirectory()) {
     throw new Error(`Scan root not found: ${devRoot}`);
   }
@@ -551,7 +551,7 @@ export function scanAll(devRoot: string, excludeDirs: string[]): ScanOutput {
     if (excludeSet.has(entry.name)) continue;
 
     const absPath = path.join(devRoot, entry.name);
-    if (!fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
+    if (!includeNonGitDirs && !fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
       continue;
     }
 

@@ -20,6 +20,7 @@ export interface AppConfig {
   mlxUrl: string;
   mlxModel: string;
   hasCompletedOnboarding: boolean;
+  includeNonGitDirs: boolean;
 }
 
 const DEFAULT: AppConfig = {
@@ -40,6 +41,7 @@ const DEFAULT: AppConfig = {
   mlxUrl: "",
   mlxModel: "",
   hasCompletedOnboarding: false,
+  includeNonGitDirs: true,
 };
 
 export function useConfig() {

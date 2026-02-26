@@ -61,4 +61,7 @@ export const config = {
   get hasCompletedOnboarding(): boolean {
     return getSettings().hasCompletedOnboarding ?? false;
   },
+  get includeNonGitDirs(): boolean {
+    return getSettings().includeNonGitDirs ?? true;
+  },
 } as const;

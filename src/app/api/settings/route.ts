@@ -23,12 +23,13 @@ export async function GET() {
     mlxUrl: config.mlxUrl,
     mlxModel: config.mlxModel,
     hasCompletedOnboarding: config.hasCompletedOnboarding,
+    includeNonGitDirs: config.includeNonGitDirs,
   });
 }
 
 const BOOL_KEYS: (keyof AppSettings)[] = [
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
-  "hasCompletedOnboarding",
+  "hasCompletedOnboarding", "includeNonGitDirs",
 ];
 const STR_KEYS: (keyof AppSettings)[] = [
   "devRoot", "excludeDirs", "llmProvider", "claudeCliModel", "codexCliModel",

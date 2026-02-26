@@ -83,7 +83,7 @@ export async function runRefreshPipeline(
   let llmSkipped = 0;
 
   // 1. Lightweight directory enumeration
-  const projectDirs = listProjectDirs(config.devRoot, config.excludeDirs);
+  const projectDirs = listProjectDirs(config.devRoot, config.excludeDirs, config.includeNonGitDirs);
 
   // Sort by existing lastTouchedAt (most recently active first) — uses DB data from prior scans
   const existingProjects = await db.project.findMany({

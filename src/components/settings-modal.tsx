@@ -114,6 +114,13 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
               />
             </Field>
 
+            <SwitchRow
+              label="Include Non-Git Directories"
+              description="Show all folders, not just git repos or recognized projects"
+              checked={draft.includeNonGitDirs}
+              onCheckedChange={(v) => set("includeNonGitDirs", v)}
+            />
+
           </section>
 
           {/* ── LLM Provider ── */}
