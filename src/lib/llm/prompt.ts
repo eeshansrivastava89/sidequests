@@ -1,17 +1,17 @@
 import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
 
-const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "stale", "idea"]);
+const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "completed", "idea"]);
 
 export const SYSTEM_PROMPT = `You are a developer project analyst. Given a project's scan data, derived metrics, and optional GitHub data, produce a JSON object with these exact fields:
 
 - "summary": A 1-2 sentence description of what this project does and its current state.
 - "nextAction": The single most important thing the developer should do next. Always provide a concrete, actionable step.
-- "status": One of "building", "shipping", "maintaining", "blocked", "stale", or "idea".
+- "status": One of "building", "shipping", "maintaining", "blocked", "completed", or "idea".
   - "building": actively being developed, frequent commits, features in progress
   - "shipping": ready or nearly ready for release/deployment
   - "maintaining": stable, only bug fixes or minor updates
   - "blocked": has open issues or PRs blocking progress, CI failures, or unresolved problems
-  - "stale": no recent activity, needs attention or archiving decision
+  - "completed": finished project, works as intended, used occasionally but not actively developed
   - "idea": early stage, minimal code, exploration phase
 - "statusReason": A short explanation of why you chose this status.
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
@@ -27,7 +27,7 @@ export function buildPrompt(input: LlmInput): string {
 {
   "summary": "1-2 sentence description + current state",
   "nextAction": "single most important next step",
-  "status": "building|shipping|maintaining|blocked|stale|idea",
+  "status": "building|shipping|maintaining|blocked|completed|idea",
   "statusReason": "why this status",
   "tags": ["3-8 descriptive tags"],
   "insights": [{"text": "observation + action", "severity": "green|amber|red"}],

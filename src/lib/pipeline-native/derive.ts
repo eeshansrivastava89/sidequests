@@ -49,7 +49,7 @@ export interface ScanProject {
 
 export interface DeriveProject {
   pathHash: string;
-  statusAuto: "active" | "paused" | "stale" | "archived";
+  statusAuto: "active" | "completed" | "paused" | "archived";
   healthScoreAuto: number;
   hygieneScoreAuto: number;
   momentumScoreAuto: number;
@@ -68,8 +68,8 @@ export interface DeriveOutput {
 export function deriveStatus(daysInactive: number | null): DeriveProject["statusAuto"] {
   if (daysInactive === null) return "archived";
   if (daysInactive <= 14) return "active";
-  if (daysInactive <= 60) return "paused";
-  if (daysInactive <= 180) return "stale";
+  if (daysInactive <= 60) return "completed";
+  if (daysInactive <= 180) return "paused";
   return "archived";
 }
 

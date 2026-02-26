@@ -123,7 +123,7 @@ export const DERIVE_FIXTURE = {
     },
     {
       pathHash: "hash-bbb",
-      statusAuto: "stale",
+      statusAuto: "completed",
       healthScoreAuto: 45,
       hygieneScoreAuto: 30,
       momentumScoreAuto: 20,

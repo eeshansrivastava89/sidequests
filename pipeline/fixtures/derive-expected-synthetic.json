@@ -40,7 +40,7 @@
     },
     {
       "pathHash": "bbbb444455556666",
-      "statusAuto": "stale",
+      "statusAuto": "paused",
       "healthScoreAuto": 21,
       "hygieneScoreAuto": 32,
       "momentumScoreAuto": 0,

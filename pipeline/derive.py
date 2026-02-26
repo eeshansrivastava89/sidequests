@@ -34,9 +34,9 @@ def derive_status(days_inactive: int | None) -> str:
     if days_inactive <= 14:
         return "active"
     if days_inactive <= 60:
-        return "paused"
+        return "completed"
     if days_inactive <= 180:
-        return "stale"
+        return "paused"
     return "archived"
 
 

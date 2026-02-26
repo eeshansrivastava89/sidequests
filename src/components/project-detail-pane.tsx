@@ -12,7 +12,7 @@ import { X, ExternalLink, Zap, Sparkles, AlertCircle } from "lucide-react";
 
 /* ── Constants ─────────────────────────────────────────── */
 
-const VALID_STATUSES = ["active", "paused", "stale", "archived"] as const;
+const VALID_STATUSES = ["active", "completed", "paused", "archived"] as const;
 
 function parseJsonList(json: string | null): Array<{ title: string; number: number }> {
   if (!json) return [];

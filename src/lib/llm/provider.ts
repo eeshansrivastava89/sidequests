@@ -3,7 +3,7 @@
  * All providers must return this shape.
  */
 
-export type LlmStatus = "building" | "shipping" | "maintaining" | "blocked" | "stale" | "idea";
+export type LlmStatus = "building" | "shipping" | "maintaining" | "blocked" | "completed" | "idea";
 
 export type InsightSeverity = "green" | "amber" | "red";
 

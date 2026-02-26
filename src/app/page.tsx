@@ -22,7 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert, Info } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
-import { evaluateAttention } from "@/lib/attention";
+
 import { toast } from "sonner";
 
 
@@ -72,12 +72,10 @@ function filterByView(projects: Project[], view: WorkflowView): Project[] {
   switch (view) {
     case "active":
       return projects.filter((p) => p.status === "active");
+    case "completed":
+      return projects.filter((p) => p.status === "completed");
     case "paused":
       return projects.filter((p) => p.status === "paused");
-    case "needs-attention":
-      return projects.filter((p) => evaluateAttention(p).needsAttention);
-    case "stale":
-      return projects.filter((p) => p.status === "stale");
     case "archived":
       return projects.filter((p) => p.status === "archived");
     default:
@@ -323,9 +321,8 @@ export default function DashboardPage() {
   const tabCounts = useMemo(() => ({
     all: projects.length,
     active: filterByView(projects, "active").length,
+    completed: filterByView(projects, "completed").length,
     paused: filterByView(projects, "paused").length,
-    "needs-attention": filterByView(projects, "needs-attention").length,
-    stale: filterByView(projects, "stale").length,
     archived: filterByView(projects, "archived").length,
   }), [projects]);
 
@@ -503,6 +500,12 @@ export default function DashboardPage() {
                         Active ({tabCounts.active})
                       </span>
                     </TabsTrigger>
+                    <TabsTrigger value="completed">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={cn("size-2 rounded-full", STATUS_COLORS.completed)} />
+                        Completed ({tabCounts.completed})
+                      </span>
+                    </TabsTrigger>
                     {tabCounts.paused > 0 && (
                       <TabsTrigger value="paused">
                         <span className="inline-flex items-center gap-1.5">
@@ -511,18 +514,6 @@ export default function DashboardPage() {
                         </span>
                       </TabsTrigger>
                     )}
-                    <TabsTrigger value="needs-attention">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-red-500" />
-                        Needs Attention ({tabCounts["needs-attention"]})
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="stale">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={cn("size-2 rounded-full", STATUS_COLORS.stale)} />
-                        Stale ({tabCounts.stale})
-                      </span>
-                    </TabsTrigger>
                     <TabsTrigger value="archived">
                       <span className="inline-flex items-center gap-1.5">
                         <span className={cn("size-2 rounded-full", STATUS_COLORS.archived)} />
@@ -559,7 +550,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 {view !== "all" && (
                   <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                    {view === "needs-attention" ? "Needs Attention" : view.charAt(0).toUpperCase() + view.slice(1)}
+                    {view.charAt(0).toUpperCase() + view.slice(1)}
                     <button
                       type="button"
                       className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"

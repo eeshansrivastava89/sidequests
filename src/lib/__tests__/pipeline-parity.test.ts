@@ -38,7 +38,7 @@ describe("pipeline parity — fixture integrity", () => {
 
     for (const p of data.projects) {
       expect(p.pathHash).toBeTypeOf("string");
-      expect(["active", "paused", "stale", "archived"]).toContain(p.statusAuto);
+      expect(["active", "completed", "paused", "archived"]).toContain(p.statusAuto);
       expect(p.healthScoreAuto).toBeGreaterThanOrEqual(0);
       expect(p.healthScoreAuto).toBeLessThanOrEqual(100);
       expect(p.hygieneScoreAuto).toBeGreaterThanOrEqual(0);
@@ -66,10 +66,10 @@ describe("pipeline parity — fixture integrity", () => {
     expect(active.hygieneScoreAuto).toBe(100);
     expect(active.momentumScoreAuto).toBe(100);
 
-    // Stale Python project — low scores
-    const stale = byHash.get("bbbb444455556666");
-    expect(stale.statusAuto).toBe("stale");
-    expect(stale.momentumScoreAuto).toBe(0);
+    // Paused Python project (168 days inactive) — low momentum
+    const paused = byHash.get("bbbb444455556666");
+    expect(paused.statusAuto).toBe("paused");
+    expect(paused.momentumScoreAuto).toBe(0);
 
     // Archived non-git project
     const archived = byHash.get("cccc777788889999");

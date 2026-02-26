@@ -100,7 +100,7 @@ export interface RawScan {
   liveUrl: string | null;
 }
 
-export type WorkflowView = "all" | "active" | "paused" | "needs-attention" | "stale" | "archived";
+export type WorkflowView = "all" | "active" | "completed" | "paused" | "archived";
 
 export type SortKey = "lastCommit" | "name" | "health" | "status" | "daysInactive";
 
