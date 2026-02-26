@@ -5,13 +5,20 @@
 
 export type LlmStatus = "building" | "shipping" | "maintaining" | "blocked" | "stale" | "idea";
 
+export type InsightSeverity = "green" | "amber" | "red";
+
+export interface Insight {
+  text: string;
+  severity: InsightSeverity;
+}
+
 export interface LlmEnrichment {
   summary: string;           // replaces purpose + pitch
   nextAction: string;        // always populated
   status: LlmStatus;         // LLM-assessed project phase
   statusReason: string;      // why this status
   tags: string[];
-  insights: string[];         // consolidated risks + recommendations
+  insights: Insight[];        // consolidated risks + recommendations with severity
   framework: string | null;        // e.g. "Next.js", "Astro", "FastAPI", "Axum"
   primaryLanguage: string | null;  // e.g. "TypeScript", "Python", "Rust"
 }

@@ -1,4 +1,4 @@
-import type { LlmInput, LlmEnrichment, LlmStatus } from "./provider";
+import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
 
 const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "stale", "idea"]);
 
@@ -15,7 +15,7 @@ export const SYSTEM_PROMPT = `You are a developer project analyst. Given a proje
   - "idea": early stage, minimal code, exploration phase
 - "statusReason": A short explanation of why you chose this status.
 - "tags": An array of 3-8 descriptive tags (technology, domain, type).
-- "insights": An array of 3-5 distinct observations. Each should state the concern AND the suggested action in a single sentence. Do not repeat the same issue in multiple bullets. Combine risks and recommendations into unified insights.
+- "insights": An array of 3-5 objects, each with "text" (the observation) and "severity" ("green" = strength/positive, "amber" = at-risk/could improve, "red" = critical issue needing immediate attention). Each text should state the concern AND the suggested action in a single sentence. Do not repeat the same issue in multiple bullets. Combine risks and recommendations into unified insights.
 - "framework": The primary framework or meta-framework (e.g. "Next.js", "Astro", "FastAPI", "Axum"). null if none detected.
 - "primaryLanguage": The dominant programming language (e.g. "TypeScript", "Python", "Rust", "HTML/CSS"). null if unclear.
 
@@ -30,7 +30,7 @@ export function buildPrompt(input: LlmInput): string {
   "status": "building|shipping|maintaining|blocked|stale|idea",
   "statusReason": "why this status",
   "tags": ["3-8 descriptive tags"],
-  "insights": ["3-5 distinct observations combining concern + action"],
+  "insights": [{"text": "observation + action", "severity": "green|amber|red"}],
   "framework": "primary framework or null",
   "primaryLanguage": "dominant language or null"
 }
@@ -107,8 +107,18 @@ export function parseEnrichment(raw: unknown): LlmEnrichment {
   const tags = Array.isArray(obj?.tags)
     ? obj.tags.filter((t): t is string => typeof t === "string")
     : [];
-  const insights = Array.isArray(obj?.insights)
-    ? obj.insights.filter((r): r is string => typeof r === "string")
+  const VALID_SEVERITIES = new Set<InsightSeverity>(["green", "amber", "red"]);
+  const insights: Insight[] = Array.isArray(obj?.insights)
+    ? obj.insights
+        .map((r): Insight | null => {
+          if (typeof r === "string") return { text: r, severity: "amber" };
+          if (r && typeof r === "object" && typeof r.text === "string") {
+            const sev = VALID_SEVERITIES.has(r.severity) ? r.severity : "amber";
+            return { text: r.text, severity: sev };
+          }
+          return null;
+        })
+        .filter((r): r is Insight => r !== null)
     : [];
 
   const framework = typeof obj?.framework === "string" ? obj.framework : null;

@@ -32,7 +32,7 @@ const LANGUAGE_INDICATORS: Record<string, string> = {
 
 const SOURCE_EXTENSIONS = new Set([
   ".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".go", ".rb", ".java", ".kt",
-  ".ex", ".exs", ".swift", ".php", ".c", ".cpp", ".h",
+  ".ex", ".exs", ".swift", ".php", ".c", ".cpp", ".h", ".md",
 ]);
 
 const SKIP_WALK_DIRS = new Set([

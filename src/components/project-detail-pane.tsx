@@ -583,12 +583,17 @@ export function ProjectDetailPane({
               <div>
                 <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground mb-2">Insights</div>
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {project.insights.map((insight, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-amber-500" />
-                      {insight}
-                    </li>
-                  ))}
+                  {project.insights.map((insight, i) => {
+                    const dotColor = insight.severity === "green" ? "bg-emerald-500"
+                      : insight.severity === "red" ? "bg-red-500"
+                      : "bg-amber-500";
+                    return (
+                      <li key={i} className="flex gap-2">
+                        <span className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                        {insight.text}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}

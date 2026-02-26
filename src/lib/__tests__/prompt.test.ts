@@ -16,7 +16,7 @@ describe("parseEnrichment", () => {
       status: "building",
       statusReason: "Active development",
       tags: ["typescript"],
-      insights: ["Set up CI to catch regressions early"],
+      insights: [{ text: "Set up CI to catch regressions early", severity: "red" }],
     });
 
     const result = parseEnrichment(raw);
@@ -25,7 +25,7 @@ describe("parseEnrichment", () => {
     expect(result.status).toBe("building");
     expect(result.statusReason).toBe("Active development");
     expect(result.tags).toEqual(["typescript"]);
-    expect(result.insights).toEqual(["Set up CI to catch regressions early"]);
+    expect(result.insights).toEqual([{ text: "Set up CI to catch regressions early", severity: "red" }]);
     expect(result.framework).toBeNull();
     expect(result.primaryLanguage).toBeNull();
   });
@@ -59,10 +59,11 @@ describe("parseEnrichment", () => {
   });
 
   it("JSON in markdown fences → extracted", () => {
-    const raw = '```json\n{"summary":"Fenced","nextAction":"Do thing","status":"shipping","statusReason":"Ready","tags":[],"insights":[]}\n```';
+    const raw = '```json\n{"summary":"Fenced","nextAction":"Do thing","status":"shipping","statusReason":"Ready","tags":[],"insights":[{"text":"Good tests","severity":"green"}]}\n```';
     const result = parseEnrichment(raw);
     expect(result.summary).toBe("Fenced");
     expect(result.status).toBe("shipping");
+    expect(result.insights).toEqual([{ text: "Good tests", severity: "green" }]);
   });
 
   it("invalid input → safe defaults", () => {
@@ -84,7 +85,7 @@ describe("parseEnrichment", () => {
       status: "shipping",
       statusReason: "Ready",
       tags: ["nextjs"],
-      insights: [],
+      insights: [{ text: "Well-structured codebase", severity: "green" }],
       framework: "Next.js",
       primaryLanguage: "TypeScript",
     });
@@ -123,11 +124,21 @@ describe("parseEnrichment", () => {
     const raw = JSON.stringify({
       summary: "A project",
       status: "building",
-      insights: ["Real insight", 42, null, "Another insight"],
+      insights: [
+        { text: "Real insight", severity: "green" },
+        42,
+        null,
+        "Legacy string insight",
+        { text: "Another insight", severity: "red" },
+      ],
       tags: ["valid", true, "also-valid"],
     });
     const result = parseEnrichment(raw);
-    expect(result.insights).toEqual(["Real insight", "Another insight"]);
+    expect(result.insights).toEqual([
+      { text: "Real insight", severity: "green" },
+      { text: "Legacy string insight", severity: "amber" },
+      { text: "Another insight", severity: "red" },
+    ]);
     expect(result.tags).toEqual(["valid", "also-valid"]);
   });
 

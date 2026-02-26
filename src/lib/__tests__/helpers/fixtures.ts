@@ -163,7 +163,11 @@ export const LLM_ENRICHMENT_FIXTURE: LlmEnrichment = {
   status: "building" as LlmStatus,
   statusReason: "Active development with frequent commits and features in progress",
   tags: ["typescript", "next", "dashboard"],
-  insights: ["Add unit tests to prevent regressions as the codebase grows", "Set up CI/CD to automate builds and catch issues early", "Consider adding a second maintainer to reduce bus factor risk"],
+  insights: [
+    { text: "Add unit tests to prevent regressions as the codebase grows", severity: "amber" },
+    { text: "Set up CI/CD to automate builds and catch issues early", severity: "red" },
+    { text: "Consider adding a second maintainer to reduce bus factor risk", severity: "amber" },
+  ],
 };
 
 // -- DB seeding helpers --

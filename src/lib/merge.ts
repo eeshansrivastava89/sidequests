@@ -24,7 +24,7 @@ export interface MergedProject {
   scoreBreakdown: Record<string, Record<string, number>>;
   summary: string | null;
   tags: string[];
-  insights: string[];
+  insights: Array<{ text: string; severity: "green" | "amber" | "red" }>;
   notes: string | null;
 
   // Phase 53W: LLM actionable fields
@@ -208,12 +208,29 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     parseJson<string[]>(llm?.tagsJson, null as unknown as string[]) ??
     (Array.isArray(derivedData.tags) ? derivedData.tags as string[] : []);
 
-  // Consolidated insights — fallback to legacy risks+recommendations for old data
-  const insights = parseJson<string[]>(llm?.insightsJson, null as unknown as string[])
-    ?? [
+  // Consolidated insights — handle new {text,severity} format, legacy string[], and legacy risks+recs
+  type Insight = { text: string; severity: "green" | "amber" | "red" };
+  const rawInsights = parseJson<unknown[]>(llm?.insightsJson, null as unknown as unknown[]);
+  let insights: Insight[];
+  if (rawInsights) {
+    insights = rawInsights
+      .map((r): Insight | null => {
+        if (typeof r === "string") return { text: r, severity: "amber" };
+        if (r && typeof r === "object" && "text" in r && typeof (r as Record<string, unknown>).text === "string") {
+          const sev = (r as Record<string, unknown>).severity;
+          const valid = sev === "green" || sev === "amber" || sev === "red";
+          return { text: (r as Record<string, unknown>).text as string, severity: valid ? sev as Insight["severity"] : "amber" };
+        }
+        return null;
+      })
+      .filter((r): r is Insight => r !== null);
+  } else {
+    const legacy = [
       ...parseJson<string[]>(llm?.risksJson, []),
       ...parseJson<string[]>(llm?.recommendationsJson, []),
     ];
+    insights = legacy.map((t) => ({ text: t, severity: "amber" as const }));
+  }
   const notes = override?.notesOverride ?? null;
 
   // Phase 53W: actionable fields with metadata override priority

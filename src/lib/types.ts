@@ -1,3 +1,8 @@
+export interface Insight {
+  text: string;
+  severity: "green" | "amber" | "red";
+}
+
 /** Client-side mirror of MergedProject from the API. */
 export interface Project {
   id: string;
@@ -10,7 +15,7 @@ export interface Project {
   scoreBreakdown: Record<string, Record<string, number>>;
   summary: string | null;
   tags: string[];
-  insights: string[];
+  insights: Insight[];
   notes: string | null;
 
   // Phase 53W: LLM actionable fields
