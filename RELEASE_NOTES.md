@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.3.8
+
+- Replace "stale" status with "completed" — for finished projects that work and run occasionally
+- New status thresholds: active (0-14d), completed (15-60d), paused (61-180d), archived (180d+)
+- Remove "Needs Attention" workflow tab — redundant with uncommitted/open-issues signal filters
+- Updated status colors: completed is sky-blue, paused moves to amber
+
 ## v0.3.7
 
 - Insight bullets are now color-coded by severity: green (strength), amber (at-risk), red (critical)
