@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.3.11
+
+- **Rewrite Codex CLI backend**: use `spawn` + stdin piping, `--sandbox read-only`, `-o` for clean output capture, prepend system prompt, wire abort signal, strip env vars
+- **Rewrite Qwen CLI backend**: add `--system-prompt`, use positional arg (not deprecated `-p`), `--approval-mode plan` (was `auto_edit` — security fix), wire `qwenCliModel` via `-m`
+- **Extract shared `runCli()` helper**: deduplicates spawn/timeout/abort/env-cleanup across all CLI providers (claude, codex, qwen)
+- **Fix settings System Status panel**: remove stale "COMING SOON" labels from OpenRouter/Ollama, remove MLX check, add Qwen CLI check, show green "Active" badge on selected provider
+- **Fix `llmAllowUnsafe` default**: changed from `true` to `false` — safety gate was previously disabled by default
+- **Structured pipeline logging**: server logs now show `[pipeline] [provider] project — enriching/done/FAILED` with timing for every LLM call
+- **Provider name in UI**: SSE events carry provider name; status bar shows e.g. "qwen-cli: enriching my-app (3/23)" instead of generic "AI scanning"
+- **Remove MLX**: removed from provider registry, preflight checks, and settings UI
+- **Add Qwen model field**: settings UI now shows model input when qwen-cli is selected
+- **Fix stale test**: provider-fields test expected removed `o3` model; add new cli-utils test suite (9 tests)
+
 ## v0.3.10
 
 - Enable OpenRouter, Ollama, and Qwen CLI providers in settings UI
