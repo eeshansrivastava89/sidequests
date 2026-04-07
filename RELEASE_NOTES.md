@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.3.10
+
+- Enable OpenRouter, Ollama, and Qwen CLI providers in settings UI
+- Remove MLX from provider list (per user request)
+- Add Qwen CLI provider with headless mode (JSON output, auto-approve)
+- Update default models: claude-sonnet-4-6, gpt-5.4
+- Codex CLI model simplified to GPT-5.4 only
+
 ## v0.3.9
 
 - Activity log now sorts by last commit (most recent first) — matches LLM scan ordering
