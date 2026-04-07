@@ -57,11 +57,11 @@ export function validateDeriveOutput(data: unknown): { derivedAt: string; projec
 
 /** Events emitted during the refresh pipeline. */
 export type PipelineEvent =
-  | { type: "enumerate_complete"; projectCount: number; names: string[] }
-  | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm" }
-  | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown>; lastCommitDate?: string | null }
-  | { type: "project_error"; name: string; step: string; error: string }
-  | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number };
+  | { type: "enumerate_complete"; projectCount: number; names: string[]; provider?: string }
+  | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm"; provider?: string }
+  | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown>; lastCommitDate?: string | null; provider?: string }
+  | { type: "project_error"; name: string; step: string; error: string; provider?: string }
+  | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number; provider?: string };
 
 function hashRawJson(rawJson: string): string {
   return createHash("sha256").update(rawJson).digest("hex");
@@ -115,6 +115,11 @@ export async function runRefreshPipeline(
 
   const total = projectDirs.length;
   const llmProvider = options?.skipLlm ? null : getLlmProvider();
+  const providerName = llmProvider?.name ?? null;
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[pipeline] Found ${projectDirs.length} projects in ${config.devRoot}`);
+    console.log(`[pipeline] LLM provider: ${providerName ?? "none (skipping LLM)"}`);
+  }
   const ghAvailable = isGhAvailable();
   const scannedAt = new Date().toISOString();
 
@@ -333,8 +338,11 @@ export async function runRefreshPipeline(
     const pd = projectDataList[i];
 
     if (llmProvider && pd.derived) {
-      emit({ type: "project_start", name: pd.name, index: i, total, step: "llm" });
+      emit({ type: "project_start", name: pd.name, index: i, total, step: "llm", provider: providerName ?? undefined });
       const llmStartTime = Date.now();
+      if (process.env.NODE_ENV !== "test") {
+        console.log(`[pipeline] [${providerName}] ${pd.name} (${i + 1}/${total}) — enriching...`);
+      }
 
       try {
         // Fetch previous summary for continuity
@@ -388,11 +396,16 @@ export async function runRefreshPipeline(
         });
 
         llmSucceeded++;
+        const llmDurationMs = Date.now() - llmStartTime;
+        if (process.env.NODE_ENV !== "test") {
+          console.log(`[pipeline] [${providerName}] ${pd.name} — done (${(llmDurationMs / 1000).toFixed(1)}s) status=${enrichment.status}`);
+        }
         emit({
           type: "project_complete",
           name: pd.name,
           step: "llm",
-          detail: { summary: enrichment.summary, durationMs: Date.now() - llmStartTime },
+          detail: { summary: enrichment.summary, durationMs: llmDurationMs },
+          provider: providerName ?? undefined,
         });
 
         projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "succeeded" });
@@ -400,15 +413,16 @@ export async function runRefreshPipeline(
         llmFailed++;
         llmFailedNames.push(pd.name);
         const message = err instanceof Error ? err.message : String(err);
+        const llmDurationMs = Date.now() - llmStartTime;
         if (process.env.NODE_ENV !== "test") {
-          console.error(`LLM enrichment failed for ${pd.name}:`, err);
+          console.error(`[pipeline] [${providerName}] ${pd.name} — FAILED (${(llmDurationMs / 1000).toFixed(1)}s): ${message}`);
         }
         await db.llm.upsert({
           where: { projectId: pd.projectId },
           create: { projectId: pd.projectId, llmError: message },
           update: { llmError: message },
         });
-        emit({ type: "project_error", name: pd.name, step: "llm", error: message });
+        emit({ type: "project_error", name: pd.name, step: "llm", error: message, provider: providerName ?? undefined });
 
         projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "failed" });
       }
@@ -448,6 +462,17 @@ export async function runRefreshPipeline(
   });
 
   const durationMs = Date.now() - startTime;
+  if (process.env.NODE_ENV !== "test") {
+    console.log(
+      `[pipeline] Complete in ${(durationMs / 1000).toFixed(1)}s — ` +
+      `${projectDirs.length} projects, ` +
+      `LLM: ${llmSucceeded} ok / ${llmFailed} failed / ${llmSkipped} skipped` +
+      (providerName ? ` (${providerName})` : ""),
+    );
+    if (llmFailedNames.length > 0) {
+      console.log(`[pipeline] Failed projects: ${llmFailedNames.join(", ")}`);
+    }
+  }
   emit({
     type: "done",
     projectCount: projectDirs.length,
@@ -456,6 +481,7 @@ export async function runRefreshPipeline(
     llmFailedNames,
     llmSkipped,
     durationMs,
+    provider: providerName ?? undefined,
   });
 
   return { projectCount: projectDirs.length };

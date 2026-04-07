@@ -1,78 +1,71 @@
-import { spawn } from "child_process";
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { SYSTEM_PROMPT, buildPrompt, parseEnrichment } from "./prompt";
 import { config } from "../config";
+import { runCli } from "./cli-utils";
 
-function runQwen(prompt: string, signal?: AbortSignal): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const cleanEnv = { ...process.env };
-    delete cleanEnv.CLAUDECODE;
-    delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
-
-    const child = spawn(
-      "qwen",
-      [
-        "-p", prompt,
-        "--output-format", "json",
-        "--approval-mode", "auto_edit",
-      ],
-      { stdio: ["pipe", "pipe", "pipe"], env: cleanEnv }
-    );
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (abortHandler) signal?.removeEventListener("abort", abortHandler);
-      fn();
-    };
-
-    child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-
-    const timeoutMs = config.llmTimeout;
-    const timer = setTimeout(() => {
-      child.kill();
-      settle(() => reject(new Error(`qwen CLI timed out after ${timeoutMs / 1000}s`)));
-    }, timeoutMs);
-
-    const abortHandler = signal ? () => {
-      child.kill();
-      settle(() => reject(new Error("Aborted")));
-    } : undefined;
-    if (abortHandler) signal!.addEventListener("abort", abortHandler);
-
-    child.on("error", (err) => settle(() => reject(err)));
-    child.on("close", (code) => {
-      if (code === 0) {
-        try {
-          const messages = JSON.parse(stdout);
-          const resultMsg = messages.find((m: Record<string, unknown>) => m.type === "result");
-          const text = resultMsg?.result as string || "";
-          resolve(text);
-        } catch {
-          resolve(stdout);
-        }
-      } else {
-        reject(new Error(`qwen exited ${code}: ${stderr || stdout}`));
-      }
-    });
-  });
-}
-
+/**
+ * Qwen CLI provider — calls `qwen` in plan-only approval mode.
+ *
+ * Key design decisions:
+ * - `--approval-mode plan` — read-only analysis, no file edits allowed.
+ * - `--system-prompt` — injects the analyst persona and JSON schema.
+ * - `--output-format json` — returns structured message array.
+ * - Prompt is passed as a positional arg (one-shot mode).
+ *   Using the positional (not deprecated `-p` flag) per Qwen docs.
+ * - Model selection via `-m` when `qwenCliModel` is configured.
+ *
+ * Requires `qwen` CLI installed and authenticated.
+ */
 export const qwenCliProvider: LlmProvider = {
   name: "qwen-cli",
 
   async enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment> {
+    if (config.llmDebug) {
+      console.log(`[qwen-cli] Starting enrichment for ${input.name}`);
+    }
+
     const prompt = buildPrompt(input);
-    const text = await runQwen(prompt, signal);
+
+    const { stdout, stderr } = await runCli({
+      command: "qwen",
+      args: [
+        "--output-format", "json",
+        "--approval-mode", "plan",
+        "--system-prompt", SYSTEM_PROMPT,
+        ...(config.qwenCliModel ? ["-m", config.qwenCliModel] : []),
+        prompt, // positional arg = one-shot mode
+      ],
+      timeoutMs: config.llmTimeout,
+      signal,
+    });
+
+    // --output-format json returns a JSON array of message objects.
+    // Look for { type: "result", result: "..." } to extract final answer.
+    let text = stdout;
+    try {
+      const messages = JSON.parse(stdout);
+      if (Array.isArray(messages)) {
+        const resultMsg = messages.find(
+          (m: Record<string, unknown>) => m.type === "result",
+        );
+        if (resultMsg) {
+          text = (resultMsg.result as string) || (resultMsg.message as string) || "";
+        }
+      }
+    } catch {
+      // If stdout isn't valid JSON, fall through to raw text parsing
+    }
+
+    if (!text.trim()) {
+      throw new Error(
+        "Empty response from Qwen CLI" +
+        (stderr ? `. stderr: ${stderr}` : ""),
+      );
+    }
 
     if (config.llmDebug) {
-      console.log(`[llm-debug] ${input.name} raw output:\n${text}`);
+      console.log(`[qwen-cli] ${input.name} raw output (${text.length} chars):\n${text.slice(0, 500)}${text.length > 500 ? "..." : ""}`);
+      if (stderr) console.log(`[qwen-cli] ${input.name} stderr:\n${stderr.slice(0, 300)}`);
     }
 
     return parseEnrichment(text);

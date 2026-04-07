@@ -188,23 +188,14 @@ export function ProviderFields({
         </>
       )}
 
-      {provider === "mlx" && (
-        <>
-          <Field label="URL">
-            <Input
-              value={draft.mlxUrl}
-              onChange={(e) => set("mlxUrl", e.target.value)}
-              placeholder="http://localhost:8080"
-            />
-          </Field>
-          <Field label="Model">
-            <Input
-              value={draft.mlxModel}
-              onChange={(e) => set("mlxModel", e.target.value)}
-              placeholder="default"
-            />
-          </Field>
-        </>
+      {provider === "qwen-cli" && (
+        <Field label="Model" description="Leave empty for default Qwen coder model">
+          <Input
+            value={draft.qwenCliModel}
+            onChange={(e) => set("qwenCliModel", e.target.value)}
+            placeholder="(default)"
+          />
+        </Field>
       )}
 
       {provider === "codex-cli" && (

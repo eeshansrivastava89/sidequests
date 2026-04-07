@@ -87,6 +87,12 @@ describe("ProviderFields — rendered DOM", () => {
     expect(screen.getByDisplayValue("codex-cli")).toBeDefined();
     const modelLabels = screen.getAllByText("Model");
     expect(modelLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("o3")).toBeDefined();
+    expect(screen.getByText("GPT-5.4 (default, supports vision)")).toBeDefined();
+  });
+
+  it("renders model field for qwen-cli", () => {
+    renderProvider("qwen-cli");
+    expect(screen.getByDisplayValue("qwen-cli")).toBeDefined();
+    expect(screen.getByPlaceholderText("(default)")).toBeDefined();
   });
 });

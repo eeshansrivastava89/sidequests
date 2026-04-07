@@ -8,6 +8,8 @@ interface PreflightCheck {
   message: string;
   /** "required" = blocks core functionality, "optional" = enhances experience */
   tier: "required" | "optional";
+  /** True when this check corresponds to the currently selected provider. */
+  active?: boolean;
 }
 
 function checkBinary(name: string, command: string, tier: "required" | "optional", hint?: string): PreflightCheck {
@@ -36,8 +38,18 @@ async function checkUrl(name: string, url: string, tier: "required" | "optional"
   }
 }
 
+/** Map from provider setting value → preflight check name */
+const PROVIDER_CHECK_NAME: Record<string, string> = {
+  "claude-cli": "claude",
+  "openrouter": "openrouter",
+  "ollama": "ollama",
+  "codex-cli": "codex",
+  "qwen-cli": "qwen",
+};
+
 export async function GET() {
   const checks: PreflightCheck[] = [];
+  const activeProvider = config.llmProvider;
 
   // Core dependencies — required for basic functionality
   checks.push(checkBinary("git", "git", "required"));
@@ -54,36 +66,40 @@ export async function GET() {
     }
   }
 
-  // LLM providers — check all, mark active provider and inactive ones
-  const provider = config.llmProvider;
+  // ── LLM Providers ──
 
-  // LLM providers — green if installed/reachable, grey if not
   // Claude CLI
   const claudeCheck = checkBinary("claude", "claude", "optional", "Install with: npm install -g @anthropic-ai/claude-code");
   checks.push(claudeCheck);
 
-  // OpenRouter
+  // OpenRouter (API key check)
   {
     const hasKey = !!config.openrouterApiKey;
-    checks.push({ name: "openrouter", ok: hasKey, message: hasKey ? "API key configured" : "No API key set", tier: "optional" });
+    checks.push({
+      name: "openrouter",
+      ok: hasKey,
+      message: hasKey ? "API key configured" : "No API key set",
+      tier: "optional",
+    });
   }
 
-  // Ollama
+  // Ollama (local server reachability)
   {
     const url = config.ollamaUrl || "http://localhost:11434";
     checks.push(await checkUrl("ollama", url, "optional", "Is Ollama running? Try: ollama serve"));
   }
 
-  // MLX
-  {
-    const url = config.mlxUrl || "http://localhost:8080";
-    checks.push(await checkUrl("mlx", url, "optional", "Is the MLX server running?"));
-  }
-
   // Codex CLI
-  {
-    const codexCheck = checkBinary("codex", "codex", "optional");
-    checks.push(codexCheck);
+  checks.push(checkBinary("codex", "codex", "optional", "Install with: npm install -g @openai/codex"));
+
+  // Qwen CLI
+  checks.push(checkBinary("qwen", "qwen", "optional", "Install with: npm install -g @anthropic-ai/qwen-code"));
+
+  // Tag the active provider
+  const activeCheckName = PROVIDER_CHECK_NAME[activeProvider];
+  if (activeCheckName) {
+    const match = checks.find((c) => c.name === activeCheckName);
+    if (match) match.active = true;
   }
 
   return NextResponse.json({ checks });

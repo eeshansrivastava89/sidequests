@@ -109,4 +109,6 @@ export interface PreflightCheck {
   ok: boolean;
   message: string;
   tier?: "required" | "optional";
+  /** True when this check corresponds to the currently selected provider. */
+  active?: boolean;
 }

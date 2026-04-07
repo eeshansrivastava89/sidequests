@@ -21,7 +21,7 @@ export const config = {
     return getSettings().llmProvider ?? "claude-cli";
   },
   get llmAllowUnsafe(): boolean {
-    return getSettings().llmAllowUnsafe ?? true;
+    return getSettings().llmAllowUnsafe ?? false;
   },
   get claudeCliModel(): string | undefined {
     return getSettings().claudeCliModel || "claude-sonnet-4-6";

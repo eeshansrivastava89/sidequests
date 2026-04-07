@@ -3,7 +3,6 @@ import type { LlmProvider } from "./provider";
 import { claudeCliProvider } from "./claude-cli";
 import { openrouterProvider } from "./openrouter";
 import { ollamaProvider } from "./ollama";
-import { mlxProvider } from "./mlx";
 import { codexCliProvider } from "./codex-cli";
 import { qwenCliProvider } from "./qwen-cli";
 
@@ -13,7 +12,6 @@ const providers: Record<string, LlmProvider> = {
   "claude-cli": claudeCliProvider,
   "openrouter": openrouterProvider,
   "ollama": ollamaProvider,
-  "mlx": mlxProvider,
 };
 
 /** Providers that can perform agentic actions (file writes, commands). */

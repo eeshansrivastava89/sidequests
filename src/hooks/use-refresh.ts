@@ -18,6 +18,7 @@ export interface RefreshEvent {
   llmSkipped?: number;
   durationMs?: number;
   lastCommitDate?: string | null;
+  provider?: string;
 }
 
 export interface ProjectProgress {
@@ -29,6 +30,7 @@ export interface ProjectProgress {
   storeOrder?: number; // completion order for staggered animation
   llmDurationMs?: number; // how long the LLM call took
   lastCommitDate?: string | null; // for activity log sorting
+  provider?: string; // which LLM provider processed this project
 }
 
 export interface RefreshState {
@@ -98,9 +100,10 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       if (d.step === "store") existing.storeStatus = "running";
       else if (d.step === "llm") existing.llmStatus = "running";
       projects.set(d.name!, existing);
+      const providerTag = d.step === "llm" && d.provider ? ` [${d.provider}]` : "";
       const phase = d.step === "llm"
-        ? `AI scanning ${d.name} (${d.index! + 1}/${d.total})`
-        : `Scanning ${d.name} (${d.index! + 1}/${d.total})`;
+        ? `${d.provider ?? "AI"}: enriching ${d.name} (${d.index! + 1}/${d.total})`
+        : `Scanning ${d.name} (${d.index! + 1}/${d.total})${providerTag}`;
       return { ...state, projects, phase };
     }
     case "project_complete": {
@@ -119,6 +122,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
           existing.llmStatus = "done";
           if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
           existing.llmDurationMs = (d.detail?.durationMs as number) ?? undefined;
+          existing.provider = d.provider ?? undefined;
         }
         projects.set(d.name!, existing);
       }

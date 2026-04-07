@@ -71,12 +71,20 @@ describe("reduceRefreshEvent — state transitions", () => {
     expect(state.deterministicReady).toBe(true);
   });
 
-  it("project_start with step=llm shows AI scanning phase", () => {
+  it("project_start with step=llm shows AI enriching phase", () => {
     const state = makeActiveState();
     const raw = JSON.stringify({ name: "my-app", step: "llm", index: 0, total: 5 });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.phase).toBe("AI scanning my-app (1/5)");
+    expect(next.phase).toBe("AI: enriching my-app (1/5)");
+  });
+
+  it("project_start with step=llm shows provider name when present", () => {
+    const state = makeActiveState();
+    const raw = JSON.stringify({ name: "my-app", step: "llm", index: 0, total: 5, provider: "qwen-cli" });
+
+    const next = reduceRefreshEvent(state, "project_start", raw);
+    expect(next.phase).toBe("qwen-cli: enriching my-app (1/5)");
   });
 
   it("project_start with step=store shows Scanning phase", () => {

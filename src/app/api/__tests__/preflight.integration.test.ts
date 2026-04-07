@@ -10,7 +10,6 @@ const mockConfig = vi.hoisted(() => ({
 
   llmDebug: false,
   ollamaUrl: "",
-  mlxUrl: "",
   openrouterApiKey: "",
 }));
 
@@ -57,8 +56,22 @@ describe("GET /api/preflight — Path A (TS-native)", () => {
     expect(names).toContain("claude");
     expect(names).toContain("openrouter");
     expect(names).toContain("ollama");
-    expect(names).toContain("mlx");
     expect(names).toContain("codex");
+    expect(names).toContain("qwen");
+    expect(names).not.toContain("mlx");
+  });
+
+  it("marks active provider with active flag", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    const res = await preflightGET();
+    const body = await res.json();
+
+    const claudeCheck = body.checks.find((c: { name: string }) => c.name === "claude");
+    expect(claudeCheck?.active).toBe(true);
+
+    // Other providers should not be active
+    const codexCheck = body.checks.find((c: { name: string }) => c.name === "codex");
+    expect(codexCheck?.active).toBeUndefined();
   });
 
   it("includes provider check when llmProvider is configured", async () => {

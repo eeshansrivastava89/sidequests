@@ -153,7 +153,7 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
 
             <SwitchRow
               label="Allow Unsafe"
-              description="Enable agentic providers (codex-cli)"
+              description="Enable agentic providers (codex-cli, qwen-cli)"
               checked={draft.llmAllowUnsafe}
               onCheckedChange={(v) => set("llmAllowUnsafe", v)}
             />
@@ -180,23 +180,21 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
               <div className="rounded-xl border border-border overflow-hidden">
                 <div className="divide-y divide-border">
                   {preflight.map((check) => {
-                    const comingSoon = ["openrouter", "ollama", "mlx"].includes(check.name);
-                    // Green = ok, red = required & failed, grey = optional & not active
-                    const dotColor = comingSoon
-                      ? "bg-amber-500/50"
-                      : check.ok
-                        ? "bg-emerald-500"
-                        : (check as { tier?: string }).tier === "required"
-                          ? "bg-red-500"
-                          : "bg-muted-foreground/30";
+                    const isActive = check.active;
+                    // Green = ok, red = required & failed, grey = optional & not available
+                    const dotColor = check.ok
+                      ? "bg-emerald-500"
+                      : (check as { tier?: string }).tier === "required"
+                        ? "bg-red-500"
+                        : "bg-muted-foreground/30";
                     return (
-                      <div key={check.name} className={`flex items-center justify-between px-4 py-3 ${comingSoon ? "opacity-60" : ""}`}>
+                      <div key={check.name} className={`flex items-center justify-between px-4 py-3`}>
                         <div className="flex items-center gap-3">
                           <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotColor}`} />
                           <span className="text-sm">{check.name}</span>
-                          {comingSoon && (
-                            <span className="text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
-                              Coming soon
+                          {isActive && (
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">
+                              Active
                             </span>
                           )}
                         </div>
