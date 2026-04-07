@@ -13,6 +13,7 @@ export interface AppConfig {
   llmDebug: boolean;
   claudeCliModel: string;
   codexCliModel: string;
+  qwenCliModel: string;
   openrouterApiKey: string;
   openrouterModel: string;
   ollamaUrl: string;
@@ -34,6 +35,7 @@ const DEFAULT: AppConfig = {
   llmDebug: false,
   claudeCliModel: "",
   codexCliModel: "",
+  qwenCliModel: "",
   openrouterApiKey: "",
   openrouterModel: "",
   ollamaUrl: "",

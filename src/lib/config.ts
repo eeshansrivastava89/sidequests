@@ -27,7 +27,10 @@ export const config = {
     return getSettings().claudeCliModel || "claude-sonnet-4-6";
   },
   get codexCliModel(): string | undefined {
-    return getSettings().codexCliModel || undefined;
+    return getSettings().codexCliModel || "gpt-5.4";
+  },
+  get qwenCliModel(): string | undefined {
+    return getSettings().qwenCliModel;
   },
   get llmDebug(): boolean {
     return getSettings().llmDebug ?? true;

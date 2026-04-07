@@ -5,6 +5,7 @@ import { openrouterProvider } from "./openrouter";
 import { ollamaProvider } from "./ollama";
 import { mlxProvider } from "./mlx";
 import { codexCliProvider } from "./codex-cli";
+import { qwenCliProvider } from "./qwen-cli";
 
 export type { LlmProvider, LlmInput, LlmEnrichment, LlmStatus } from "./provider";
 
@@ -18,6 +19,7 @@ const providers: Record<string, LlmProvider> = {
 /** Providers that can perform agentic actions (file writes, commands). */
 const unsafeProviders: Record<string, LlmProvider> = {
   "codex-cli": codexCliProvider,
+  "qwen-cli": qwenCliProvider,
 };
 
 /**

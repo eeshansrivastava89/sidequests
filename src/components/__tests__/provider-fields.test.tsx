@@ -8,7 +8,6 @@ afterEach(cleanup);
 
 function makeDraft(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
-    sanitizePaths: true,
     devRoot: "~/dev",
     excludeDirs: "",
     llmProvider: "claude-cli",
@@ -16,15 +15,18 @@ function makeDraft(overrides: Partial<AppConfig> = {}): AppConfig {
     llmOverwriteMetadata: false,
     llmAllowUnsafe: false,
     llmDebug: false,
+    llmTimeout: 90,
     claudeCliModel: "",
+    codexCliModel: "",
+    qwenCliModel: "",
     openrouterApiKey: "",
     openrouterModel: "",
     ollamaUrl: "",
     ollamaModel: "",
     mlxUrl: "",
     mlxModel: "",
-    codexCliModel: "",
     hasCompletedOnboarding: false,
+    includeNonGitDirs: true,
     ...overrides,
   };
 }
@@ -55,7 +57,7 @@ describe("ProviderFields — rendered DOM", () => {
     renderProvider("claude-cli");
     const modelLabels = screen.getAllByText("Model");
     expect(modelLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Default")).toBeDefined();
+    expect(screen.getByText("Sonnet 4.6 (default)")).toBeDefined();
     expect(screen.getByText("Opus 4.6")).toBeDefined();
   });
 
@@ -64,7 +66,7 @@ describe("ProviderFields — rendered DOM", () => {
     expect(screen.getByDisplayValue("claude-cli")).toBeDefined();
     const modelLabels = screen.getAllByText("Model");
     expect(modelLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Default")).toBeDefined();
+    expect(screen.getByText("Sonnet 4.6 (default)")).toBeDefined();
   });
 
   it('falls back to claude-cli when llmProvider is "none" (stale settings)', () => {
@@ -72,15 +74,12 @@ describe("ProviderFields — rendered DOM", () => {
     expect(screen.getByDisplayValue("claude-cli")).toBeDefined();
     const modelLabels = screen.getAllByText("Model");
     expect(modelLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Default")).toBeDefined();
+    expect(screen.getByText("Sonnet 4.6 (default)")).toBeDefined();
   });
 
-  it('falls back to claude-cli when llmProvider is stale "openrouter"', () => {
+  it('shows openrouter provider when selected', () => {
     renderProvider("openrouter");
-    expect(screen.getByDisplayValue("claude-cli")).toBeDefined();
-    const modelLabels = screen.getAllByText("Model");
-    expect(modelLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Default")).toBeDefined();
+    expect(screen.getByDisplayValue("openrouter")).toBeDefined();
   });
 
   it("renders model selector for codex-cli", () => {

@@ -6,21 +6,20 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { AppConfig } from "@/hooks/use-config";
 
-/** Active providers shown in UI. See GitHub issue #2 for re-enabling openrouter/ollama/mlx. */
-export const PROVIDERS = ["claude-cli", "codex-cli"] as const;
+/** Active providers shown in UI. */
+export const PROVIDERS = ["claude-cli", "openrouter", "ollama", "qwen-cli", "codex-cli"] as const;
 
 export const CLAUDE_CLI_MODELS = [
-  { value: "", label: "Default" },
+  { value: "claude-sonnet-4-6", label: "Sonnet 4.6 (default)" },
   { value: "claude-opus-4-6", label: "Opus 4.6" },
   { value: "claude-sonnet-4-5-20250929", label: "Sonnet 4.5" },
   { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5" },
+  { value: "sonnet", label: "sonnet (alias)" },
+  { value: "opus", label: "opus (alias)" },
 ] as const;
 
 export const CODEX_CLI_MODELS = [
-  { value: "", label: "Default" },
-  { value: "o3", label: "o3" },
-  { value: "o4-mini", label: "o4-mini" },
-  { value: "gpt-4.1", label: "GPT-4.1" },
+  { value: "gpt-5.4", label: "GPT-5.4 (default, supports vision)" },
 ] as const;
 
 const CUSTOM_SENTINEL = "__custom__";

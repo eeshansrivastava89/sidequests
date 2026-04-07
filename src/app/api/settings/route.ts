@@ -16,6 +16,7 @@ export async function GET() {
     llmDebug: config.llmDebug,
     claudeCliModel: config.claudeCliModel ?? "",
     codexCliModel: config.codexCliModel ?? "",
+    qwenCliModel: config.qwenCliModel ?? "",
     openrouterApiKey: config.openrouterApiKey ? "***" : "",
     openrouterModel: config.openrouterModel,
     ollamaUrl: config.ollamaUrl,
@@ -32,7 +33,7 @@ const BOOL_KEYS: (keyof AppSettings)[] = [
   "hasCompletedOnboarding", "includeNonGitDirs",
 ];
 const STR_KEYS: (keyof AppSettings)[] = [
-  "devRoot", "excludeDirs", "llmProvider", "claudeCliModel", "codexCliModel",
+  "devRoot", "excludeDirs", "llmProvider", "claudeCliModel", "codexCliModel", "qwenCliModel",
   "openrouterApiKey", "openrouterModel",
   "ollamaUrl", "ollamaModel", "mlxUrl", "mlxModel",
 ];

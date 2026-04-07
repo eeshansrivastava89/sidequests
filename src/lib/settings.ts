@@ -13,6 +13,7 @@ export interface AppSettings {
   llmTimeout?: number;
   claudeCliModel?: string;
   codexCliModel?: string;
+  qwenCliModel?: string;
   openrouterApiKey?: string;
   openrouterModel?: string;
   ollamaUrl?: string;
