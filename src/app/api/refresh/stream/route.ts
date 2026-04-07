@@ -42,6 +42,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const forceSkipLlm = url.searchParams.get("skipLlm") === "true";
   const skipLlm = forceSkipLlm || getLlmProvider() === null;
+  const namesParam = url.searchParams.get("names");
+  const selectedNames = namesParam ? namesParam.split(",").filter(Boolean) : undefined;
 
   // Wire client disconnect to abort signal
   request.signal.addEventListener("abort", () => abort.abort());
@@ -58,7 +60,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await runRefreshPipeline(emit, abort.signal, { skipLlm });
+        await runRefreshPipeline(emit, abort.signal, { skipLlm, selectedNames });
       } catch (err) {
         if (abort.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);

@@ -74,7 +74,7 @@ function hashRawJson(rawJson: string): string {
 export async function runRefreshPipeline(
   emit: (event: PipelineEvent) => void = () => {},
   signal?: AbortSignal,
-  options?: { skipLlm?: boolean }
+  options?: { skipLlm?: boolean; selectedNames?: string[] }
 ): Promise<{ projectCount: number }> {
   const startTime = Date.now();
   let llmSucceeded = 0;
@@ -83,7 +83,13 @@ export async function runRefreshPipeline(
   let llmSkipped = 0;
 
   // 1. Lightweight directory enumeration
-  const projectDirs = listProjectDirs(config.devRoot, config.excludeDirs, config.includeNonGitDirs);
+  let projectDirs = listProjectDirs(config.devRoot, config.excludeDirs, config.includeNonGitDirs);
+
+  // Scope to selected projects if specified
+  if (options?.selectedNames && options.selectedNames.length > 0) {
+    const nameSet = new Set(options.selectedNames);
+    projectDirs = projectDirs.filter((d) => nameSet.has(d.name));
+  }
 
   // Sort by existing lastTouchedAt (most recently active first) — uses DB data from prior scans
   const existingProjects = await db.project.findMany({

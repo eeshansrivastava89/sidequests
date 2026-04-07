@@ -156,6 +156,9 @@ export default function DashboardPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [signalFilter, setSignalFilter] = useState<SignalFilter>(null);
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const filteredRef = useRef<Project[]>([]);
+
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
@@ -237,13 +240,34 @@ export default function DashboardPage() {
 
   const handleFastScan = useCallback(() => {
     deltaHook.snapshot();
-    refreshHook.start({ skipLlm: true });
-  }, [deltaHook, refreshHook]);
+    const names = selectedNames.size > 0 ? [...selectedNames] : undefined;
+    refreshHook.start({ skipLlm: true, selectedNames: names });
+    setSelectedNames(new Set());
+  }, [deltaHook, refreshHook, selectedNames]);
 
   const handleAiScan = useCallback(() => {
     deltaHook.snapshot();
-    refreshHook.start();
-  }, [deltaHook, refreshHook]);
+    const names = selectedNames.size > 0 ? [...selectedNames] : undefined;
+    refreshHook.start({ selectedNames: names });
+    setSelectedNames(new Set());
+  }, [deltaHook, refreshHook, selectedNames]);
+
+  const handleToggleSelect = useCallback((name: string) => {
+    setSelectedNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedNames((prev) => {
+      const current = filteredRef.current;
+      if (prev.size === current.length) return new Set();
+      return new Set(current.map((p) => p.name));
+    });
+  }, []);
 
   const handleSortChange = useCallback((key: SortKey) => {
     setSortKey(key);
@@ -263,8 +287,6 @@ export default function DashboardPage() {
     },
     [touchProject]
   );
-
-  const filteredRef = useRef<Project[]>([]);
 
   const filtered = useMemo(
     () => sortProjects(filterBySignal(filterBySearch(filterByView(projects, view), search), signalFilter), sortKey),
@@ -403,7 +425,7 @@ export default function DashboardPage() {
                           className="gap-1.5"
                         >
                           <Zap className="size-3.5" />
-                          Fast Scan
+                          Fast Scan{selectedNames.size > 0 ? ` [${selectedNames.size}]` : ""}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-[220px] text-xs">
@@ -419,7 +441,7 @@ export default function DashboardPage() {
                           className="gap-1.5"
                         >
                           <Sparkles className="size-3.5" />
-                          AI Scan
+                          AI Scan{selectedNames.size > 0 ? ` [${selectedNames.size}]` : ""}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-[240px] text-xs">
@@ -654,6 +676,10 @@ export default function DashboardPage() {
                       onTogglePin={handleTogglePin}
                       onTouch={handleTouch}
                       refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                      selectedNames={selectedNames}
+                      onToggleSelect={handleToggleSelect}
+                      onSelectAll={handleSelectAll}
+                      allSelected={selectedNames.size === filtered.length && filtered.length > 0}
                     />
                   </div>
                 )}
@@ -671,6 +697,10 @@ export default function DashboardPage() {
                       onTogglePin={handleTogglePin}
                       onTouch={handleTouch}
                       refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                      selectedNames={selectedNames}
+                      onToggleSelect={handleToggleSelect}
+                      onSelectAll={handleSelectAll}
+                      allSelected={selectedNames.size === filtered.length && filtered.length > 0}
                     />
                   </div>
                 )}

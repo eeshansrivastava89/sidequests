@@ -178,7 +178,7 @@ export function useRefresh(onComplete: () => void) {
     }
   }, [onComplete]);
 
-  const start = useCallback((options?: { skipLlm?: boolean }) => {
+  const start = useCallback((options?: { skipLlm?: boolean; selectedNames?: string[] }) => {
     if (state.active) return;
 
     const abort = new AbortController();
@@ -197,7 +197,12 @@ export function useRefresh(onComplete: () => void) {
 
     (async () => {
       let response: Response;
-      const qs = options?.skipLlm ? "?skipLlm=true" : "";
+      const params = new URLSearchParams();
+      if (options?.skipLlm) params.set("skipLlm", "true");
+      if (options?.selectedNames && options.selectedNames.length > 0) {
+        params.set("names", options.selectedNames.join(","));
+      }
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const connect = async () => fetch(`/api/refresh/stream${qs}`, { signal: abort.signal });
       try {
         response = await connect();

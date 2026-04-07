@@ -16,6 +16,10 @@ interface ProjectListProps {
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
   refreshProgress?: Map<string, ProjectProgress>;
+  selectedNames?: Set<string>;
+  onToggleSelect?: (name: string) => void;
+  onSelectAll?: () => void;
+  allSelected?: boolean;
 }
 
 const STATUS_DOT = STATUS_COLORS;
@@ -55,9 +59,12 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   return "";
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, refreshProgress }: ProjectListProps) {
+export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, refreshProgress, selectedNames, onToggleSelect, onSelectAll, allSelected }: ProjectListProps) {
+  const hasSelection = !!(selectedNames && onToggleSelect);
   // Project ~60% (6fr), right columns ~40% total
-  const gridCols = "grid-cols-[auto_6fr_5rem_3.5rem_3.5rem_2.5rem_3rem_5.5rem]";
+  const gridCols = hasSelection
+    ? "grid-cols-[1.5rem_auto_6fr_5rem_3.5rem_3.5rem_2.5rem_3rem_5.5rem]"
+    : "grid-cols-[auto_6fr_5rem_3.5rem_3.5rem_2.5rem_3rem_5.5rem]";
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
@@ -66,6 +73,17 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         "grid items-center gap-x-4 px-5 h-10 bg-card border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider select-none",
         gridCols
       )}>
+        {hasSelection && (
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={allSelected ?? false}
+              onChange={(e) => { e.stopPropagation(); onSelectAll?.(); }}
+              className="size-3.5 rounded border-border accent-foreground cursor-pointer"
+              title="Select all / Deselect all"
+            />
+          </div>
+        )}
         <div className="w-8" />
         <div>Project</div>
         <div className="text-right">Last Active</div>
@@ -119,6 +137,18 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               shimmerClass
             )}
           >
+            {/* Checkbox */}
+            {hasSelection && (
+              <div className="flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={selectedNames.has(project.name)}
+                  onChange={(e) => { e.stopPropagation(); onToggleSelect(project.name); }}
+                  className="size-3.5 rounded border-border accent-foreground cursor-pointer"
+                />
+              </div>
+            )}
+
             {/* Status dot + pin */}
             <div className="flex items-center gap-2">
               <div
