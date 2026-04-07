@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.3.9
+
+- Activity log now sorts by last commit (most recent first) — matches LLM scan ordering
+- Enhanced scan animation: slower (1.2s), thicker line, gradient fade from blue to green
+- Fix lint ERR_MODULE_NOT_FOUND — updated eslint-config-next and eslint for compatibility
+- Default Claude CLI model is now `claude-sonnet-4-6` (was undefined)
+
 ## v0.3.8
 
 - Replace "stale" status with "completed" — for finished projects that work and run occasionally
