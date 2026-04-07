@@ -17,6 +17,7 @@ export interface RefreshEvent {
   llmFailedNames?: string[];
   llmSkipped?: number;
   durationMs?: number;
+  lastCommitDate?: string | null;
 }
 
 export interface ProjectProgress {
@@ -27,6 +28,7 @@ export interface ProjectProgress {
   detail?: Record<string, unknown>;
   storeOrder?: number; // completion order for staggered animation
   llmDurationMs?: number; // how long the LLM call took
+  lastCommitDate?: string | null; // for activity log sorting
 }
 
 export interface RefreshState {
@@ -109,6 +111,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
         if (d.step === "store") {
           existing.storeStatus = "done";
           existing.detail = d.detail;
+          existing.lastCommitDate = d.lastCommitDate ?? undefined;
           // Track completion order for staggered animation
           const doneCount = [...projects.values()].filter(p => p.storeStatus === "done").length;
           existing.storeOrder = doneCount;

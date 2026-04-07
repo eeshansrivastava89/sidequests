@@ -212,14 +212,23 @@
 }
 
 @keyframes scan-sweep {
-  0% { background-size: 0% 2px; }
-  100% { background-size: 100% 2px; }
+  0% { 
+    background-size: 0% 3px;
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% { 
+    background-size: 100% 3px;
+    opacity: 1;
+  }
 }
 
 .row-scan-complete {
-  background-image: linear-gradient(90deg, #89b4fa, #89b4fa) !important;
+  background-image: linear-gradient(90deg, #89b4fa, #a6e3a1) !important;
   background-repeat: no-repeat !important;
   background-position: bottom left !important;
-  background-size: 100% 2px !important;
-  animation: scan-sweep 0.5s ease-out forwards;
+  background-size: 100% 3px !important;
+  animation: scan-sweep 1.2s ease-out forwards;
 }

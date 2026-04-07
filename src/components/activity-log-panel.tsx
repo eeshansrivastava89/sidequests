@@ -82,15 +82,29 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
   const wasActiveRef = useRef(false);
   useEffect(() => {
     if (refreshState.active && !wasActiveRef.current) {
-      setExpanded(true);
+      // Defer state update to avoid setState-in-effect warning
+      requestAnimationFrame(() => {
+        setExpanded(true);
+      });
     }
     wasActiveRef.current = refreshState.active;
   }, [refreshState.active]);
 
   // Build the project status list from refreshState.projects map
-  const projectNames = Array.from(refreshState.projects.keys());
   const progressMap = refreshState.projects;
   const refreshDone = !refreshState.active && refreshState.summary !== null;
+
+  // Sort projects by lastCommitDate (most recent first), then by name
+  const projectNames = Array.from(progressMap.entries())
+    .sort(([, a], [, b]) => {
+      const aDate = a?.lastCommitDate;
+      const bDate = b?.lastCommitDate;
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    })
+    .map(([name]) => name);
 
   // Count stats
   let doneCount = 0;

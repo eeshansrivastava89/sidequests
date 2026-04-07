@@ -59,7 +59,7 @@ export function validateDeriveOutput(data: unknown): { derivedAt: string; projec
 export type PipelineEvent =
   | { type: "enumerate_complete"; projectCount: number; names: string[] }
   | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm" }
-  | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown> }
+  | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown>; lastCommitDate?: string | null }
   | { type: "project_error"; name: string; step: string; error: string }
   | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number };
 
@@ -296,6 +296,7 @@ export async function runRefreshPipeline(
       name,
       step: "store",
       detail: { status: derived?.statusAuto, healthScore: derived?.healthScoreAuto },
+      lastCommitDate: lastCommitDateStr,
     });
 
     // Stash data for pass 2
