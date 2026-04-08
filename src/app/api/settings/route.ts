@@ -11,6 +11,7 @@ export async function GET() {
     llmProvider: config.llmProvider,
 
     llmTimeout: config.llmTimeout / 1000,
+    llmConcurrency: config.llmConcurrency,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
     llmAllowUnsafe: config.llmAllowUnsafe,
     llmDebug: config.llmDebug,
@@ -37,7 +38,7 @@ const STR_KEYS: (keyof AppSettings)[] = [
   "openrouterApiKey", "openrouterModel",
   "ollamaUrl", "ollamaModel", "mlxUrl", "mlxModel",
 ];
-const NUM_KEYS: (keyof AppSettings)[] = ["llmTimeout"];
+const NUM_KEYS: (keyof AppSettings)[] = ["llmTimeout", "llmConcurrency"];
 
 /** PUT — merge incoming fields into settings.json. */
 export async function PUT(req: Request) {
@@ -61,6 +62,10 @@ export async function PUT(req: Request) {
     }
     for (const key of NUM_KEYS) {
       if (key in body && typeof body[key] === "number") {
+        if (key === "llmConcurrency") {
+          (updated as Record<string, unknown>)[key] = Math.max(2, Math.min(5, Math.floor(body[key])));
+          continue;
+        }
         (updated as Record<string, unknown>)[key] = body[key];
       }
     }

@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.3.14
+
+- Restore concurrent AI scan with a new Settings slider for `llmConcurrency` (2-5)
+- Run LLM enrichment through a bounded worker pool while keeping the deterministic fast-scan pass unchanged
+- Fix cancel behavior: reset in-flight UI state immediately, but preserve completed AI scan activity already finished before cancel
+- Compact concurrent progress text in the header to avoid truncation beside the Cancel button
+- Re-enable Prisma smoke coverage in automation via `prisma validate` and `prisma generate`
+- Stabilize integration tests by building the test SQLite database from checked-in migration SQL
+- Align Prisma packages to `7.4.1`
+
 ## v0.3.11
 
 - **Rewrite Codex CLI backend**: use `spawn` + stdin piping, `--sandbox read-only`, `-o` for clean output capture, prepend system prompt, wire abort signal, strip env vars

@@ -75,6 +75,32 @@ export function parseSSE(chunk: string): Array<{ type: string; data: string }> {
   return events;
 }
 
+function getActiveProvider(projects: Map<string, ProjectProgress>, fallback?: string): string {
+  if (fallback) return fallback;
+  for (const project of projects.values()) {
+    if (project.provider) return project.provider;
+  }
+  return "AI";
+}
+
+function buildLlmPhase(projects: Map<string, ProjectProgress>, provider?: string): string {
+  const total = projects.size;
+  const running = [...projects.values()].filter((p) => p.llmStatus === "running").length;
+  const complete = [...projects.values()].filter((p) =>
+    p.llmStatus === "done" || p.llmStatus === "error" || p.llmStatus === "skipped",
+  ).length;
+  const waiting = Math.max(total - running - complete, 0);
+  const label = getActiveProvider(projects, provider);
+
+  if (running > 0) {
+    return `${label}: ${running} running | ${complete}/${total}`;
+  }
+  if (waiting > 0) {
+    return `${label}: ${complete}/${total} | ${waiting} waiting`;
+  }
+  return `${label}: ${complete}/${total}`;
+}
+
 /** Pure state reducer for SSE events — testable without React. */
 export function reduceRefreshEvent(state: RefreshState, type: string, raw: string): RefreshState {
   switch (type) {
@@ -102,10 +128,13 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
         llmStatus: "pending" as const,
       };
       if (d.step === "store") existing.storeStatus = "running";
-      else if (d.step === "llm") existing.llmStatus = "running";
+      else if (d.step === "llm") {
+        existing.llmStatus = "running";
+        existing.provider = d.provider ?? existing.provider;
+      }
       projects.set(key, existing);
       const phase = d.step === "llm"
-        ? `${d.provider ?? "AI"}: enriching ${d.name} (${d.index! + 1}/${d.total})`
+        ? buildLlmPhase(projects, d.provider)
         : `Scanning ${d.name} (${d.index! + 1}/${d.total})`;
       return { ...state, projects, phase };
     }
@@ -126,13 +155,14 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
           existing.llmStatus = "done";
           if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
           existing.llmDurationMs = (d.detail?.durationMs as number) ?? undefined;
-          existing.provider = d.provider ?? undefined;
+          existing.provider = d.provider ?? existing.provider;
         }
         projects.set(key, existing);
       }
       // Set deterministicReady on first project_complete(store)
       const deterministicReady = d.step === "store" ? true : state.deterministicReady;
-      return { ...state, projects, deterministicReady };
+      const phase = d.step === "llm" ? buildLlmPhase(projects, d.provider) : state.phase;
+      return { ...state, projects, deterministicReady, phase };
     }
     case "project_error": {
       const d: RefreshEvent = JSON.parse(raw);
@@ -142,9 +172,10 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       if (existing) {
         existing.llmStatus = "error";
         existing.llmError = d.error;
+        existing.provider = d.provider ?? existing.provider;
         projects.set(key, existing);
       }
-      return { ...state, projects };
+      return { ...state, projects, phase: buildLlmPhase(projects, d.provider) };
     }
     case "done": {
       const d: RefreshEvent = JSON.parse(raw);
@@ -289,7 +320,10 @@ export function useRefresh(onComplete: () => void) {
 
     // Cleanup on abort
     abort.signal.addEventListener("abort", () => {
-      setState((s) => ({ ...s, active: false, phase: "Cancelled" }));
+      setState({
+        ...INITIAL_STATE,
+        phase: "Cancelled",
+      });
     });
   }, [state.active, onComplete, handleEvent]);
 

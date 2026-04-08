@@ -11,6 +11,7 @@ export interface AppSettings {
   llmAllowUnsafe?: boolean;
   llmDebug?: boolean;
   llmTimeout?: number;
+  llmConcurrency?: number;
   claudeCliModel?: string;
   codexCliModel?: string;
   qwenCliModel?: string;

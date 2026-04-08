@@ -16,6 +16,7 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
+  llmConcurrency: 3,
   llmDebug: false,
 }));
 
@@ -74,6 +75,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   mockConfig.llmProvider = "none";
   mockConfig.llmOverwriteMetadata = false;
+  mockConfig.llmConcurrency = 3;
   // Reset scan data to full 3-project set
   mockScanProjects.dirs = SCAN_FIXTURE.projects.map((p) => ({
     name: p.name,
@@ -321,6 +323,109 @@ describe("pipeline integration — LLM enrichment", () => {
     await runRefreshPipeline();
     const llms = await db.llm.findMany();
     expect(llms).toHaveLength(3); // Still 3, not 6
+  });
+
+  it("runs LLM enrichment concurrently up to llmConcurrency", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    mockConfig.llmConcurrency = 2;
+
+    let active = 0;
+    let maxActive = 0;
+    let callCount = 0;
+    let seenTwoResolve: (() => void) | null = null;
+    const seenTwo = new Promise<void>((resolve) => {
+      seenTwoResolve = resolve;
+    });
+
+    mockEnrich.mockImplementation(async () => {
+      callCount++;
+      active++;
+      maxActive = Math.max(maxActive, active);
+      if (maxActive >= 2) seenTwoResolve?.();
+
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      active--;
+      return LLM_ENRICHMENT_FIXTURE;
+    });
+
+    const pipelinePromise = runRefreshPipeline();
+    await seenTwo;
+    expect(maxActive).toBe(2);
+    await pipelinePromise;
+    expect(callCount).toBe(3);
+  });
+
+  it("abort during concurrent LLM pass does not record cancellations as failures", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    mockConfig.llmConcurrency = 2;
+
+    const controller = new AbortController();
+    const events: PipelineEvent[] = [];
+
+    mockEnrich.mockImplementation(async (_input, signal?: AbortSignal) => {
+      await new Promise<never>((_resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new Error("Aborted"));
+          return;
+        }
+        signal?.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
+      });
+    });
+
+    const emit = (event: PipelineEvent) => {
+      events.push(event);
+      if (event.type === "project_start" && event.step === "llm") {
+        const llmStarts = events.filter((e) => e.type === "project_start" && e.step === "llm").length;
+        if (llmStarts === 2) controller.abort();
+      }
+    };
+
+    await runRefreshPipeline(emit, controller.signal);
+
+    expect(events.some((e) => e.type === "project_error")).toBe(false);
+    expect(events.some((e) => e.type === "done")).toBe(false);
+
+    const llms = await db.llm.findMany();
+    expect(llms).toHaveLength(0);
+  });
+
+  it("abort preserves activity for projects that completed before cancellation", async () => {
+    mockConfig.llmProvider = "claude-cli";
+    mockConfig.llmConcurrency = 2;
+
+    const controller = new AbortController();
+    let callCount = 0;
+
+    mockEnrich.mockImplementation(async (_input, signal?: AbortSignal) => {
+      callCount++;
+      if (callCount === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return LLM_ENRICHMENT_FIXTURE;
+      }
+
+      await new Promise<never>((_resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new Error("Aborted"));
+          return;
+        }
+        signal?.addEventListener("abort", () => reject(new Error("Aborted")), { once: true });
+      });
+    });
+
+    const events: PipelineEvent[] = [];
+    const emit = (event: PipelineEvent) => {
+      events.push(event);
+      if (event.type === "project_complete" && event.step === "llm") {
+        controller.abort();
+      }
+    };
+
+    await runRefreshPipeline(emit, controller.signal);
+
+    const activities = await db.activity.findMany();
+    const payloads = activities.map((a: { payloadJson: string }) => JSON.parse(a.payloadJson));
+    expect(payloads.filter((p: { llmResult: string }) => p.llmResult === "succeeded")).toHaveLength(1);
+    expect(events.some((e) => e.type === "done")).toBe(false);
   });
 });
 

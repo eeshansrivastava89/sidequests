@@ -67,6 +67,12 @@ function hashRawJson(rawJson: string): string {
   return createHash("sha256").update(rawJson).digest("hex");
 }
 
+function isAbortError(error: unknown, signal?: AbortSignal): boolean {
+  if (signal?.aborted) return true;
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  return error instanceof Error && /aborted/i.test(error.message);
+}
+
 /**
  * Executes the full pipeline: enumerate → per-project (scan → derive → store → optional GitHub + LLM) → cleanup.
  * Each project completes fully before the next starts.
@@ -353,21 +359,52 @@ export async function runRefreshPipeline(
     return new Date(bDate).getTime() - new Date(aDate).getTime();
   });
 
-  // ── Pass 2: LLM enrichment one-by-one (most recent first) ──
-  for (let i = 0; i < projectDataList.length; i++) {
-    if (signal?.aborted) break;
+  if (signal?.aborted) {
+    return { projectCount: projectDirs.length };
+  }
 
-    const pd = projectDataList[i];
+  // ── Pass 2: LLM enrichment with bounded concurrency (most recent first) ──
+  if (!llmProvider) {
+    for (const pd of projectDataList) {
+      llmSkipped++;
+      projectLog.push({
+        projectId: pd.projectId,
+        name: pd.name,
+        derived: pd.derived ? { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto } : undefined,
+        llmResult: "skipped",
+      });
+    }
+  } else {
+    const llmCandidates: ProjectData[] = [];
+    const projectOrder = new Map(projectDataList.map((pd, index) => [pd.dir.pathHash, index]));
 
-    if (llmProvider && pd.derived) {
-      emit({ type: "project_start", name: pd.name, pathHash: pd.dir.pathHash, index: i, total, step: "llm", provider: providerName ?? undefined });
+    for (const pd of projectDataList) {
+      if (pd.derived) llmCandidates.push(pd);
+      else {
+        llmSkipped++;
+        projectLog.push({
+          projectId: pd.projectId,
+          name: pd.name,
+          derived: undefined,
+          llmResult: "skipped",
+        });
+      }
+    }
+
+    if (process.env.NODE_ENV !== "test" && llmCandidates.length > 0) {
+      console.log(`[pipeline] [${providerName}] concurrency=${config.llmConcurrency}`);
+    }
+
+    const runLlmForProject = async (pd: ProjectData, index: number) => {
+      if (!pd.derived || signal?.aborted) return;
+
+      emit({ type: "project_start", name: pd.name, pathHash: pd.dir.pathHash, index, total, step: "llm", provider: providerName ?? undefined });
       const llmStartTime = Date.now();
       if (process.env.NODE_ENV !== "test") {
-        console.log(`[pipeline] [${providerName}] ${pd.name} (${i + 1}/${total}) — enriching...`);
+        console.log(`[pipeline] [${providerName}] ${pd.name} (${index + 1}/${total}) — enriching...`);
       }
 
       try {
-        // Fetch previous summary for continuity
         const existingLlm = await db.llm.findUnique({
           where: { projectId: pd.projectId },
           select: { summary: true, purpose: true },
@@ -388,6 +425,8 @@ export async function runRefreshPipeline(
           github: pd.github,
           previousSummary,
         }, signal);
+
+        if (signal?.aborted) return;
 
         await db.llm.upsert({
           where: { projectId: pd.projectId },
@@ -431,8 +470,15 @@ export async function runRefreshPipeline(
           provider: providerName ?? undefined,
         });
 
-        projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "succeeded" });
+        projectLog.push({
+          projectId: pd.projectId,
+          name: pd.name,
+          derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto },
+          llmResult: "succeeded",
+        });
       } catch (err) {
+        if (isAbortError(err, signal)) return;
+
         llmFailed++;
         llmFailedNames.push(pd.name);
         const message = err instanceof Error ? err.message : String(err);
@@ -447,23 +493,31 @@ export async function runRefreshPipeline(
         });
         emit({ type: "project_error", name: pd.name, pathHash: pd.dir.pathHash, step: "llm", error: message, provider: providerName ?? undefined });
 
-        projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "failed" });
+        projectLog.push({
+          projectId: pd.projectId,
+          name: pd.name,
+          derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto },
+          llmResult: "failed",
+        });
       }
-    } else {
-      // No LLM for this project
-      llmSkipped++;
-      projectLog.push({
-        projectId: pd.projectId,
-        name: pd.name,
-        derived: pd.derived ? { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto } : undefined,
-        llmResult: "skipped",
-      });
-    }
+    };
+
+    let nextCandidate = 0;
+    const workerCount = Math.min(config.llmConcurrency, llmCandidates.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (!signal?.aborted) {
+          const candidate = llmCandidates[nextCandidate++];
+          if (!candidate) return;
+          const index = projectOrder.get(candidate.dir.pathHash) ?? 0;
+          await runLlmForProject(candidate, index);
+        }
+      }),
+    );
   }
 
   // 4. Log activity for each project
   for (const entry of projectLog) {
-    if (signal?.aborted) break;
     await db.activity.create({
       data: {
         projectId: entry.projectId,
@@ -483,6 +537,10 @@ export async function runRefreshPipeline(
   await db.activity.deleteMany({
     where: { createdAt: { lt: ninetyDaysAgo } },
   });
+
+  if (signal?.aborted) {
+    return { projectCount: projectDirs.length };
+  }
 
   const durationMs = Date.now() - startTime;
   if (process.env.NODE_ENV !== "test") {

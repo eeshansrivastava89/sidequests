@@ -16,6 +16,7 @@ function makeDraft(overrides: Partial<AppConfig> = {}): AppConfig {
     llmAllowUnsafe: false,
     llmDebug: false,
     llmTimeout: 90,
+    llmConcurrency: 3,
     claudeCliModel: "",
     codexCliModel: "",
     qwenCliModel: "",

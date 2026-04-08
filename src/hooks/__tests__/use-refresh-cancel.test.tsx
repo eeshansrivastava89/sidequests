@@ -113,9 +113,10 @@ describe("useRefresh — hook-level cancel path", () => {
       result.current.cancel();
     });
 
-    // deterministicReady should be preserved
-    expect(result.current.state.deterministicReady).toBe(true);
+    // Cancel resets transient refresh UI state
+    expect(result.current.state.deterministicReady).toBe(false);
     expect(result.current.state.active).toBe(false);
+    expect(result.current.state.projects.size).toBe(0);
   });
 
   it("can start a new refresh after cancel (retry)", async () => {
@@ -158,5 +159,41 @@ describe("useRefresh — hook-level cancel path", () => {
     act(() => {
       result.current.cancel();
     });
+  });
+
+  it("cancel clears in-flight project progress so activity log resets", async () => {
+    const { mockFetch, pushSSE } = createMockSSEFetch();
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    const onComplete = vi.fn();
+    const { result } = renderHook(() => useRefresh(onComplete));
+
+    await act(async () => {
+      result.current.start();
+    });
+
+    await act(async () => {
+      pushSSE("enumerate_complete", JSON.stringify({
+        projectCount: 3,
+        names: ["a", "b", "c"],
+      }));
+      pushSSE("project_start", JSON.stringify({
+        name: "a", step: "llm", index: 0, total: 3, provider: "claude-cli",
+      }));
+      pushSSE("project_start", JSON.stringify({
+        name: "b", step: "llm", index: 1, total: 3, provider: "claude-cli",
+      }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    expect(result.current.state.projects.size).toBe(3);
+
+    act(() => {
+      result.current.cancel();
+    });
+
+    expect(result.current.state.active).toBe(false);
+    expect(result.current.state.projects.size).toBe(0);
+    expect(result.current.state.summary).toBeNull();
   });
 });

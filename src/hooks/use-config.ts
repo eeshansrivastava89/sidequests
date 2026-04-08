@@ -8,6 +8,7 @@ export interface AppConfig {
   llmProvider: string;
 
   llmTimeout: number;
+  llmConcurrency: number;
   llmOverwriteMetadata: boolean;
   llmAllowUnsafe: boolean;
   llmDebug: boolean;
@@ -30,6 +31,7 @@ const DEFAULT: AppConfig = {
   llmProvider: "claude-cli",
 
   llmTimeout: 90,
+  llmConcurrency: 3,
   llmOverwriteMetadata: false,
   llmAllowUnsafe: false,
   llmDebug: false,

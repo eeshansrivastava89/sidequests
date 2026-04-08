@@ -144,6 +144,27 @@ export function SettingsModal({ open, onOpenChange, config, onSaved }: Props) {
               />
             </Field>
 
+            <Field label="LLM Concurrency" description="How many AI scans can run at once. Higher values use more local CPU and provider capacity.">
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  min={2}
+                  max={5}
+                  step={1}
+                  value={draft.llmConcurrency}
+                  onChange={(e) => set("llmConcurrency", parseInt(e.target.value, 10) || 3)}
+                  className="w-full"
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>2</span>
+                  <span className="font-medium text-foreground">
+                    {draft.llmConcurrency} concurrent AI scans
+                  </span>
+                  <span>5</span>
+                </div>
+              </div>
+            </Field>
+
             <SwitchRow
               label="Overwrite Metadata"
               description="Force overwrite existing metadata on enrich"

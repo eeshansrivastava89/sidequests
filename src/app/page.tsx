@@ -399,11 +399,11 @@ export default function DashboardPage() {
                 </TooltipProvider>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <TooltipProvider delayDuration={300}>
               {refreshHook.state.active ? (
                 <>
-                  <span className="text-xs text-muted-foreground max-w-[200px] truncate">
+                  <span className="text-xs text-muted-foreground max-w-[320px] truncate text-right shrink min-w-0">
                     {refreshHook.state.phase}
                   </span>
                   <Button

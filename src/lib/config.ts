@@ -42,6 +42,13 @@ export const config = {
     const s = getSettings().llmTimeout;
     return typeof s === "number" && s > 0 ? s * 1000 : 90_000;
   },
+  get llmConcurrency(): number {
+    const n = getSettings().llmConcurrency;
+    if (typeof n === "number" && Number.isFinite(n)) {
+      return Math.max(2, Math.min(5, Math.floor(n)));
+    }
+    return 3;
+  },
 
   get openrouterApiKey(): string | undefined {
     return getSettings().openrouterApiKey || undefined;

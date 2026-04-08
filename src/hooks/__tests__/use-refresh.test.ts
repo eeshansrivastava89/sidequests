@@ -6,6 +6,7 @@ function makeActiveState(overrides: Partial<RefreshState> = {}): RefreshState {
     active: true,
     phase: "Scanning...",
     deterministicReady: false,
+    skipLlm: false,
     projects: new Map(),
     summary: null,
     error: null,
@@ -76,7 +77,7 @@ describe("reduceRefreshEvent — state transitions", () => {
     const raw = JSON.stringify({ name: "my-app", step: "llm", index: 0, total: 5 });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.phase).toBe("AI: enriching my-app (1/5)");
+    expect(next.phase).toBe("AI: 1 running | 0/1");
   });
 
   it("project_start with step=llm shows provider name when present", () => {
@@ -84,7 +85,7 @@ describe("reduceRefreshEvent — state transitions", () => {
     const raw = JSON.stringify({ name: "my-app", step: "llm", index: 0, total: 5, provider: "qwen-cli" });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.phase).toBe("qwen-cli: enriching my-app (1/5)");
+    expect(next.phase).toBe("qwen-cli: 1 running | 0/1");
   });
 
   it("project_start with step=store shows Scanning phase", () => {
@@ -156,6 +157,28 @@ describe("reduceRefreshEvent — state transitions", () => {
     }));
     expect(state.projects.get("app-b")?.llmStatus).toBe("error");
     expect(state.projects.get("app-b")?.llmError).toBe("Rate limited");
+    expect(state.phase).toBe("AI: 1/1");
+  });
+
+  it("llm phase text aggregates concurrent progress", () => {
+    let state = makeActiveState();
+    state = reduceRefreshEvent(state, "enumerate_complete", JSON.stringify({
+      projectCount: 3,
+      names: ["app-a", "app-b", "app-c"],
+    }));
+
+    state = reduceRefreshEvent(state, "project_start", JSON.stringify({
+      name: "app-a", step: "llm", index: 0, total: 3, provider: "claude-cli",
+    }));
+    state = reduceRefreshEvent(state, "project_start", JSON.stringify({
+      name: "app-b", step: "llm", index: 1, total: 3, provider: "claude-cli",
+    }));
+    expect(state.phase).toBe("claude-cli: 2 running | 0/3");
+
+    state = reduceRefreshEvent(state, "project_complete", JSON.stringify({
+      name: "app-a", step: "llm", provider: "claude-cli",
+    }));
+    expect(state.phase).toBe("claude-cli: 1 running | 1/3");
   });
 
   it("unknown event type returns state unchanged", () => {

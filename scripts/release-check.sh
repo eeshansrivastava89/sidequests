@@ -204,6 +204,8 @@ else
   add_summary "npm ci" "SKIP" "--skip-install"
   print_warn "Skipping npm ci (--skip-install)"
 fi
+run_check "Prisma validate" npx prisma validate
+run_check "Prisma generate" npx prisma generate
 run_check "Lint" npm run lint
 run_check "Build" npm run build
 run_check "Unit tests" npm test

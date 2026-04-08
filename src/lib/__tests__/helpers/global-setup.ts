@@ -1,17 +1,32 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
 const TEST_DB_PATH = path.resolve(process.cwd(), "test.db");
+const MIGRATIONS_DIR = path.resolve(process.cwd(), "prisma", "migrations");
+
+function buildMigrationSql(): string {
+  const migrationDirs = fs.readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name !== "migration_lock.toml")
+    .sort();
+
+  return migrationDirs
+    .map((dir) => path.join(MIGRATIONS_DIR, dir, "migration.sql"))
+    .filter((file) => fs.existsSync(file))
+    .map((file) => fs.readFileSync(file, "utf8"))
+    .join("\n\n");
+}
 
 export function setup() {
-  execSync(`npx prisma db push --force-reset --url "file:${TEST_DB_PATH}"`, {
-    env: {
-      ...process.env,
-      // Consent for Prisma 7 AI agent safety check — this only affects the ephemeral test.db
-      PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: "yes",
-    },
-    stdio: "pipe",
+  try {
+    fs.unlinkSync(TEST_DB_PATH);
+  } catch {
+    // ignore if file does not exist
+  }
+
+  execFileSync("sqlite3", [TEST_DB_PATH], {
+    input: buildMigrationSql(),
+    stdio: ["pipe", "pipe", "pipe"],
   });
 }
 

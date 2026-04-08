@@ -16,6 +16,8 @@ const DEFAULT_CONFIG = {
   llmOverwriteMetadata: false,
   llmAllowUnsafe: false,
   llmDebug: false,
+  llmTimeout: 90,
+  llmConcurrency: 3,
   claudeCliModel: "",
   openrouterApiKey: "",
   openrouterModel: "",
@@ -24,6 +26,7 @@ const DEFAULT_CONFIG = {
   mlxUrl: "",
   mlxModel: "",
   hasCompletedOnboarding: false,
+  includeNonGitDirs: true,
 };
 
 const INITIAL_SCAN_STATE: RefreshState = {

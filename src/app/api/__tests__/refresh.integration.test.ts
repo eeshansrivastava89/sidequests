@@ -9,6 +9,7 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
+  llmConcurrency: 3,
   llmDebug: false,
 }));
 

@@ -26,6 +26,7 @@ const mockConfig = vi.hoisted(() => ({
   llmProvider: "claude-cli",
   llmAllowUnsafe: false,
   llmOverwriteMetadata: false,
+  llmConcurrency: 3,
 
   llmDebug: false,
   ollamaUrl: "",
@@ -93,6 +94,7 @@ describe("settings persistence round-trip", () => {
     const payload = {
       devRoot: "~/projects",
       llmProvider: "ollama",
+      llmConcurrency: 5,
     };
     const putRes = await settingsPUT(makePutRequest(payload));
     expect((await putRes.json()).ok).toBe(true);
@@ -101,6 +103,7 @@ describe("settings persistence round-trip", () => {
     const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
     expect(onDisk.devRoot).toBe("~/projects");
     expect(onDisk.llmProvider).toBe("ollama");
+    expect(onDisk.llmConcurrency).toBe(5);
   });
 
   it("PUT preserves existing settings not in payload", async () => {
@@ -118,6 +121,14 @@ describe("settings persistence round-trip", () => {
     expect(onDisk.devRoot).toBe("~/dev");
     expect(onDisk.ollamaUrl).toBe("http://custom:11434");
     expect(onDisk.llmProvider).toBe("mlx");
+  });
+
+  it("clamps llmConcurrency into the supported 2-5 range", async () => {
+    const putRes = await settingsPUT(makePutRequest({ llmConcurrency: 9 }));
+    expect((await putRes.json()).ok).toBe(true);
+
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tmpDir, "settings.json"), "utf-8"));
+    expect(onDisk.llmConcurrency).toBe(5);
   });
 });
 
@@ -222,4 +233,3 @@ describe("failure: invalid dev root", () => {
     expect(data.ok).toBe(true);
   });
 });
-
