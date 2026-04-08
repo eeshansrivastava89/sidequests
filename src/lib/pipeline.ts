@@ -109,11 +109,16 @@ export async function runRefreshPipeline(
   emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name) });
 
   // 2. Soft-prune missing projects and restore returning ones
+  //    Skip when doing a selective scan — we don't want to prune
+  //    projects that simply weren't selected.
+  const isSelectiveScan = !!(options?.selectedNames && options.selectedNames.length > 0);
   const scannedHashes = new Set(projectDirs.map((d) => d.pathHash));
-  await db.project.updateMany({
-    where: { pathHash: { notIn: [...scannedHashes] }, prunedAt: null },
-    data: { prunedAt: new Date() },
-  });
+  if (!isSelectiveScan) {
+    await db.project.updateMany({
+      where: { pathHash: { notIn: [...scannedHashes] }, prunedAt: null },
+      data: { prunedAt: new Date() },
+    });
+  }
   await db.project.updateMany({
     where: { pathHash: { in: [...scannedHashes] }, prunedAt: { not: null } },
     data: { prunedAt: null },
