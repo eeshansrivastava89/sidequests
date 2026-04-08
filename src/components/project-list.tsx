@@ -74,11 +74,14 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         gridCols
       )}>
         {hasSelection && (
-          <div className="flex items-center justify-center">
+          <div
+            className="flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); onSelectAll?.(); }}
+          >
             <input
               type="checkbox"
               checked={allSelected ?? false}
-              onChange={(e) => { e.stopPropagation(); onSelectAll?.(); }}
+              readOnly
               className="size-3.5 rounded border-border accent-foreground cursor-pointer"
               title="Select all / Deselect all"
             />
@@ -139,11 +142,14 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
           >
             {/* Checkbox */}
             {hasSelection && (
-              <div className="flex items-center justify-center">
+              <div
+                className="flex items-center justify-center"
+                onClick={(e) => { e.stopPropagation(); onToggleSelect(project.name); }}
+              >
                 <input
                   type="checkbox"
                   checked={selectedNames.has(project.name)}
-                  onChange={(e) => { e.stopPropagation(); onToggleSelect(project.name); }}
+                  readOnly
                   className="size-3.5 rounded border-border accent-foreground cursor-pointer"
                 />
               </div>
