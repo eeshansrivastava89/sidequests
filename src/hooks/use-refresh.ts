@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface RefreshEvent {
   type: string;
   name?: string;
+  pathHash?: string;
   index?: number;
   total?: number;
   step?: string;
@@ -82,9 +83,11 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       // Pre-populate all projects as "pending" so the activity log shows the full list
       const projects = new Map(state.projects);
       const names: string[] = d.names ?? [];
-      for (const name of names) {
-        if (!projects.has(name)) {
-          projects.set(name, { name, storeStatus: "pending", llmStatus: "pending" });
+      const pathHashes: string[] = d.pathHashes ?? [];
+      for (let i = 0; i < names.length; i++) {
+        const key = pathHashes[i] ?? names[i];
+        if (!projects.has(key)) {
+          projects.set(key, { name: names[i], storeStatus: "pending", llmStatus: "pending" });
         }
       }
       return { ...state, projects, phase: `Found ${d.projectCount} projects. Scanning...` };
@@ -92,24 +95,25 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
     case "project_start": {
       const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
-      const existing = projects.get(d.name!) ?? {
+      const key = d.pathHash ?? d.name!;
+      const existing = projects.get(key) ?? {
         name: d.name!,
         storeStatus: "pending" as const,
         llmStatus: "pending" as const,
       };
       if (d.step === "store") existing.storeStatus = "running";
       else if (d.step === "llm") existing.llmStatus = "running";
-      projects.set(d.name!, existing);
-      const providerTag = d.step === "llm" && d.provider ? ` [${d.provider}]` : "";
+      projects.set(key, existing);
       const phase = d.step === "llm"
         ? `${d.provider ?? "AI"}: enriching ${d.name} (${d.index! + 1}/${d.total})`
-        : `Scanning ${d.name} (${d.index! + 1}/${d.total})${providerTag}`;
+        : `Scanning ${d.name} (${d.index! + 1}/${d.total})`;
       return { ...state, projects, phase };
     }
     case "project_complete": {
       const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
-      const existing = projects.get(d.name!);
+      const key = d.pathHash ?? d.name!;
+      const existing = projects.get(key);
       if (existing) {
         if (d.step === "store") {
           existing.storeStatus = "done";
@@ -124,7 +128,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
           existing.llmDurationMs = (d.detail?.durationMs as number) ?? undefined;
           existing.provider = d.provider ?? undefined;
         }
-        projects.set(d.name!, existing);
+        projects.set(key, existing);
       }
       // Set deterministicReady on first project_complete(store)
       const deterministicReady = d.step === "store" ? true : state.deterministicReady;
@@ -133,11 +137,12 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
     case "project_error": {
       const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
-      const existing = projects.get(d.name!);
+      const key = d.pathHash ?? d.name!;
+      const existing = projects.get(key);
       if (existing) {
         existing.llmStatus = "error";
         existing.llmError = d.error;
-        projects.set(d.name!, existing);
+        projects.set(key, existing);
       }
       return { ...state, projects };
     }

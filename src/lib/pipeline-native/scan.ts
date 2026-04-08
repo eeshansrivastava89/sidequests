@@ -30,14 +30,29 @@ const LANGUAGE_INDICATORS: Record<string, string> = {
   "index.html": "HTML/CSS",
 };
 
-const SOURCE_EXTENSIONS = new Set([
+/** Extensions counted as source code. */
+const CODE_EXTENSIONS = new Set([
   ".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".go", ".rb", ".java", ".kt",
-  ".ex", ".exs", ".swift", ".php", ".c", ".cpp", ".h", ".md",
+  ".ex", ".exs", ".swift", ".php", ".c", ".cpp", ".h",
 ]);
+
+/** Extensions counted as documentation. */
+const DOC_EXTENSIONS = new Set([".md", ".mdx", ".rst", ".txt", ".adoc"]);
+
+/** All extensions we walk for LOC / TODO / FIXME. */
+const SOURCE_EXTENSIONS = new Set([...CODE_EXTENSIONS, ...DOC_EXTENSIONS]);
 
 const SKIP_WALK_DIRS = new Set([
   "node_modules", ".venv", ".git", "__pycache__", "dist", "build",
   ".next", "target", ".tox", "venv", "env",
+]);
+
+/** Directories whose contents are generated code (not hand-written). */
+const GENERATED_DIRS = new Set([
+  "generated", ".generated", "__generated__",
+  ".prisma", "prisma/client",
+  ".graphql", "__graphql__",
+  ".openapi", "swagger-codegen",
 ]);
 
 const SERVICE_DEPS: Record<string, string> = {
@@ -302,12 +317,19 @@ function checkDeployment(projectPath: string): Record<string, boolean> {
   };
 }
 
-function countTodos(projectPath: string): [number, number, number] {
+export interface LocBreakdown {
+  code: number;
+  docs: number;
+  generated: number;
+}
+
+function countTodos(projectPath: string): [number, number, number, LocBreakdown] {
   let todoCount = 0;
   let fixmeCount = 0;
   let locCount = 0;
+  const breakdown: LocBreakdown = { code: 0, docs: 0, generated: 0 };
 
-  function walk(dir: string) {
+  function walk(dir: string, inGenerated: boolean) {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -318,19 +340,26 @@ function countTodos(projectPath: string): [number, number, number] {
     for (const entry of entries) {
       if (entry.isDirectory()) {
         if (!SKIP_WALK_DIRS.has(entry.name)) {
-          walk(path.join(dir, entry.name));
+          const isGen = inGenerated || GENERATED_DIRS.has(entry.name);
+          walk(path.join(dir, entry.name), isGen);
         }
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name);
         if (!SOURCE_EXTENSIONS.has(ext)) continue;
+
+        // Classify: generated files (e.g. *.generated.ts) or by directory
+        const isGenFile = inGenerated || entry.name.includes(".generated.") || entry.name.includes(".g.");
+        const isDoc = DOC_EXTENSIONS.has(ext);
+
         try {
           const content = fs.readFileSync(path.join(dir, entry.name), "utf-8");
-          // Match Python iterator semantics: split on \n but don't count
-          // a trailing empty element from a final newline
           const lines = content.split("\n");
           const lineCount = lines.length > 0 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
           for (let li = 0; li < lineCount; li++) {
             locCount++;
+            if (isGenFile) breakdown.generated++;
+            else if (isDoc) breakdown.docs++;
+            else breakdown.code++;
             if (lines[li].includes("TODO")) todoCount++;
             if (lines[li].includes("FIXME")) fixmeCount++;
           }
@@ -341,8 +370,8 @@ function countTodos(projectPath: string): [number, number, number] {
     }
   }
 
-  walk(projectPath);
-  return [todoCount, fixmeCount, locCount];
+  walk(projectPath, false);
+  return [todoCount, fixmeCount, locCount, breakdown];
 }
 
 function getDescription(projectPath: string): string | null {
@@ -493,7 +522,7 @@ export function scanProject(absPath: string): Record<string, unknown> {
   const files = checkFiles(absPath);
   const cicd = checkCicd(absPath);
   const deployment = checkDeployment(absPath);
-  const [todoCount, fixmeCount, locEstimate] = countTodos(absPath);
+  const [todoCount, fixmeCount, locEstimate, locBreakdown] = countTodos(absPath);
   const description = getDescription(absPath);
   const framework = null; // Phase 61W: framework detection moved to LLM enrichment
 
@@ -528,6 +557,7 @@ export function scanProject(absPath: string): Record<string, unknown> {
     scripts,
     services,
     locEstimate,
+    locBreakdown,
     packageManager,
     license,
   };

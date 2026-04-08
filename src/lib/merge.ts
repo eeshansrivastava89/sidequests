@@ -14,6 +14,7 @@ import type { RawScan } from "./types";
 export interface MergedProject {
   id: string;
   name: string;
+  pathHash: string;
   pathDisplay: string;
 
   // Core fields (derived, overridable)
@@ -43,6 +44,9 @@ export interface MergedProject {
   branchName: string | null;
   lastCommitDate: string | null;
   locEstimate: number;
+  locCode: number;
+  locDocs: number;
+  locGenerated: number;
 
   // Raw scan data
   scan: RawScan | null;
@@ -134,6 +138,9 @@ export type ProjectWithRelations = Project & {
     branchName: string | null;
     lastCommitDate: Date | null;
     locEstimate: number;
+    locCode: number;
+    locDocs: number;
+    locGenerated: number;
   } | null;
   llm: {
     // New fields
@@ -241,6 +248,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   return {
     id: project.id,
     name: project.name,
+    pathHash: project.pathHash,
     pathDisplay: project.pathDisplay,
 
     status,
@@ -267,6 +275,9 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     branchName: derived?.branchName ?? rawScan?.branch ?? null,
     lastCommitDate: derived?.lastCommitDate?.toISOString() ?? rawScan?.lastCommitDate ?? null,
     locEstimate: derived?.locEstimate ?? rawScan?.locEstimate ?? 0,
+    locCode: derived?.locCode ?? 0,
+    locDocs: derived?.locDocs ?? 0,
+    locGenerated: derived?.locGenerated ?? 0,
 
     scan: rawScan,
 

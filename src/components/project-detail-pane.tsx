@@ -220,6 +220,10 @@ export function ProjectDetailPane({
   const framework = project.framework ?? project.primaryLanguage ?? null;
   const branchName = project.branchName ?? scan?.branch ?? null;
   const loc = project.locEstimate || null;
+  const locCode = project.locCode || 0;
+  const locDocs = project.locDocs || 0;
+  const locGenerated = project.locGenerated || 0;
+  const hasLocBreakdown = locCode > 0 || locDocs > 0 || locGenerated > 0;
   const services = project.services.length > 0 ? project.services : null;
   const timeline = buildTimeline(project.recentCommits, activities);
   const hasGitHub = project.repoVisibility !== "not-on-github";
@@ -569,8 +573,14 @@ export function ProjectDetailPane({
                 </div>
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">LOC</div>
-                <div className="text-sm font-mono">{loc != null ? loc.toLocaleString() : "\u2014"}</div>
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Code LOC</div>
+                <div className="text-sm font-mono">{hasLocBreakdown ? locCode.toLocaleString() : (loc != null ? loc.toLocaleString() : "\u2014")}</div>
+                {hasLocBreakdown && (locDocs > 0 || locGenerated > 0) && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5 space-x-2">
+                    {locDocs > 0 && <span>Docs: {locDocs.toLocaleString()}</span>}
+                    {locGenerated > 0 && <span>Gen: {locGenerated.toLocaleString()}</span>}
+                  </div>
+                )}
               </div>
               <div>
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Commits</div>

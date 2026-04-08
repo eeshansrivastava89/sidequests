@@ -283,7 +283,11 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
     for (let i = 0; i < tsOutput.projects.length; i++) {
       const tsProject = tsOutput.projects.find((p) => p.name === pyOutput.projects[i].name)!;
       const pyProject = pyOutput.projects[i];
-      expect(Object.keys(tsProject).sort()).toEqual(Object.keys(pyProject).sort());
+      // TS scanner has additional keys not in Python scanner (e.g. locBreakdown)
+      const tsKeys = Object.keys(tsProject).sort();
+      const pyKeys = Object.keys(pyProject).sort();
+      const tsOnly = new Set(["locBreakdown"]); // TS-only fields
+      expect(tsKeys.filter(k => !tsOnly.has(k))).toEqual(pyKeys);
     }
   });
 

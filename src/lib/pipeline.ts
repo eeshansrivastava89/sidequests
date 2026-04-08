@@ -57,10 +57,10 @@ export function validateDeriveOutput(data: unknown): { derivedAt: string; projec
 
 /** Events emitted during the refresh pipeline. */
 export type PipelineEvent =
-  | { type: "enumerate_complete"; projectCount: number; names: string[]; provider?: string }
-  | { type: "project_start"; name: string; index: number; total: number; step: "store" | "llm"; provider?: string }
-  | { type: "project_complete"; name: string; step: "store" | "llm"; detail?: Record<string, unknown>; lastCommitDate?: string | null; provider?: string }
-  | { type: "project_error"; name: string; step: string; error: string; provider?: string }
+  | { type: "enumerate_complete"; projectCount: number; names: string[]; pathHashes?: string[]; provider?: string }
+  | { type: "project_start"; name: string; pathHash: string; index: number; total: number; step: "store" | "llm"; provider?: string }
+  | { type: "project_complete"; name: string; pathHash: string; step: "store" | "llm"; detail?: Record<string, unknown>; lastCommitDate?: string | null; provider?: string }
+  | { type: "project_error"; name: string; pathHash: string; step: string; error: string; provider?: string }
   | { type: "done"; projectCount: number; llmSucceeded: number; llmFailed: number; llmFailedNames: string[]; llmSkipped: number; durationMs: number; provider?: string };
 
 function hashRawJson(rawJson: string): string {
@@ -106,7 +106,7 @@ export async function runRefreshPipeline(
     return new Date(bDate).getTime() - new Date(aDate).getTime();
   });
 
-  emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name) });
+  emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name), pathHashes: projectDirs.map((d) => d.pathHash) });
 
   // 2. Soft-prune missing projects and restore returning ones
   //    Skip when doing a selective scan — we don't want to prune
@@ -167,7 +167,7 @@ export async function runRefreshPipeline(
     const dir = projectDirs[i];
     const name = dir.name;
 
-    emit({ type: "project_start", name, index: i, total, step: "store" });
+    emit({ type: "project_start", name, pathHash: dir.pathHash, index: i, total, step: "store" });
 
     // 3a. Scan
     const scanned = scanProject(dir.absPath);
@@ -224,6 +224,10 @@ export async function runRefreshPipeline(
       const branchName = (scanned.branch as string) ?? null;
       const lastCommitDate = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
       const locEstimate = (scanned.locEstimate as number) ?? 0;
+      const locBk = (scanned.locBreakdown as { code?: number; docs?: number; generated?: number }) ?? {};
+      const locCode = locBk.code ?? 0;
+      const locDocs = locBk.docs ?? 0;
+      const locGenerated = locBk.generated ?? 0;
 
       await db.derived.upsert({
         where: { projectId: project.id },
@@ -243,6 +247,9 @@ export async function runRefreshPipeline(
           branchName,
           lastCommitDate,
           locEstimate,
+          locCode,
+          locDocs,
+          locGenerated,
         },
         update: {
           statusAuto: derived.statusAuto,
@@ -259,6 +266,9 @@ export async function runRefreshPipeline(
           branchName,
           lastCommitDate,
           locEstimate,
+          locCode,
+          locDocs,
+          locGenerated,
         },
       });
     }
@@ -310,6 +320,7 @@ export async function runRefreshPipeline(
     emit({
       type: "project_complete",
       name,
+      pathHash: dir.pathHash,
       step: "store",
       detail: { status: derived?.statusAuto, healthScore: derived?.healthScoreAuto },
       lastCommitDate: lastCommitDateStr,
@@ -349,7 +360,7 @@ export async function runRefreshPipeline(
     const pd = projectDataList[i];
 
     if (llmProvider && pd.derived) {
-      emit({ type: "project_start", name: pd.name, index: i, total, step: "llm", provider: providerName ?? undefined });
+      emit({ type: "project_start", name: pd.name, pathHash: pd.dir.pathHash, index: i, total, step: "llm", provider: providerName ?? undefined });
       const llmStartTime = Date.now();
       if (process.env.NODE_ENV !== "test") {
         console.log(`[pipeline] [${providerName}] ${pd.name} (${i + 1}/${total}) — enriching...`);
@@ -414,6 +425,7 @@ export async function runRefreshPipeline(
         emit({
           type: "project_complete",
           name: pd.name,
+          pathHash: pd.dir.pathHash,
           step: "llm",
           detail: { summary: enrichment.summary, durationMs: llmDurationMs },
           provider: providerName ?? undefined,
@@ -433,7 +445,7 @@ export async function runRefreshPipeline(
           create: { projectId: pd.projectId, llmError: message },
           update: { llmError: message },
         });
-        emit({ type: "project_error", name: pd.name, step: "llm", error: message, provider: providerName ?? undefined });
+        emit({ type: "project_error", name: pd.name, pathHash: pd.dir.pathHash, step: "llm", error: message, provider: providerName ?? undefined });
 
         projectLog.push({ projectId: pd.projectId, name: pd.name, derived: { statusAuto: pd.derived.statusAuto, healthScoreAuto: pd.derived.healthScoreAuto }, llmResult: "failed" });
       }

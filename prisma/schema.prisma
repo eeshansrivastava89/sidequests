@@ -54,6 +54,9 @@ model Derived {
   branchName         String?
   lastCommitDate     DateTime?
   locEstimate        Int       @default(0)
+  locCode            Int       @default(0)
+  locDocs            Int       @default(0)
+  locGenerated       Int       @default(0)
 }
 
 model Llm {

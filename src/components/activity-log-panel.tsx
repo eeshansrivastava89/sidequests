@@ -220,14 +220,15 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
           </div>
         ) : (
           <div className="py-1">
-            {projectNames.map((name) => {
-              const prog = progressMap.get(name);
+            {projectNames.map((key) => {
+              const prog = progressMap.get(key);
+              const displayName = prog?.name ?? key;
               const status = deriveStatus(prog, refreshDone);
               const isActive = status === "ai-scanning" || status === "scanning";
 
               return (
                 <div
-                  key={name}
+                  key={key}
                   className={cn(
                     "flex items-center gap-2.5 px-4 py-1.5 text-xs transition-colors",
                     isActive && "bg-muted/40"
@@ -239,9 +240,9 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
                       "flex-1 truncate",
                       status === "pending" ? "text-muted-foreground" : "text-foreground font-medium"
                     )}
-                    title={name}
+                    title={displayName}
                   >
-                    {name}
+                    {displayName}
                   </span>
                   <span
                     className={cn(

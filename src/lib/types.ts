@@ -7,6 +7,7 @@ export interface Insight {
 export interface Project {
   id: string;
   name: string;
+  pathHash: string;
   pathDisplay: string;
   status: string;
   healthScore: number;
@@ -33,6 +34,9 @@ export interface Project {
   branchName: string | null;
   lastCommitDate: string | null;
   locEstimate: number;
+  locCode: number;
+  locDocs: number;
+  locGenerated: number;
 
   scan: RawScan | null;
 

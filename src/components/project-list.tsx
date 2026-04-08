@@ -49,7 +49,7 @@ function VisibilityIcon({ visibility }: { visibility: string }) {
 }
 
 function getRowShimmerClass(project: Project, refreshProgress?: Map<string, ProjectProgress>): string {
-  const prog = refreshProgress?.get(project.name);
+  const prog = refreshProgress?.get(project.pathHash);
   if (!prog) return "";
   if (prog.llmStatus === "running") return "row-enriching";
   if (prog.storeStatus === "running") return "row-scanning";
@@ -103,7 +103,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         const rawPath = project.pathDisplay;
         const hasGitHub = project.repoVisibility !== "not-on-github";
         const ownerRepo = hasGitHub ? parseGitHubOwnerRepo(project.scan?.remoteUrl) : null;
-        const prog = refreshProgress?.get(project.name);
+        const prog = refreshProgress?.get(project.pathHash);
         const shimmerClass = getRowShimmerClass(project, refreshProgress);
         const lastActive = project.lastTouchedAt ?? project.scan?.lastCommitDate ?? "";
         const scanDelay = shimmerClass === "row-scan-complete" && prog?.storeOrder != null
