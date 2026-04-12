@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.3.21
+
+- **Fix `--muted` surface token** — `tokens.css` defines `--muted` as a mid-weight text tone; shadcn/Tailwind expect it to be a subtle background. Added `--muted: #ede6de` (light) / `--muted: #2e261f` (dark) overrides in `globals.css`, restoring correct tab strip, row hover, panel header, and inline-code backgrounds (26 `bg-muted` usages were broken)
+- **Fix `--radius-sm`/`--radius-lg` name collision** — `tokens.css` defines these at 8px/14px in `:root`, conflicting with Tailwind's `@theme inline` values. Re-asserted the full Tailwind radius scale explicitly in `:root` so `rounded-sm`/`rounded-lg` always resolve to the correct derived values
+- **Replace Catppuccin hardcodes in scan animations** — `globals.css` shimmer/scan/progress bar animations now use `var(--blue)`, `var(--green)`, `var(--red)`, `var(--primary)` from `tokens.css`, with `color-mix()` for opacity gradients; no more Catppuccin hex values in animation code
+- **Fix stats bar accent colors** — replaced hardcoded `#fab387`/`#f38ba8` Catppuccin hex values in `stats-bar.tsx` with `text-amber-500 dark:text-amber-400` and `text-red-500 dark:text-red-400`
+- **Fix dark mode FOUC** — added anti-FOUC inline script to `layout.tsx` that reads `localStorage` and sets `data-theme` synchronously before first paint; added `suppressHydrationWarning` to `<html>`; dark-mode users no longer see a flash of the light theme on load
+
 ## v0.3.14
 
 - Restore concurrent AI scan with a new Settings slider for `llmConcurrency` (2-5)
