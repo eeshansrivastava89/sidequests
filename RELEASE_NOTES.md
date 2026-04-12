@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.3.22
+
+- **Fix database migration regression (critical)** — `bootstrap-db.mjs` was missing `locCode`, `locDocs`, and `locGenerated` columns added to the `Derived` table in v0.3.13. Both the `SCHEMA_SQL` initial-creation block and the `MIGRATIONS` additive-alter array were incomplete, causing `prisma.derived.upsert()` to fail with "column does not exist" for all users — new installs and existing databases alike. Columns are now added on next launch for all existing databases. Updated schema parity test to cover the three columns.
+
 ## v0.3.21
 
 - **Fix `--muted` surface token** — `tokens.css` defines `--muted` as a mid-weight text tone; shadcn/Tailwind expect it to be a subtle background. Added `--muted: #ede6de` (light) / `--muted: #2e261f` (dark) overrides in `globals.css`, restoring correct tab strip, row hover, panel header, and inline-code backgrounds (26 `bg-muted` usages were broken)
