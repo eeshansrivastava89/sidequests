@@ -55,6 +55,9 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     branchName: "TEXT",
     lastCommitDate: "TEXT",
     locEstimate: "INTEGER",
+    locCode: "INTEGER",
+    locDocs: "INTEGER",
+    locGenerated: "INTEGER",
   },
   Llm: {
     id: "TEXT",

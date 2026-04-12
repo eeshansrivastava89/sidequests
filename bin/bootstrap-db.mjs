@@ -52,6 +52,9 @@ const SCHEMA_SQL = [
     "branchName"         TEXT,
     "lastCommitDate"     TEXT,
     "locEstimate"        INTEGER NOT NULL DEFAULT 0,
+    "locCode"            INTEGER NOT NULL DEFAULT 0,
+    "locDocs"            INTEGER NOT NULL DEFAULT 0,
+    "locGenerated"       INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "Derived_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Derived_projectId_key" ON "Derived"("projectId")`,
@@ -153,6 +156,10 @@ const MIGRATIONS = [
   `ALTER TABLE "Llm" ADD COLUMN "llmError" TEXT`,
   // Dirty file count for uncommitted badge
   `ALTER TABLE "Derived" ADD COLUMN "dirtyFileCount" INTEGER NOT NULL DEFAULT 0`,
+  // v0.3.13: LOC breakdown (locCode/locDocs/locGenerated)
+  `ALTER TABLE "Derived" ADD COLUMN "locCode" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "Derived" ADD COLUMN "locDocs" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "Derived" ADD COLUMN "locGenerated" INTEGER NOT NULL DEFAULT 0`,
 ];
 
 /**
