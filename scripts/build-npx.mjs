@@ -91,4 +91,22 @@ if (existsSync(serverJs)) {
 
 chmodSync("bin/cli.mjs", 0o755);
 
+// 6. Validate: every @prisma/client-* hash referenced by server chunks must exist
+const chunksDir = ".next/standalone/.next/server/chunks";
+const hashPattern = /@prisma\/client-[a-f0-9]+/g;
+const requiredHashes = new Set();
+for (const f of readdirSync(chunksDir)) {
+  if (!f.endsWith(".js")) continue;
+  for (const m of readFileSync(join(chunksDir, f), "utf-8").matchAll(hashPattern)) {
+    requiredHashes.add(m[0]);
+  }
+}
+for (const ref of requiredHashes) {
+  const dest = join(standaloneRoot, "node_modules", ref);
+  if (!existsSync(dest)) {
+    console.error(`✗ Missing ${ref} in standalone node_modules`);
+    process.exit(1);
+  }
+}
+
 console.log("✓ NPX bundle built successfully");
