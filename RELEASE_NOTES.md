@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.3.23
+
+- **Fix project row background contrast** — rows now use `bg-card` (white) as their base background instead of inheriting the warm cream page background, matching the table header and giving the list proper contrast against the page
+
 ## v0.3.22
 
 - **Fix database migration regression (critical)** — `bootstrap-db.mjs` was missing `locCode`, `locDocs`, and `locGenerated` columns added to the `Derived` table in v0.3.13. Both the `SCHEMA_SQL` initial-creation block and the `MIGRATIONS` additive-alter array were incomplete, causing `prisma.derived.upsert()` to fail with "column does not exist" for all users — new installs and existing databases alike. Columns are now added on next launch for all existing databases. Updated schema parity test to cover the three columns.

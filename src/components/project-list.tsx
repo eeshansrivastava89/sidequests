@@ -135,7 +135,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
               gridCols,
               isSelected
                 ? "bg-accent"
-                : "hover:bg-muted/50",
+                : "bg-card hover:bg-muted/50",
               project.status === "archived" && "opacity-50",
               shimmerClass
             )}
