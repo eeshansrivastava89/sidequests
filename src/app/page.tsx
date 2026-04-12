@@ -190,9 +190,9 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
-  // Apply dark class to <html>
+  // Apply data-theme attribute to <html>
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
