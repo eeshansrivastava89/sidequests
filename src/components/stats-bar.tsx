@@ -12,12 +12,12 @@ interface StatsBarProps {
   onClearAll?: () => void;
 }
 
-/* Catppuccin-aligned accent colors per card type */
+/* Accent colors using coffee palette tokens */
 const ACCENT_CLASSES: Record<string, string> = {
-  uncommitted: "text-[#fab387] dark:text-[#fab387]",     // peach
-  "open-issues": "text-[#fab387] dark:text-[#fab387]",   // peach
-  "ci-failing": "text-[#f38ba8] dark:text-[#f38ba8]",    // red
-  "not-on-github": "text-muted-foreground",               // grey/muted
+  uncommitted: "text-amber-500 dark:text-amber-400",
+  "open-issues": "text-amber-500 dark:text-amber-400",
+  "ci-failing": "text-red-500 dark:text-red-400",
+  "not-on-github": "text-muted-foreground",
 };
 
 export function StatsBar({ projects, activeFilter, onFilter, onClearAll }: StatsBarProps) {
