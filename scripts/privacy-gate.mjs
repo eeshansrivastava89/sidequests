@@ -10,7 +10,8 @@
  */
 
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 
 const RED = "\x1b[31m";
 const GREEN = "\x1b[32m";
@@ -171,6 +172,64 @@ if (fsExists(serverJsPath)) {
   }
 } else {
   pass("server.js not present (no standalone build)");
+}
+
+// ── 5. Tarball content secret scan ──────────────────────────────────
+
+console.log("\n=== Tarball Content Secret Scan ===\n");
+
+const SECRET_PATTERNS = [
+  { name: "OpenRouter API key", pattern: /sk-or-v1-[a-zA-Z0-9]+/ },
+  { name: "Anthropic API key", pattern: /sk-ant-api[0-9]+-[a-zA-Z0-9_-]+/ },
+  { name: "OpenAI API key", pattern: /sk-proj-[a-zA-Z0-9_-]{20,}/ },
+];
+
+const walkFiles = (dir) => {
+  const results = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) results.push(...walkFiles(full));
+    else results.push(full);
+  }
+  return results;
+};
+
+let _tarball = null;
+let _tmpDir = null;
+try {
+  const packJson = JSON.parse(execSync("npm pack --json 2>/dev/null", { encoding: "utf-8" }));
+  _tarball = packJson[0].filename;
+  _tmpDir = mkdtempSync(join(os.tmpdir(), "sq-scan-"));
+  execSync(`tar -C "${_tmpDir}" -xzf "${_tarball}"`, { encoding: "utf-8" });
+
+  const allFiles = walkFiles(_tmpDir);
+  let secretsFound = false;
+
+  for (const file of allFiles) {
+    let content;
+    try {
+      content = readFileSync(file, "utf-8");
+    } catch {
+      continue; // binary file — skip
+    }
+    for (const { name: secretName, pattern } of SECRET_PATTERNS) {
+      if (pattern.test(content)) {
+        const rel = file.slice(_tmpDir.length + 1);
+        fail(`Secret found in tarball (${secretName}) in: ${rel}`);
+        secretsFound = true;
+      }
+    }
+  }
+
+  if (!secretsFound) {
+    pass("No secrets found in tarball contents");
+  }
+} catch (e) {
+  console.warn("⚠ Could not run tarball content secret scan:", e.message);
+  warnings++;
+} finally {
+  if (_tarball) rmSync(_tarball, { force: true });
+  if (_tmpDir) rmSync(_tmpDir, { recursive: true, force: true });
 }
 
 // ── Summary ─────────────────────────────────────────────────────────
