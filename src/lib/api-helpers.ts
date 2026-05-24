@@ -1,83 +1,19 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 /* ------------------------------------------------------------------ */
-/*  Error wrapper                                                      */
-/* ------------------------------------------------------------------ */
-
-/** Format an unknown error into a consistent message string. */
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** Detect SQLite "no such table" errors from Prisma/LibSQL. */
-function isMissingTableError(error: unknown): boolean {
-  const msg = errorMessage(error);
-  return msg.includes("no such table") || msg.includes("SQLITE_ERROR");
-}
-
-/** Return a standard `{ ok: false, error }` 500 response. */
-export function errorResponse(error: unknown, status = 500) {
-  return NextResponse.json(
-    { ok: false, error: errorMessage(error) },
-    { status },
-  );
-}
-
-/**
- * Wrap an async route handler with standard error handling.
- * Catches any thrown error and returns `{ ok: false, error }` with 500.
- * When `missingTableFallback` is provided, missing DB tables return that
- * response (200) instead of an error — used for routes that should degrade
- * gracefully on first run before any scan has populated the database.
- */
-export function withErrorHandler<Args extends unknown[]>(
-  handler: (...args: Args) => Promise<NextResponse>,
-  options?: { missingTableFallback?: () => NextResponse },
-) {
-  return async (...args: Args): Promise<NextResponse> => {
-    try {
-      return await handler(...args);
-    } catch (error) {
-      if (isMissingTableError(error)) {
-        if (options?.missingTableFallback) {
-          return options.missingTableFallback();
-        }
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Database tables not found. Run `npm run setup` to initialize the database, then restart the dev server.",
-          },
-          { status: 503 },
-        );
-      }
-      return errorResponse(error);
-    }
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/*  Find-or-404                                                        */
+/*  Find-or-404 (framework-agnostic)                                   */
 /* ------------------------------------------------------------------ */
 
 /**
  * Find a project by id or return null.
- * Callers should check for null and return `notFound()`.
+ * Callers handle the null case with their framework's response type.
  */
 export async function findProject(id: string) {
   return db.project.findUnique({ where: { id } });
 }
 
-/** Standard 404 response for missing projects. */
-export function notFound() {
-  return NextResponse.json(
-    { ok: false, error: "Project not found" },
-    { status: 404 },
-  );
-}
-
 /* ------------------------------------------------------------------ */
-/*  PATCH field coercion                                               */
+/*  PATCH field coercion (framework-agnostic)                          */
 /* ------------------------------------------------------------------ */
 
 interface FieldSpec {
@@ -103,13 +39,16 @@ function coerceField(
 
 /**
  * Parse and coerce a PATCH body against an allowed-fields spec.
- * Returns `{ data }` on success, or `{ error: NextResponse }` on failure.
+ * Returns `{ data }` on success, or `{ error: string, status: number }` on failure.
+ *
+ * Framework-specific callers should convert the error into their response type.
  */
 export function coercePatchBody(
   body: Record<string, unknown>,
   spec: FieldSpec,
-): { data: Record<string, string | null>; error?: never }
-  | { data?: never; error: NextResponse } {
+):
+  | { data: Record<string, string | null>; error?: never }
+  | { data?: never; error: string; status: number } {
   const allowedFields = [...spec.stringFields, ...spec.jsonFields];
   const data: Record<string, string | null> = {};
 
@@ -119,10 +58,8 @@ export function coercePatchBody(
         data[field] = coerceField(field, body[field], spec.jsonFields);
       } catch (e) {
         return {
-          error: NextResponse.json(
-            { ok: false, error: (e as Error).message },
-            { status: 400 },
-          ),
+          error: (e as Error).message,
+          status: 400,
         };
       }
     }
@@ -130,10 +67,8 @@ export function coercePatchBody(
 
   if (Object.keys(data).length === 0) {
     return {
-      error: NextResponse.json(
-        { ok: false, error: `No valid fields. Allowed: ${allowedFields.join(", ")}` },
-        { status: 400 },
-      ),
+      error: `No valid fields. Allowed: ${allowedFields.join(", ")}`,
+      status: 400,
     };
   }
 
@@ -152,4 +87,19 @@ export function safeJsonParse<T>(json: string | null | undefined, fallback: T): 
   } catch {
     return fallback;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Error detection (framework-agnostic)                                */
+/* ------------------------------------------------------------------ */
+
+/** Format an unknown error into a consistent message string. */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Detect SQLite "no such table" errors from Prisma/LibSQL. */
+export function isMissingTableError(error: unknown): boolean {
+  const msg = errorMessage(error);
+  return msg.includes("no such table") || msg.includes("SQLITE_ERROR");
 }

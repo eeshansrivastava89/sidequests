@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({ db: {} }));
 
-import { coercePatchBody, safeJsonParse, withErrorHandler } from "@/lib/api-helpers";
+import { coercePatchBody, safeJsonParse } from "@/lib/api-helpers";
+import { withErrorHandler } from "@/lib/next-api-helpers";
 import { NextResponse } from "next/server";
 
 const OVERRIDE_SPEC = {
@@ -32,15 +33,21 @@ describe("coercePatchBody", () => {
     expect(result.data).toEqual({ tagsOverride: '["a"]' });
   });
 
-  it("returns 400 on wrong type for string field", () => {
+  it("returns error on wrong type for string field", () => {
     const result = coercePatchBody({ statusOverride: 123 }, OVERRIDE_SPEC);
     expect(result.error).toBeDefined();
     expect(result.data).toBeUndefined();
+    if (result.error) {
+      expect(result.status).toBe(400);
+    }
   });
 
-  it("returns 400 on empty body", () => {
+  it("returns error on empty body", () => {
     const result = coercePatchBody({}, OVERRIDE_SPEC);
     expect(result.error).toBeDefined();
+    if (result.error) {
+      expect(result.status).toBe(400);
+    }
   });
 
   it("ignores unknown fields", () => {

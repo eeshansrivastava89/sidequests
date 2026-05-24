@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { mergeAllProjects } from "@/lib/merge";
 import { db } from "@/lib/db";
-import { withErrorHandler } from "@/lib/api-helpers";
+import { withErrorHandler } from "@/lib/next-api-helpers";
 
 export const GET = withErrorHandler(
   async (): Promise<NextResponse> => {

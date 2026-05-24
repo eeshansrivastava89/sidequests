@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { withErrorHandler, findProject, notFound, safeJsonParse } from "@/lib/api-helpers";
+import { withErrorHandler, notFound } from "@/lib/next-api-helpers";
+import { findProject, safeJsonParse } from "@/lib/api-helpers";
 
 export const GET = withErrorHandler(async (
   _request: NextRequest,

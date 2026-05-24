@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { withErrorHandler, findProject, notFound } from "@/lib/api-helpers";
+import { withErrorHandler, notFound } from "@/lib/next-api-helpers";
+import { findProject } from "@/lib/api-helpers";
 
 export const PATCH = withErrorHandler(async (
   _request: NextRequest,

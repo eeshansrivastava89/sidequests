@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mergeProjectView } from "@/lib/merge";
-import { withErrorHandler } from "@/lib/api-helpers";
+import { withErrorHandler } from "@/lib/next-api-helpers";
 
 export const GET = withErrorHandler(async (
   _request: Request,

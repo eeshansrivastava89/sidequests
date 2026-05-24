@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sidequests — Minimal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <style>
+    :root,[data-theme="light"]{--background:#f5f3f0;--foreground:#3c3226;--card:#fff;--primary:#5c3d2e;--primary-foreground:#f5f3f0;--secondary:#ede6de;--muted-foreground:#6b5e50;--border:#d9d2c9;--green:#16a34a;--blue:#1a5bdb;--red:#d20f39;--amber:#d97706;--shadow:0 1px 3px rgba(60,50,38,.06),0 4px 12px rgba(60,50,38,.04)}
+    [data-theme="dark"]{--background:#1c1816;--foreground:#e0d6cc;--card:#2a2420;--primary:#c9a882;--primary-foreground:#1c1816;--secondary:#2e261f;--muted-foreground:#b0a596;--border:#3d342c;--green:#16a34a;--blue:#89b4fa;--red:#f38ba8;--amber:#f59e0b;--shadow:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2)}
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{font-size:15px}
+    body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--background);color:var(--foreground);min-height:100vh;line-height:1.5}
+
+    /* NAV */
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:48px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:100}
+    .nav-left{display:flex;align-items:center;gap:16px}
+    .nav-logo{font-family:'Fraunces',serif;font-weight:700;font-size:1.1rem;color:var(--primary)}
+    .nav-logo span{color:var(--muted-foreground);font-weight:400;font-size:.95rem}
+    .nav-tabs{display:flex;gap:2px;background:var(--secondary);border-radius:8px;padding:3px}
+    .nav-tabs button{font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;padding:5px 14px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--muted-foreground);transition:all .15s}
+    .nav-tabs button.active{background:var(--card);color:var(--foreground);box-shadow:var(--shadow)}
+    .nav-tabs button:hover:not(.active){color:var(--foreground)}
+    .nav-right{display:flex;align-items:center;gap:10px}
+    .nav-stat{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted-foreground)}
+    .nav-stat strong{color:var(--green);font-weight:600}
+    .nav-btn{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--muted-foreground);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;transition:all .12s;position:relative}
+    .nav-btn:hover{background:var(--secondary);color:var(--foreground)}
+    .nav-dot{position:absolute;top:3px;right:3px;width:6px;height:6px;background:var(--red);border-radius:50%}
+    .nav-scan{font-size:.78rem;font-weight:600;padding:5px 12px;border-radius:7px;border:none;background:var(--primary);color:var(--primary-foreground);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .12s}
+    .nav-scan:hover{filter:brightness(1.1)}
+
+    /* MAIN */
+    .main{max-width:680px;margin:0 auto;padding:20px 20px 60px}
+
+    /* SCAN TIME */
+    .scan-time{text-align:center;font-size:.7rem;color:var(--muted-foreground);margin-bottom:20px}
+    .scan-time strong{color:var(--primary)}
+
+    /* DELTA */
+    .delta{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px}
+    .delta-label{font-size:.72rem;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+    .delta-item{font-size:.82rem;color:var(--foreground);line-height:1.7;display:flex;align-items:flex-start;gap:8px}
+    .delta-icon{flex-shrink:0;width:18px;text-align:center}
+    .delta-icon.up{color:var(--green)} .delta-icon.down{color:var(--amber)} .delta-icon.fail{color:var(--red)} .delta-icon.ok{color:var(--green)}
+    .delta-detail{color:var(--muted-foreground);font-size:.76rem}
+
+    /* ACTION CARDS */
+    .action-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer;transition:all .15s}
+    .action-card:hover{border-color:var(--primary);box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px)}
+    .action-card.urgent{border-left:3px solid var(--red)}
+    .action-card.warning{border-left:3px solid var(--amber)}
+    .action-card.focus{border-left:3px solid var(--blue)}
+    .action-card.stale{border-left:3px solid var(--muted-foreground)}
+    .action-top{display:flex;align-items:flex-start;gap:10px}
+    .action-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;margin-top:1px}
+    .action-icon.urgent{background:rgba(243,139,168,.12)}
+    .action-icon.warning{background:rgba(245,158,11,.12)}
+    .action-icon.focus{background:rgba(137,180,250,.12)}
+    .action-icon.stale{background:rgba(176,165,150,.08)}
+    .action-body{flex:1;min-width:0}
+    .action-title{font-size:.9rem;font-weight:600;line-height:1.35}
+    .action-context{font-size:.78rem;color:var(--muted-foreground);margin-top:2px;line-height:1.4}
+    .action-meta{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+    .action-project{font-size:.68rem;font-weight:600;color:var(--primary);background:rgba(201,168,130,.1);padding:2px 7px;border-radius:4px}
+    .action-source{font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.02em}
+    .action-source.git{background:rgba(245,158,11,.1);color:var(--amber)}
+    .action-source.issue{background:rgba(22,163,74,.1);color:var(--green)}
+    .action-source.ai{background:rgba(137,180,250,.1);color:var(--blue)}
+    .action-source.stale-src{background:rgba(176,165,150,.1);color:var(--muted-foreground)}
+    .action-cmd{display:flex;align-items:center;gap:4px;margin-top:8px}
+    .action-cmd-code{font-family:'JetBrains Mono',monospace;font-size:.72rem;background:var(--secondary);border:1px solid var(--border);color:var(--foreground);padding:3px 8px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;cursor:pointer;transition:all .12s}
+    .action-cmd-code:hover{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+    .action-cmd-copy{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted-foreground);padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--card);cursor:pointer;transition:all .12s;white-space:nowrap}
+    .action-cmd-copy:hover{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+
+    /* SECTION DIVIDER */
+    .divider{display:flex;align-items:center;gap:12px;margin:28px 0 16px}
+    .divider-line{flex:1;height:1px;background:var(--border)}
+    .divider-label{font-size:.7rem;font-weight:600;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+    .divider-toggle{font-size:.68rem;color:var(--primary);cursor:pointer;font-weight:500}
+    .divider-toggle:hover{text-decoration:underline}
+
+    /* PROJECT LIST */
+    .project-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:all .1s}
+    .project-row:last-child{border-bottom:none}
+    .project-row:hover{background:var(--card);margin:0 -8px;padding:8px 8px;border-radius:6px}
+    .project-row.stale{opacity:.4}
+    .status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+    .status-dot.building{background:var(--blue)}.status-dot.shipping{background:var(--green)}.status-dot.maintaining{background:var(--amber)}.status-dot.completed{background:#8b7355}.status-dot.stale,.status-dot.idea{background:var(--muted-foreground)}.status-dot.blocked{background:var(--red)}
+    .proj-name{font-weight:600;font-size:.85rem;width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .proj-status{font-size:.68rem;font-weight:600;color:var(--primary);background:var(--secondary);padding:1px 6px;border-radius:4px;white-space:nowrap;width:70px;text-align:center}
+    .proj-next{font-size:.76rem;color:var(--muted-foreground);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .proj-meta{display:flex;gap:8px;flex-shrink:0}
+    .proj-meta-item{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted-foreground)}
+    .proj-meta-item.alert{color:var(--red)}
+    .proj-meta-item.warn{color:var(--amber)}
+    .sparkline{display:flex;align-items:flex-end;gap:1px;height:14px;flex-shrink:0}
+    .spark-bar{width:2px;border-radius:1px;background:var(--muted-foreground);opacity:.3}
+    .spark-bar:last-child{opacity:.8;background:var(--primary)}
+
+    /* EXPANDABLE SECTIONS */
+    .expandable{margin-top:24px}
+    .expandable-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border)}
+    .expandable-title{font-size:.78rem;font-weight:600;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.05em}
+    .expandable-arrow{font-size:.7rem;color:var(--muted-foreground);transition:transform .2s}
+    .expandable.open .expandable-arrow{transform:rotate(180deg)}
+    .expandable-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+    .expandable.open .expandable-body{max-height:600px}
+
+    /* FOCUS */
+    .focus-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+    .focus-item:last-child{border-bottom:none}
+    .focus-check{width:16px;height:16px;border-radius:4px;border:2px solid var(--border);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--card);font-size:.6rem;margin-top:1px;transition:all .12s}
+    .focus-check.done{background:var(--green);border-color:var(--green);color:white}
+    .focus-check:hover{border-color:var(--primary)}
+    .focus-project{font-weight:600;font-size:.82rem}
+    .focus-goal{font-size:.74rem;color:var(--muted-foreground)}
+    .focus-progress{font-size:.62rem;color:var(--green);font-weight:600}
+
+    /* SHIPPED */
+    .shipped-row{display:flex;gap:20px;padding:10px 0;align-items:center}
+    .shipped-item{text-align:center}
+    .shipped-val{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700}
+    .shipped-label{font-size:.62rem;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.04em}
+    .shipped-change{font-size:.62rem;font-weight:600}
+    .divider-section{margin-top:8px}
+
+    /* TOAST */
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 18px;box-shadow:0 12px 40px rgba(0,0,0,.3);font-size:.82rem;font-weight:500;z-index:300;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    .toast.visible{transform:translateX(-50%) translateY(0)}
+
+    /* MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .2s}
+    .modal-overlay.open{opacity:1;pointer-events:auto}
+    .modal-box{background:var(--card);border-radius:14px;border:1px solid var(--border);padding:22px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .modal-title{font-family:'Fraunces',serif;font-size:1.05rem;font-weight:700;margin-bottom:6px}
+    .modal-desc{font-size:.8rem;color:var(--muted-foreground);line-height:1.55;margin-bottom:14px}
+    .modal-stats{background:var(--secondary);border-radius:8px;padding:10px;margin-bottom:14px;font-size:.76rem}
+    .modal-stat{display:flex;justify-content:space-between;padding:2px 0}
+    .msl{color:var(--muted-foreground)}.msv{font-weight:600}
+    .modal-actions{display:flex;gap:8px}
+    .modal-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .12s;text-align:center}
+    .modal-btn.primary{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+    .modal-btn.danger{background:var(--red);color:white;border-color:var(--red)}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-left">
+      <div class="nav-logo">sidequests<span>.dev</span></div>
+      <div class="nav-tabs">
+        <button class="active" onclick="showView('whatnow')">What Now</button>
+        <button onclick="showView('projects')">Projects</button>
+      </div>
+    </div>
+    <div class="nav-right">
+      <span class="nav-icon">💡</span>
+      <span class="nav-stat"><strong>47</strong> commits this week</span>
+      <button class="nav-btn" onclick="toast('Opening notifications…')">🔔<div class="nav-dot"></div></button>
+      <button class="nav-btn" onclick="toggleTheme()">🌓</button>
+      <button class="nav-scan">⟳ Scan</button>
+    </div>
+  </nav>
+
+  <main class="main">
+    <!-- ═══════════════════════════════════════
+         VIEW: WHAT NOW
+         ═══════════════════════════════════════ -->
+    <div id="view-whatnow">
+      <div class="scan-time">Scanned <strong>12 minutes ago</strong></div>
+
+      <!-- Delta: What changed -->
+      <div class="delta">
+        <div class="delta-label">Since last visit · 2 days ago</div>
+        <div class="delta-item"><span class="delta-icon up">↑</span> <strong>datascienceapps</strong> — 5 new commits, 1 new issue <span class="delta-detail">(#12: Plotly dashboard)</span></div>
+        <div class="delta-item"><span class="delta-icon fail">✗</span> <strong>goalbot</strong> — CI still failing (was failing before)</div>
+        <div class="delta-item"><span class="delta-icon down">↓</span> <strong>weather-app</strong> — crossed 200 days inactive</div>
+        <div class="delta-item"><span class="delta-icon ok">✓</span> <strong>hermes-workspace</strong> — 4 new commits on feature branch</div>
+      </div>
+
+      <!-- Action cards -->
+      <div class="action-card urgent" onclick="toast('Navigating to goalbot…')">
+        <div class="action-top">
+          <div class="action-icon urgent">🔴</div>
+          <div class="action-body">
+            <div class="action-title">Fix failing CI in goalbot</div>
+            <div class="action-context">Pipeline red for 42 days. 38 unpushed commits at risk of loss.</div>
+            <div class="action-meta">
+              <span class="action-project">goalbot</span>
+              <span class="action-source git">git</span>
+              <span class="action-source git">ci</span>
+            </div>
+            <div class="action-cmd">
+              <div class="action-cmd-code" onclick="event.stopPropagation(); toast('Copied!')">cd ~/dev/goalbot && git push origin main</div>
+              <div class="action-cmd-copy" onclick="event.stopPropagation(); toast('Copied!')">Copy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card urgent" onclick="toast('Creating remote…')">
+        <div class="action-top">
+          <div class="action-icon urgent">🔴</div>
+          <div class="action-body">
+            <div class="action-title">Push code to remote — no repo configured</div>
+            <div class="action-context">opt-outs exists only locally. 17 uncommitted files could be lost.</div>
+            <div class="action-meta">
+              <span class="action-project">opt-outs</span>
+              <span class="action-source git">git</span>
+            </div>
+            <div class="action-cmd">
+              <div class="action-cmd-code" onclick="event.stopPropagation(); toast('Copied!')">cd ~/dev/opt-outs && gh repo create --private && git push -u origin main</div>
+              <div class="action-cmd-copy" onclick="event.stopPropagation(); toast('Copied!')">Copy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card urgent" onclick="toast('Pushing…')">
+        <div class="action-top">
+          <div class="action-icon urgent">🔴</div>
+          <div class="action-body">
+            <div class="action-title">Push 28 unpushed commits</div>
+            <div class="action-context">local-llm-bench has never pushed to remote. Data loss risk.</div>
+            <div class="action-meta">
+              <span class="action-project">local-llm-bench</span>
+              <span class="action-source git">git</span>
+            </div>
+            <div class="action-cmd">
+              <div class="action-cmd-code" onclick="event.stopPropagation(); toast('Copied!')">cd ~/dev/local-llm-bench && git push</div>
+              <div class="action-cmd-copy" onclick="event.stopPropagation(); toast('Copied!')">Copy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card warning" onclick="toast('Opening issue…')">
+        <div class="action-top">
+          <div class="action-icon warning">🟡</div>
+          <div class="action-body">
+            <div class="action-title">Add tests for Substack feed integration</div>
+            <div class="action-context">4 consecutive fix commits suggest fragile code. 5 issues open on roadmap.</div>
+            <div class="action-meta">
+              <span class="action-project">datascienceapps</span>
+              <span class="action-source ai">ai suggested</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card warning" onclick="toast('Opening issue #12…')">
+        <div class="action-top">
+          <div class="action-icon warning">🟡</div>
+          <div class="action-body">
+            <div class="action-title">Add Plotly chart component for dashboard</div>
+            <div class="action-context">Feature request, 2 days old. Open issue on datascienceapps.</div>
+            <div class="action-meta">
+              <span class="action-project">datascienceapps</span>
+              <span class="action-source issue">issue #12</span>
+            </div>
+            <div class="action-cmd">
+              <div class="action-cmd-code" onclick="event.stopPropagation(); toast('Copied!')">gh issue checkout 12 --repo eeshansrivastava89/datascienceapps</div>
+              <div class="action-cmd-copy" onclick="event.stopPropagation(); toast('Copied!')">Copy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card warning" onclick="toast('Opening triage…')">
+        <div class="action-top">
+          <div class="action-icon warning">🟡</div>
+          <div class="action-body">
+            <div class="action-title">Triage 3 open issues</div>
+            <div class="action-context">#26 linguistics tab, #27 scratchpad, #31 menu bar app — need decisions.</div>
+            <div class="action-meta">
+              <span class="action-project">howiprompt</span>
+              <span class="action-source issue">3 issues</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card focus" onclick="toast('Viewing Issue #10…')">
+        <div class="action-top">
+          <div class="action-icon focus">🎯</div>
+          <div class="action-body">
+            <div class="action-title">Ship Hono+Vite migration</div>
+            <div class="action-context">Could reduce package size by 75%. Project is stable — good time for infra work.</div>
+            <div class="action-meta">
+              <span class="action-project">sidequests</span>
+              <span class="action-source issue">issue #10</span>
+            </div>
+            <div class="action-cmd">
+              <div class="action-cmd-code" onclick="event.stopPropagation(); toast('Copied!')">gh issue checkout 10 --repo eeshansrivastava89/sidequests</div>
+              <div class="action-cmd-copy" onclick="event.stopPropagation(); toast('Copied!')">Copy</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="action-card stale" onclick="showAbandonModal('weather-app')">
+        <div class="action-top">
+          <div class="action-icon stale">⏳</div>
+          <div class="action-body">
+            <div class="action-title">Decide: archive weather-app?</div>
+            <div class="action-context">231 days inactive. Served its purpose. Time to close the loop.</div>
+            <div class="action-meta">
+              <span class="action-project">weather-app</span>
+              <span class="action-source stale-src">stale</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expandable: Focus & Shipped -->
+      <div class="expandable open" id="expand-focus">
+        <div class="expandable-header" onclick="
+          <span class="expandable-title">🎯 This week · 1 of 3 done</span>
+          <span class="expandable-arrow">▼</span>
+        </div>
+        <div class="expandable-body">
+          <div class="focus-item">
+            <div class="focus-check done" onclick="this.classList.toggle('done'); this.textContent=this.classList.contains('done')?'✓':''">✓</div>
+            <div>
+              <div class="focus-project">sidequests</div>
+              <div class="focus-goal">Ship Hono+Vite migration</div>
+            </div>
+          </div>
+          <div class="focus-item">
+            <div class="focus-check" onclick="this.classList.toggle('done'); this.textContent=this.classList.contains('done')?'✓':''"></div>
+            <div>
+              <div class="focus-project">datascienceapps</div>
+              <div class="focus-goal">Add tests for Substack feed</div>
+            </div>
+          </div>
+          <div class="focus-item">
+            <div class="focus-check" onclick="this.classList.toggle('done'); this.textContent=this.classList.contains('done')?'✓':''"></div>
+            <div>
+              <div class="focus-project">howiprompt</div>
+              <div class="focus-goal">Triage 3 open issues</div>
+            </div>
+          </div>
+          <div style="font-size:.68rem;color:var(--muted-foreground);padding:6px 0">Last week: 2 of 3 goals completed ✓</div>
+        </div>
+      </div>
+
+      <div class="expandable open" id="expand-shipped">
+        <div class="expandable-header" onclick="
+          <span class="expandable-title">📦 Shipped · 47 commits this week</span>
+          <span class="expandable-arrow">▼</span>
+        </div>
+        <div class="expandable-body">
+          <div class="shipped-row">
+            <div class="shipped-item"><div class="shipped-val" style="color:var(--green)">47</div><div class="shipped-label">7 days</div><div class="shipped-change" style="color:var(--green)">↑ 18%</div></div>
+            <div class="shipped-item"><div class="shipped-val" style="color:var(--primary)">162</div><div class="shipped-label">30 days</div></div>
+            <div class="shipped-item"><div class="shipped-val" style="color:var(--muted-foreground)">410</div><div class="shipped-label">90 days</div></div>
+          </div>
+          <div style="font-size:.68rem;color:var(--muted-foreground)">Across 6 active projects</div>
+        </div>
+      </div>
+
+      <div class="expandable open" id="expand-insights">
+        <div class="expandable-header" onclick="
+          <span class="expandable-title">💡 Insights</span>
+          <span class="expandable-arrow">▼</span>
+        </div>
+        <div class="expandable-body" style="padding-top:8px">
+          <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:.82rem;font-weight:600">5 projects have no remote repository</div>
+            <div style="font-size:.74rem;color:var(--muted-foreground);margin-top:1px">opt-outs, privacy-checker, picoclaw, and 2 others exist only locally. One disk failure and they're gone.</div>
+            <span style="display:inline-block;font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(243,139,168,.12);color:var(--red);margin-top:4px">Risk</span>
+          </div>
+          <div style="padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:.82rem;font-weight:600">Your active projects have strong CI/CD</div>
+            <div style="font-size:.74rem;color:var(--muted-foreground);margin-top:1px">datascienceapps, howiprompt, and sidequests all use GitHub Actions + Docker. Above average for solo projects.</div>
+            <span style="display:inline-block;font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(22,163,74,.12);color:var(--green);margin-top:4px">Strength</span>
+          </div>
+          <div style="padding:8px 0">
+            <div style="font-size:.82rem;font-weight:600">7 projects have zero test coverage</div>
+            <div style="font-size:.74rem;color:var(--muted-foreground);margin-top:1px">Adding CI to datascienceapps would have caught the Substack regression before 4 fix commits.</div>
+            <span style="display:inline-block;font-size:.6rem;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(137,180,250,.12);color:var(--blue);margin-top:4px">Actionable</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         VIEW: PROJECTS
+         ═══════════════════════════════════════ -->
+    <div id="view-projects" style="display:none">
+      <div class="scan-time" style="margin-bottom:16px">Scanned <strong>12 minutes ago</strong> · 24 projects · sorted by urgency</div>
+
+      <div id="projectList"></div>
+
+      <div class="divider-section">
+        <div class="expandable open" id="expand-lifecycle">
+          <div class="expandable-header" onclick="
+            <span class="expandable-title">📊 Lifecycle distribution</span>
+            <span class="expandable-arrow">▼</span>
+          </div>
+          <div class="expandable-body" style="padding-top:8px">
+            <div style="display:flex;height:20px;border-radius:4px;overflow:hidden;margin-bottom:8px">
+              <div style="width:21%;background:var(--blue);color:white;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:600">5</div>
+              <div style="width:8%;background:var(--green);color:white;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:600">2</div>
+              <div style="width:4%;background:var(--amber);color:white;font-size:.5rem;display:flex;align-items:center;justify-content:center">1</div>
+              <div style="width:42%;background:#8b7355;color:white;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:600">10</div>
+              <div style="width:4%;background:var(--muted-foreground);font-size:.5rem;display:flex;align-items:center;justify-content:center">1</div>
+              <div style="width:8%;background:var(--red);color:white;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:600">2</div>
+              <div style="width:12%;background:#6b7280;color:white;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:600">3</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:.7rem;color:var(--muted-foreground)">
+              <div>🔵 Building 5</div><div>🟢 Shipping 2</div>
+              <div>🟡 Maintaining 1</div><div>🟤 Completed 10</div>
+              <div>⚪ Stale 1</div><div>🔴 Blocked 2</div>
+              <div>⚫ Idea 3</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="abandonModal">
+    <div class="modal-box">
+      <div class="modal-title">What happened to this project?</div>
+      <div class="modal-desc" id="abandonDesc"></div>
+      <div class="modal-stats" id="abandonStats"></div>
+      <div style="font-size:.78rem;color:var(--muted-foreground);margin-bottom:14px">
+        <label style="display:block;margin-bottom:4px;font-weight:600;color:var(--foreground)">What did you learn?</label>
+        <textarea style="width:100%;height:48px;border-radius:6px;border:1px solid var(--border);background:var(--secondary);color:var(--foreground);padding:8px;font-family:inherit;font-size:.78rem;resize:none" placeholder="e.g. Good exploration, wouldn't build it this way again…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn primary" onclick="toast('🔄 Snoozed 2 weeks'); closeAbandonModal()">Snooze 2 weeks</button>
+        <button class="modal-btn danger" onclick="toast('📦 Archived'); closeAbandonModal()">Archive</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+  <script>
+    const projects = [
+      {name:"goalbot",status:"blocked",momentum:45,issues:4,ci:"failure",git:"38↑, 3 dirty",next:"Fix CI pipeline and push 38 unpushed commits",sparkline:[1,3,5,7,4,2,0,0,0,0,0,0],urgent:true},
+      {name:"opt-outs",status:"blocked",momentum:20,issues:0,ci:"none",git:"No remote",next:"Create remote repo and push immediately",sparkline:[0,0,1,3,0,0,0,0,0,0,0,0],urgent:true},
+      {name:"datascienceapps",status:"building",momentum:93,issues:5,ci:"success",git:"1 behind",next:"Add tests for Substack feed integration",sparkline:[2,0,1,3,0,4,2,5,1,3,6,3]},
+      {name:"hermes-workspace",status:"building",momentum:71,issues:0,ci:"none",git:"2 untracked",next:"Open PR for auth-check gateway detection",sparkline:[0,0,2,1,3,7,4,0,0,3,5,2]},
+      {name:"llama.cpp-mtp",status:"building",momentum:100,issues:0,ci:"success",git:"clean",next:"Review and merge PR #4 (397B compat)",sparkline:[3,5,2,7,8,4,6,9,5,8,3,6]},
+      {name:"local-llm-visual-bench",status:"shipping",momentum:70,issues:0,ci:"success",git:"clean",next:"Add MIT license to public repo",sparkline:[0,0,0,1,3,5,8,4,6,3,2,4]},
+      {name:"es-portfolio",status:"building",momentum:90,issues:0,ci:"none",git:"clean",next:"Add testing framework for migration work",sparkline:[0,0,1,2,4,3,6,8,5,3,7,4]},
+      {name:"picoclaw",status:"building",momentum:65,issues:0,ci:"none",git:"9 modified",next:"Set up remote repo and add README",sparkline:[0,0,0,0,0,0,0,1,2,3,0,2]},
+      {name:"howiprompt",status:"maintaining",momentum:57,issues:3,ci:"success",git:"clean",next:"Triage 3 open feature issues (#26, #27, #31)",sparkline:[2,3,5,8,4,3,2,1,3,6,2,0]},
+      {name:"sidequests",status:"completed",momentum:50,issues:1,ci:"success",git:"1 modified",next:"Evaluate Hono+Vite migration (Issue #10)",sparkline:[4,6,8,12,15,5,3,1,0,0,0,1]},
+      {name:"aw-import-screentime",status:"blocked",momentum:30,issues:4,ci:"none",git:"10 dirty",next:"Decide: merge PR #13 or close?",sparkline:[1,2,4,3,0,0,0,0,0,0,0,0]},
+      {name:"local-llm-bench",status:"completed",momentum:35,issues:4,ci:"success",git:"28↑",next:"Push 28 unpushed commits to remote",sparkline:[1,3,5,2,0,0,0,0,0,0,0,0]},
+      {name:"ab-simulator",status:"completed",momentum:40,issues:0,ci:"success",git:"clean",next:"Add OSI-approved license file",sparkline:[3,5,2,1,0,0,4,2,0,0,0,0]},
+      {name:"quizzard",status:"completed",momentum:43,issues:0,ci:"success",git:"2 untracked",next:"Commit uncommitted changes",sparkline:[2,4,6,3,5,2,0,0,0,0,0,0]},
+      {name:"weather-app",status:"completed",momentum:10,issues:0,ci:"success",git:"1 untracked",next:"Decide: archive, snooze, or revive?",sparkline:[2,3,1,0,0,0,0,0,0,0,0,0],stale:true},
+    ];
+    projects.sort((a,b)=>{
+      if(a.urgent&&!b.urgent)return -1;if(!a.urgent&&b.urgent)return 1;
+      if(a.stale&&!b.stale)return 1;if(!a.stale&&b.stale)return -1;
+      const o={blocked:0,building:1,shipping:2,maintaining:3,completed:4,stale:5,idea:6};
+      const sa=o[a.status]??5,sb=o[b.status]??5;
+      if(sa!==sb)return sa-sb;
+      return b.momentum-a.momentum;
+    });
+
+    function renderProjects(){
+      const rows=projects.map(p=>{
+        const mc=p.momentum>=70?'var(--green)':p.momentum>=40?'var(--amber)':'var(--muted-foreground)';
+        const sp=p.sparkline.map(v=>`<div class="spark-bar" style="height:${Math.max(2,v*2)}px"></div>`).join('');
+        const issues=p.issues>0?`<span style="color:var(--amber)">${p.issues}</span>`:`<span style="color:var(--muted-foreground)">—</span>`;
+        const ciIcon=p.ci==='success'?'✓':p.ci==='failure'?'✗':'—';
+        const ciColor=p.ci==='success'?'var(--green)':p.ci==='failure'?'var(--red)':'var(--muted-foreground)';
+        const gitAlert=p.git!=='clean';
+        const gitDisplay=p.git.length>14?'⚠ dirty':p.git;
+        const gitColor=gitAlert?'var(--amber)':'var(--green)';
+        return `<div class="project-row${p.stale?' stale':''}">
+          <div class="status-dot ${p.status}"></div>
+          <div class="proj-name"${p.urgent?' style="color:var(--foreground)"':''}>${p.name}${p.urgent?' <span style="font-size:.6rem;color:var(--red);font-weight:500">⚠</span>':''}</div>
+          <div class="proj-status">${p.status}</div>
+          <div class="proj-next">${p.next}</div>
+          <div class="proj-meta">
+            <span class="proj-meta-item" style="color:${mc}">${p.momentum}</span>
+            <span class="proj-meta-item">${issues}</span>
+            <span class="proj-meta-item" style="color:${gitColor}">${gitDisplay}</span>
+            <span class="proj-meta-item" style="color:${ciColor}">${ciIcon}</span>
+          </div>
+          <div class="sparkline">${sp}</div>
+        </div>`;
+      }).join('');
+      document.getElementById('projectList').innerHTML=rows;
+    }
+
+    function showView(view){
+      document.getElementById('view-whatnow').style.display=view==='whatnow'?'block':'none';
+      document.getElementById('view-projects').style.display=view==='projects'?'block':'none';
+      document.querySelectorAll('.nav-tabs button').forEach((b,i)=>{
+        b.classList.toggle('active',(view==='whatnow'&&i===0)||(view==='projects'&&i===1));
+      });
+    }
+    function 
+      const el=document.getElementById(id);
+      el.classList.toggle('open');
+    }
+    function toggleTheme(){document.documentElement.setAttribute('data-theme',document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');}
+    function showAbandonModal(project){
+      const d={'weather-app':{dur:'7+ months',c:28,l:'3,412',p:'Weather data visualization'}}[project]||{dur:'3 months',c:10,l:'1,000',p:'Side project'};
+      document.getElementById('abandonDesc').innerHTML=`<strong>${project}</strong> ran for ${d.dur} with ${d.c} commits. Before archiving:`;
+      document.getElementById('abandonStats').innerHTML=`<div class="modal-stat"><span class="msl">Lifetime</span><span class="msv">${d.dur}</span></div><div class="modal-stat"><span class="msl">Commits</span><span class="msv">${d.c}</span></div><div class="modal-stat"><span class="msl">LOC</span><span class="msv">${d.l}</span></div><div class="modal-stat"><span class="msl">Purpose</span><span class="msv">${d.p}</span></div>`;
+      document.getElementById('abandonModal').classList.add('open');
+    }
+    function closeAbandonModal(){document.getElementById('abandonModal').classList.remove('open');}
+    document.getElementById('abandonModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeAbandonModal();});
+
+    let toastTimer;
+    function toast(msg){const e=document.getElementById('toast');document.getElementById('toastMsg').textContent=msg;e.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove('visible'),2500);}
+
+    renderProjects();
+    // Open focus section by default
+    
+  </script>
+</body>
+</html>

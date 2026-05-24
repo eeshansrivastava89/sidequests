@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { withErrorHandler, findProject, notFound, coercePatchBody } from "@/lib/api-helpers";
+import { withErrorHandler, notFound, patchErrorToNextResponse } from "@/lib/next-api-helpers";
+import { findProject, coercePatchBody } from "@/lib/api-helpers";
 
 const FIELD_SPEC = {
   jsonFields: new Set<string>(),
@@ -18,7 +19,7 @@ export const PATCH = withErrorHandler(async (
 
   const body = await request.json();
   const result = coercePatchBody(body, FIELD_SPEC);
-  if (result.error) return result.error;
+  if (result.error) return patchErrorToNextResponse(result);
   const { data } = result;
 
   const metadata = await db.metadata.upsert({
