@@ -3,11 +3,15 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { projectsRoute } from "./routes/projects";
 import { projectByIdRoute } from "./routes/projects/[id]";
+import { dismissAlertRoute } from "./routes/dismiss-alert";
 import { refreshRoute } from "./routes/refresh";
 import { settingsRoute } from "./routes/settings";
 import { configRoute } from "./routes/config";
 import { preflightRoute } from "./routes/preflight";
 import { versionRoute } from "./routes/version";
+import { focusRoute } from "./routes/focus";
+import { visitRoute } from "./routes/visit";
+import { shippedRoute } from "./routes/shipped";
 
 export const app = new Hono();
 
@@ -23,11 +27,15 @@ app.get("/api/health", (c) => c.json({ ok: true, ts: new Date().toISOString() })
 // ── Routes ───────────────────────────────────────────────
 app.route("/api/projects", projectsRoute);
 app.route("/api/projects", projectByIdRoute);   // /:id, /:id/override, etc.
+app.route("/api/projects", dismissAlertRoute);   // /:id/dismiss-alert
 app.route("/api/refresh", refreshRoute);
 app.route("/api/settings", settingsRoute);
 app.route("/api/config", configRoute);
 app.route("/api/preflight", preflightRoute);
 app.route("/api/version", versionRoute);
+app.route("/api/focus", focusRoute);
+app.route("/api/visit", visitRoute);
+app.route("/api/shipped", shippedRoute);
 
 // ── 404 fallback ────────────────────────────────────────
 app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));

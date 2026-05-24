@@ -247,14 +247,14 @@ GET  /api/shipped
 
 ### Checklist
 
-- [ ] Extend `mergeAllProjects()` and `buildMergedView()` to include `actions[]`, `weekCommits`/`monthCommits`/`quarterCommits`, and `snoozedUntil`/`archivedNote`
-- [ ] Create `src/lib/actions.ts` — pure function that computes priority actions from a MergedProject + GitHub data
-- [ ] Extend `PUT /api/projects/:id/override` handler to accept `snoozedUntil` and `archivedNote`
-- [ ] Create `POST /api/projects/:id/dismiss-alert` route
-- [ ] Create `GET/POST /api/focus` routes
-- [ ] Create `GET/POST /api/visit` routes (snapshot save + diff)
-- [ ] Create `GET /api/shipped` route (aggregate commit counts)
-- [ ] Add tests for action computation, dismissal, snooze/archive/revive, and visit snapshot
+- [x] Extend `mergeAllProjects()` and `buildMergedView()` to include `actions[]`, `weekCommits`/`monthCommits`/`quarterCommits`, and `snoozedUntil`/`archivedNote`
+- [x] Create `src/lib/actions.ts` — pure function that computes priority actions from a MergedProject + GitHub data
+- [x] Extend `PUT /api/projects/:id/override` handler to accept `snoozedUntil` and `archivedNote`
+- [x] Create `POST /api/projects/:id/dismiss-alert` route
+- [x] Create `GET/POST /api/focus` routes
+- [x] Create `GET/POST /api/visit` routes (snapshot save + diff)
+- [x] Create `GET /api/shipped` route (aggregate commit counts)
+- [x] Add tests for action computation, dismissal, snooze/archive/revive, and visit snapshot
 
 ---
 

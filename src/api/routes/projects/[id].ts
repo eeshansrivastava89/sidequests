@@ -39,20 +39,51 @@ projectByIdRoute.patch("/:id/override", async (c) => {
   if (!project) return notFound;
 
   const body = await c.req.json();
+
+  // Separate Project-level fields from Override fields
+  const projectFields: Record<string, string | null> = {};
+  if ("snoozedUntil" in body) projectFields.snoozedUntil = body.snoozedUntil as string | null;
+  if ("archivedNote" in body) projectFields.archivedNote = body.archivedNote as string | null;
+
+  // Update Project-level snooze/archive fields if provided
+  if (Object.keys(projectFields).length > 0) {
+    const update: Record<string, unknown> = {};
+    if ("snoozedUntil" in projectFields) {
+      update.snoozedUntil = projectFields.snoozedUntil ? new Date(projectFields.snoozedUntil) : null;
+    }
+    if ("archivedNote" in projectFields) {
+      update.archivedNote = projectFields.archivedNote ?? null;
+    }
+    await db.project.update({ where: { id }, data: update });
+  }
+
+  // Coerce override fields — may be empty if only project-level fields were sent
   const result = coercePatchBody(body, OVERRIDE_FIELDS);
+
+  // Only upsert Override if there are override fields
+  if (result.data && Object.keys(result.data).length > 0) {
+    const override = await db.override.upsert({
+      where: { projectId: id },
+      create: { projectId: id, ...result.data },
+      update: result.data,
+    });
+
+    await db.activity.create({
+      data: { projectId: id, type: "override", payloadJson: JSON.stringify(result.data) },
+    });
+
+    return c.json({ ok: true, override });
+  }
+
+  // Only project-level fields were provided
+  if (result.error && Object.keys(projectFields).length > 0) {
+    return c.json({ ok: true, projectFields: Object.keys(projectFields) });
+  }
+
+  // No valid fields at all
   if (result.error) return c.json({ ok: false, error: result.error }, result.status);
 
-  const override = await db.override.upsert({
-    where: { projectId: id },
-    create: { projectId: id, ...result.data },
-    update: result.data,
-  });
-
-  await db.activity.create({
-    data: { projectId: id, type: "override", payloadJson: JSON.stringify(result.data) },
-  });
-
-  return c.json({ ok: true, override });
+  return c.json({ ok: true, projectFields: Object.keys(projectFields) });
 });
 
 // ── PATCH /api/projects/:id/metadata ─────────────────────
