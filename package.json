@@ -18,8 +18,8 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "DATABASE_URL=file:./dev.db APP_DATA_DIR=. concurrently \"tsx watch src/server.ts\" \"vite --port 5173\"",
-    "dev:api": "DATABASE_URL=file:./dev.db APP_DATA_DIR=. tsx watch src/server.ts",
+    "dev": "node bin/dev.mjs",
+    "dev:api": "DATABASE_URL=file:./dev.db APP_DATA_DIR=. PORT=${PORT:-3000} tsx watch src/server.ts",
     "dev:spa": "vite --port 5173",
     "build": "vite build && esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --external:@prisma/adapter-libsql --external:libsql --external:better-sqlite3 --external:cpu-features --external:encoding",
     "build:npx": "node scripts/build-npx.mjs",
