@@ -321,11 +321,11 @@ Everything visible. No accordions, no "click to expand." If content is secondary
 - Quiet hours configurable via `UserPreference`
 
 ### Checklist
-- [ ] Install `node-notifier` dependency
-- [ ] Create `src/lib/notifications.ts` — notification rules + deduplication logic
-- [ ] Hook into pipeline: after scan completes, evaluate notification rules
-- [ ] Track sent notifications in `Activity` table
-- [ ] Quiet hours check via `UserPreference`
+- [x] Install `node-notifier` dependency
+- [x] Create `src/lib/notifications.ts` — notification rules + deduplication logic
+- [x] Hook into pipeline: after scan completes, evaluate notification rules
+- [x] Track sent notifications in `Activity` table
+- [x] Quiet hours check via `UserPreference`
 
 ---
 

@@ -541,7 +541,24 @@ export async function runRefreshPipeline(
     });
   }
 
-  // 5. Cleanup: delete Activity records older than 90 days
+  // 5. Evaluate and send notifications
+  if (process.env.NODE_ENV !== "test") {
+    try {
+      const { sendNotifications } = await import("./notifications");
+      const { mergeAllProjects } = await import("./merge");
+      const mergedProjects = await mergeAllProjects();
+      const result = await sendNotifications(mergedProjects);
+      if (result.sent.length > 0) {
+        console.log(`[pipeline] Notifications sent: ${result.sent.length}`);
+      }
+    } catch (err) {
+      // Notifications are best-effort — don't fail the pipeline
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[pipeline] Notification error: ${msg}`);
+    }
+  }
+
+  // 6. Cleanup: delete Activity records older than 90 days
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   await db.activity.deleteMany({
     where: { createdAt: { lt: ninetyDaysAgo } },
