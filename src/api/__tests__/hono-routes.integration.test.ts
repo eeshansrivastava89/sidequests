@@ -7,7 +7,7 @@
  * Pattern: Use Hono's app.request() to test routes without an HTTP server.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-import { getTestDb, cleanDb } from "@/lib/__tests__/helpers/test-db";
+import { getTestDb, cleanDb, TEST_DB_PATH } from "@/lib/__tests__/helpers/test-db";
 import { seedProject } from "@/lib/__tests__/helpers/fixtures";
 
 // Mock config and settings before importing the app
@@ -32,6 +32,10 @@ let db: any;
 let app: Awaited<ReturnType<typeof import("@/api/index")>>["app"];
 
 beforeAll(async () => {
+  // Ensure DB schema is current by running bootstrap migrations
+  const { bootstrapDb } = await import("../../../../bin/bootstrap-db.mjs");
+  await bootstrapDb(TEST_DB_PATH);
+
   db = await getTestDb();
   const mod = await import("@/api/index");
   app = mod.app;

@@ -169,16 +169,16 @@ UserVisit
 
 ### Checklist
 
-- [ ] Add `snoozedUntil` and `archivedNote` columns to `Project` model in Prisma schema
-- [ ] Add `weekCommits`, `monthCommits`, `quarterCommits` columns to `Derived` model
-- [ ] Create `WeeklyFocus` model
-- [ ] Create `DismissedAlert` model with unique constraint on `[projectId, alertType]`
-- [ ] Create `UserPreference` model (gradually replaces `settings.json` file)
-- [ ] Create `UserVisit` model (single-row table for last-visit snapshot)
-- [ ] Update `bootstrap-db.mjs` with new SCHEMA_SQL and MIGRATIONS array
-- [ ] Update `bootstrap-db.test.ts` EXPECTED_COLUMNS fixture
-- [ ] Update `scanProject()` in `pipeline-native/scan.ts` to compute commit counts by date range
-- [ ] Update `pipeline.ts` to store `weekCommits`/`monthCommits`/`quarterCommits` in Derived
+- [x] Add `snoozedUntil` and `archivedNote` columns to `Project` model in Prisma schema
+- [x] Add `weekCommits`, `monthCommits`, `quarterCommits` columns to `Derived` model
+- [x] Create `WeeklyFocus` model
+- [x] Create `DismissedAlert` model with unique constraint on `[projectId, alertType]`
+- [x] Create `UserPreference` model (gradually replaces `settings.json` file)
+- [x] Create `UserVisit` model (single-row table for last-visit snapshot)
+- [x] Update `bootstrap-db.mjs` with new SCHEMA_SQL and MIGRATIONS array
+- [x] Update `bootstrap-db.test.ts` EXPECTED_COLUMNS fixture
+- [x] Update `scanProject()` in `pipeline-native/scan.ts` to compute commit counts by date range
+- [x] Update `pipeline.ts` to store `weekCommits`/`monthCommits`/`quarterCommits` in Derived
 
 ---
 

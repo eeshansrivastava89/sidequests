@@ -234,6 +234,9 @@ export async function runRefreshPipeline(
       const locCode = locBk.code ?? 0;
       const locDocs = locBk.docs ?? 0;
       const locGenerated = locBk.generated ?? 0;
+      const weekCommits = (scanned.weekCommits as number) ?? 0;
+      const monthCommits = (scanned.monthCommits as number) ?? 0;
+      const quarterCommits = (scanned.quarterCommits as number) ?? 0;
 
       await db.derived.upsert({
         where: { projectId: project.id },
@@ -256,6 +259,9 @@ export async function runRefreshPipeline(
           locCode,
           locDocs,
           locGenerated,
+          weekCommits,
+          monthCommits,
+          quarterCommits,
         },
         update: {
           statusAuto: derived.statusAuto,
@@ -275,6 +281,9 @@ export async function runRefreshPipeline(
           locCode,
           locDocs,
           locGenerated,
+          weekCommits,
+          monthCommits,
+          quarterCommits,
         },
       });
     }

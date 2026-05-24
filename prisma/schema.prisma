@@ -14,17 +14,21 @@ model Project {
   pathDisplay   String
   pinned        Boolean   @default(false)
   lastTouchedAt DateTime?
+  snoozedUntil  DateTime?    // When snooze expires (null = not snoozed)
+  archivedNote  String?       // Retirement note when archived
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   prunedAt      DateTime?
 
-  scan     Scan?
-  derived  Derived?
-  llm      Llm?
-  override Override?
-  metadata Metadata?
-  github   GitHub?
-  activity Activity[]
+  scan           Scan?
+  derived        Derived?
+  llm            Llm?
+  override       Override?
+  metadata       Metadata?
+  github         GitHub?
+  activity       Activity[]
+  weeklyFocuses  WeeklyFocus[]
+  dismissedAlerts DismissedAlert[]
 }
 
 model Scan {
@@ -57,6 +61,9 @@ model Derived {
   locCode            Int       @default(0)
   locDocs            Int       @default(0)
   locGenerated       Int       @default(0)
+  weekCommits        Int       @default(0)   // Commits in last 7 days
+  monthCommits       Int       @default(0)   // Commits in last 30 days
+  quarterCommits    Int       @default(0)   // Commits in last 90 days
 }
 
 model Llm {
@@ -128,4 +135,40 @@ model Activity {
   createdAt   DateTime @default(now())
 
   @@index([projectId, createdAt])
+}
+
+model WeeklyFocus {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  goal         String   // What you want to accomplish this week
+  completed   Boolean  @default(false)
+  weekStart    DateTime // Monday 00:00 of the week
+  createdAt    DateTime @default(now())
+
+  @@index([weekStart])
+}
+
+model DismissedAlert {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  alertType   String   // e.g. "git-urgent", "git-warning", "issue", "stale-decision"
+  dismissedAt DateTime @default(now())
+
+  @@unique([projectId, alertType])
+}
+
+model UserPreference {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "notification.quietHours", "staleness.threshold"
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+}
+
+model UserVisit {
+  id           String   @id @default(cuid())
+  key          String   @unique // "lastVisit"
+  snapshotJson String  // Serialized MergedProject[] at last visit
+  updatedAt    DateTime @updatedAt
 }

@@ -138,6 +138,15 @@ function readJsonSafe(filePath: string): Record<string, unknown> | null {
 // Detection functions
 // ---------------------------------------------------------------------------
 
+/** Count commits in the last N days using git log --since. */
+function countCommitsSince(projectPath: string, days: number): number {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0]; // YYYY-MM-DD
+  const result = runGit(projectPath, "rev-list", "--count", "HEAD", `--since=${since}`);
+  return result ? parseInt(result, 10) : 0;
+}
+
 function getGitInfo(projectPath: string): Record<string, unknown> {
   if (!fs.existsSync(path.join(projectPath, ".git"))) {
     return {
@@ -147,6 +156,9 @@ function getGitInfo(projectPath: string): Record<string, unknown> {
       branch: null,
       remoteUrl: null,
       commitCount: 0,
+      weekCommits: 0,
+      monthCommits: 0,
+      quarterCommits: 0,
       daysInactive: null,
       isDirty: false,
       untrackedCount: 0,
@@ -166,6 +178,11 @@ function getGitInfo(projectPath: string): Record<string, unknown> {
   const remote = runGit(projectPath, "remote", "get-url", "origin");
   const countStr = runGit(projectPath, "rev-list", "--count", "HEAD");
   const commitCount = countStr ? parseInt(countStr, 10) : 0;
+
+  // Commit counts by date range for "shipped history"
+  const weekCommits = countCommitsSince(projectPath, 7);
+  const monthCommits = countCommitsSince(projectPath, 30);
+  const quarterCommits = countCommitsSince(projectPath, 90);
 
   let daysInactive: number | null = null;
   if (lastDate) {
@@ -236,6 +253,9 @@ function getGitInfo(projectPath: string): Record<string, unknown> {
     branch,
     remoteUrl: remote,
     commitCount,
+    weekCommits,
+    monthCommits,
+    quarterCommits,
     daysInactive,
     isDirty,
     untrackedCount: untracked,

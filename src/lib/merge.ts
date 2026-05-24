@@ -60,9 +60,16 @@ export interface MergedProject {
   stashCount: number;
   license: boolean;
 
+  // Commit counts by date range (shipped history)
+  weekCommits: number;
+  monthCommits: number;
+  quarterCommits: number;
+
   // Project-level fields
   pinned: boolean;
   lastTouchedAt: string | null;
+  snoozedUntil: string | null;
+  archivedNote: string | null;
 
   // Metadata (workflow fields)
   goal: string | null;
@@ -279,6 +286,10 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     locDocs: derived?.locDocs ?? 0,
     locGenerated: derived?.locGenerated ?? 0,
 
+    weekCommits: derived?.weekCommits ?? 0,
+    monthCommits: derived?.monthCommits ?? 0,
+    quarterCommits: derived?.quarterCommits ?? 0,
+
     scan: rawScan,
 
     // Scan-derived fields surfaced at top level
@@ -293,6 +304,8 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     // Project-level fields
     pinned: project.pinned,
     lastTouchedAt: project.lastTouchedAt?.toISOString() ?? null,
+    snoozedUntil: project.snoozedUntil?.toISOString() ?? null,
+    archivedNote: project.archivedNote ?? null,
 
     goal: metadata?.goal ?? null,
     audience: metadata?.audience ?? null,

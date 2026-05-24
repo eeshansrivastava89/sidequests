@@ -15,6 +15,10 @@ const EXPECTED_TABLES = [
   "Metadata",
   "Activity",
   "GitHub",
+  "WeeklyFocus",
+  "DismissedAlert",
+  "UserPreference",
+  "UserVisit",
   "_DataFix",
 ];
 
@@ -27,6 +31,8 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     pathDisplay: "TEXT",
     pinned: "INTEGER",
     lastTouchedAt: "TEXT",
+    snoozedUntil: "TEXT",
+    archivedNote: "TEXT",
     createdAt: "TEXT",
     updatedAt: "TEXT",
     prunedAt: "TEXT",
@@ -58,6 +64,9 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     locCode: "INTEGER",
     locDocs: "INTEGER",
     locGenerated: "INTEGER",
+    weekCommits: "INTEGER",
+    monthCommits: "INTEGER",
+    quarterCommits: "INTEGER",
   },
   Llm: {
     id: "TEXT",
@@ -120,6 +129,32 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     name: "TEXT",
     appliedAt: "TEXT",
   },
+  WeeklyFocus: {
+    id: "TEXT",
+    projectId: "TEXT",
+    goal: "TEXT",
+    completed: "INTEGER",
+    weekStart: "TEXT",
+    createdAt: "TEXT",
+  },
+  DismissedAlert: {
+    id: "TEXT",
+    projectId: "TEXT",
+    alertType: "TEXT",
+    dismissedAt: "TEXT",
+  },
+  UserPreference: {
+    id: "TEXT",
+    key: "TEXT",
+    value: "TEXT",
+    updatedAt: "TEXT",
+  },
+  UserVisit: {
+    id: "TEXT",
+    key: "TEXT",
+    snapshotJson: "TEXT",
+    updatedAt: "TEXT",
+  },
 };
 
 /** Expected unique indexes (index name → table) */
@@ -131,12 +166,15 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   Override_projectId_key: "Override",
   Metadata_projectId_key: "Metadata",
   GitHub_projectId_key: "GitHub",
+  DismissedAlert_projectId_alertType_key: "DismissedAlert",
+  UserPreference_key_key: "UserPreference",
+  UserVisit_key_key: "UserVisit",
 };
 
 const EXPECTED_COMPOSITE_INDEX = "Activity_projectId_createdAt_idx";
 
 /** Tables with FK to Project.id */
-const TABLES_WITH_FK = ["Scan", "Derived", "Llm", "Override", "Metadata", "Activity", "GitHub"];
+const TABLES_WITH_FK = ["Scan", "Derived", "Llm", "Override", "Metadata", "Activity", "GitHub", "WeeklyFocus", "DismissedAlert"];
 
 let tmpPath: string;
 

@@ -17,6 +17,8 @@ const SCHEMA_SQL = [
     "pathDisplay"   TEXT NOT NULL,
     "pinned"        INTEGER NOT NULL DEFAULT 0,
     "lastTouchedAt" TEXT,
+    "snoozedUntil"  TEXT,
+    "archivedNote"  TEXT,
     "createdAt"     TEXT NOT NULL DEFAULT (datetime('now')),
     "updatedAt"     TEXT NOT NULL DEFAULT (datetime('now')),
     "prunedAt"      TEXT
@@ -55,6 +57,9 @@ const SCHEMA_SQL = [
     "locCode"            INTEGER NOT NULL DEFAULT 0,
     "locDocs"            INTEGER NOT NULL DEFAULT 0,
     "locGenerated"       INTEGER NOT NULL DEFAULT 0,
+    "weekCommits"        INTEGER NOT NULL DEFAULT 0,
+    "monthCommits"       INTEGER NOT NULL DEFAULT 0,
+    "quarterCommits"    INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT "Derived_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Derived_projectId_key" ON "Derived"("projectId")`,
@@ -134,6 +139,46 @@ const SCHEMA_SQL = [
     CONSTRAINT "GitHub_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "GitHub_projectId_key" ON "GitHub"("projectId")`,
+
+  // 9. WeeklyFocus
+  `CREATE TABLE IF NOT EXISTS "WeeklyFocus" (
+    "id"          TEXT NOT NULL PRIMARY KEY,
+    "projectId"   TEXT NOT NULL,
+    "goal"        TEXT NOT NULL,
+    "completed"  INTEGER NOT NULL DEFAULT 0,
+    "weekStart"   TEXT NOT NULL,
+    "createdAt"   TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "WeeklyFocus_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "WeeklyFocus_weekStart_idx" ON "WeeklyFocus"("weekStart")`,
+
+  // 10. DismissedAlert
+  `CREATE TABLE IF NOT EXISTS "DismissedAlert" (
+    "id"          TEXT NOT NULL PRIMARY KEY,
+    "projectId"   TEXT NOT NULL,
+    "alertType"   TEXT NOT NULL,
+    "dismissedAt" TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "DismissedAlert_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "DismissedAlert_projectId_alertType_key" ON "DismissedAlert"("projectId", "alertType")`,
+
+  // 11. UserPreference
+  `CREATE TABLE IF NOT EXISTS "UserPreference" (
+    "id"        TEXT NOT NULL PRIMARY KEY,
+    "key"       TEXT NOT NULL,
+    "value"    TEXT NOT NULL,
+    "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "UserPreference_key_key" ON "UserPreference"("key")`,
+
+  // 12. UserVisit
+  `CREATE TABLE IF NOT EXISTS "UserVisit" (
+    "id"           TEXT NOT NULL PRIMARY KEY,
+    "key"          TEXT NOT NULL,
+    "snapshotJson" TEXT NOT NULL,
+    "updatedAt"    TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "UserVisit_key_key" ON "UserVisit"("key")`,
 ];
 
 /**
@@ -160,6 +205,13 @@ const MIGRATIONS = [
   `ALTER TABLE "Derived" ADD COLUMN "locCode" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "Derived" ADD COLUMN "locDocs" INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE "Derived" ADD COLUMN "locGenerated" INTEGER NOT NULL DEFAULT 0`,
+  // Phase 1: commit counts by date range
+  `ALTER TABLE "Derived" ADD COLUMN "weekCommits" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "Derived" ADD COLUMN "monthCommits" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "Derived" ADD COLUMN "quarterCommits" INTEGER NOT NULL DEFAULT 0`,
+  // Phase 1: snooze/archive columns on Project
+  `ALTER TABLE "Project" ADD COLUMN "snoozedUntil" TEXT`,
+  `ALTER TABLE "Project" ADD COLUMN "archivedNote" TEXT`,
 ];
 
 /**

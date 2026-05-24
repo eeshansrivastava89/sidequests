@@ -5,50 +5,63 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phase 0 COMPLETE (Hono+Vite migration), ready for Phase 1 (data model)
+- Current phase: Phase 0 + Phase 1 COMPLETE, ready for Phase 2 (API routes)
 
 ## Git Snapshot
-- Branch: feat/hono-vite-migration
-- Working tree: clean (all changes committed)
+- Branch: main
 - Recent commits:
-  - 624fdf1 feat: Phase 0a — Hono API scaffold alongside Next.js
+  - 14b3539 chore: clean up Phase 0 dead code and stale Next.js artifacts
+  - a34cc54 Merge feat/hono-vite-migration into main: Phase 0 complete
+  - 5e1a530 feat: Phase 0 complete — Hono+Vite migration
+- Working tree: has uncommitted Phase 1 changes
+- Nothing pushed to origin
 
 ## What We Were Doing
-- Task: Phase 0 — Hono+Vite migration (COMPLETE)
+- Task: Phase 0 cleanup → Phase 1 (data model extensions) — COMPLETE
 - Progress:
-  - [x] Phase 0a: Hono scaffold + 8 route modules, framework-agnostic api-helpers refactor, 19 integration tests
-  - [x] Phase 0b: SSE streaming (streamSSE), pipeline state management, all routes ported
-  - [x] Phase 0c: Vite SPA (vite.config.ts, App.tsx, entry.tsx, index.html, font-faces.css, server.ts), production build
-  - [x] Phase 0d: CLI update, build-npx rewrite, Next.js removal, cleanup
-  - Result: 5.7MB dist/ (was 252MB .next/), 245 unit tests + 50 integration tests passing
+  - [x] Phase 0 cleanup: removed stale Next.js artifacts, dead code, redundant deps, rewrote packaging test
+  - [x] Phase 1: Added `snoozedUntil` + `archivedNote` columns to Project model in Prisma schema
+  - [x] Phase 1: Added `weekCommits`/`monthCommits`/`quarterCommits` columns to Derived model
+  - [x] Phase 1: Created `WeeklyFocus` model (goal tracking per project per week)
+  - [x] Phase 1: Created `DismissedAlert` model (unique on projectId + alertType)
+  - [x] Phase 1: Created `UserPreference` model (key-value, replaces settings.json long-term)
+  - [x] Phase 1: Created `UserVisit` model (single-row snapshot for "since last visit")
+  - [x] Phase 1: Updated `bootstrap-db.mjs` with new SCHEMA_SQL (4 new tables) + MIGRATIONS (7 new ALTER TABLEs)
+  - [x] Phase 1: Updated `bootstrap-db.test.ts` with new tables, columns, and indexes
+  - [x] Phase 1: Added `countCommitsSince()` to scan.ts — computes week/month/quarter commit counts via `git log --since`
+  - [x] Phase 1: Updated `pipeline.ts` to store commit counts in Derived upsert
+  - [x] Phase 1: Updated `MergedProject` interface + `buildMergedView()` with snoozedUntil, archivedNote, weekCommits/monthCommits/quarterCommits
+  - [x] Phase 1: Updated integration test bootstrap to run migrations on test DB
+  - [x] Phase 1: All 245 unit tests + 19 integration tests + 5 bootstrap tests passing
 
 ## Decisions
-- Priority actions: computed on-the-fly from existing data, NOT stored in a PriorityAction table
-- Snooze/archive/revive: 2 columns on Project (snoozedUntil, archivedNote) + existing override API
-- Since-last-visit: UserVisit snapshot comparison, NOT ScanDelta table
-- Commit counts: Stored in Derived model (weekCommits/monthCommits/quarterCommits)
-- api-helpers.ts: Framework-agnostic (coercePatchBody returns {error, status}, not NextResponse)
-- Hono routes: All 13 existing endpoints + SSE + health check + 404 fallback
-- Vite build: React plugin + tsconfigPaths, 420KB JS bundle + 66KB CSS
+- **Priority actions: computed, not stored.** API computes `actions[]` per project from existing data. Dismissals tracked via lightweight `DismissedAlert` table.
+- **Snooze/archive/revive: 2 columns on Project.** `snoozedUntil` + `archivedNote`, flowing through existing override API.
+- **Since-last-visit: UserVisit snapshot.** Single row storing last-visit merged project state as JSON.
+- **Shipped history: columns on Derived.** `weekCommits`/`monthCommits`/`quarterCommits` computed during scan.
+- **Phase 0 cleanup:** Removed next-env.d.ts, Next.js plugin from tsconfig, unused findProject export, unused config import, unused DATA_DIR variable, stale ARCHITECTURE.md reference. Consolidated Radix UI imports to umbrella package. Removed 5 redundant @radix-ui deps + @testing-library/dom. Rewrote packaging test for Vite+Hono.
+- **Radix UI:** Umbrella `radix-ui` package used for all components. `Slot` accessed via `SlotPrimitive.Slot` pattern since umbrella re-exports namespaces.
 
 ## Open Items
-- Phase 1: Data model extensions (add columns + new tables)
-- Phase 2: API routes (extend projects response, add focus/visit/shipped endpoints)
-- Phase 3: Frontend redesign (What Now + Projects views)
+- Phase 2: API routes (extend projects response with actions, focus, visit, shipped endpoints)
+- Phase 3: Frontend redesign (What Now + Projects views, DeltaStrip, ActionCard, FocusSection, ShippedSection)
 - Phase 4: Notifications (node-notifier)
-- end-to-end validation needed: `npm run build:npx` + `npx` startup test
+- End-to-end npx validation needed before shipping
 - GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
 - Standalone Prisma hash fragility root cause unresolved
+- Pre-existing TypeScript strict errors in [id].ts (Hono status code types) and some test files — not blocking but should be addressed
 
 ## Resume Plan
-1. Validate Phase 0 end-to-end: run `npm run dev`, verify dashboard works through Hono+Vite
-2. Start Phase 1: Prisma schema changes (snoozedUntil, archivedNote, weekCommits, etc.)
-3. Then Phase 2: New API routes (actions in projects response, focus, visit, shipped)
+1. Commit Phase 1 changes
+2. Start Phase 2: Extend projects response with actions, create focus/visit/shipped API routes
+3. Extend override endpoint to handle snooze/archive/revive
+4. Create action computation logic (`src/lib/actions.ts`)
 
-## Notes
-- `tokens.css` is synced from datascienceapps — do not edit directly
-- bootstrap-db.mjs is the source of truth for runtime DB schema
-- Publish flow: `npm version patch --no-git-tag-version` → commit → `git tag vX.Y.Z` → `git push origin main && git push origin vX.Y.Z` → CI publishes to npm
-- `npm run dev` now runs `concurrently "tsx watch src/server.ts" "vite --port 5173"` with proxy from Vite to Hono
-- `npm run build` now runs `vite build && esbuild src/server.ts ...`
-- Old Next.js files removed: src/app/api/, src/app/layout.tsx, src/lib/next-api-helpers.ts, next.config.mjs, .next/
+## Key Files
+- `docs/internal/IMPLEMENTATION_PLAN.md` — revised plan with Phase 0 + Phase 1 checkmarks complete
+- `docs/internal/PRODUCT_VISION.md` — product vision (unchanged)
+- `prisma/schema.prisma` — updated with 4 new models + 2 new Project columns + 3 new Derived columns
+- `bin/bootstrap-db.mjs` — updated with new tables and migrations
+- `src/lib/pipeline-native/scan.ts` — now computes weekCommits/monthCommits/quarterCommits
+- `src/lib/merge.ts` — MergedProject + buildMergedView updated with new fields
+- `src/lib/__tests__/helpers/test-db.ts` — exports TEST_DB_PATH, cleanDb handles 12 tables
