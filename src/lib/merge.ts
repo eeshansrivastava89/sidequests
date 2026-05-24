@@ -148,6 +148,9 @@ export type ProjectWithRelations = Project & {
     locCode: number;
     locDocs: number;
     locGenerated: number;
+    weekCommits: number;
+    monthCommits: number;
+    quarterCommits: number;
   } | null;
   llm: {
     // New fields

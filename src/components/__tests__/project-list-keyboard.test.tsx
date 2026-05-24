@@ -10,6 +10,7 @@ function makeProject(id: string, name: string): Project {
   return {
     id,
     name,
+    pathHash: id,
     pathDisplay: `/${name}`,
     status: "active",
     healthScore: 80,
@@ -24,12 +25,17 @@ function makeProject(id: string, name: string): Project {
     llmStatus: null,
     statusReason: null,
     isDirty: false,
+    dirtyFileCount: 0,
     ahead: 0,
     behind: 0,
     framework: null,
+    primaryLanguage: null,
     branchName: "main",
     lastCommitDate: null,
     locEstimate: 0,
+    locCode: 0,
+    locDocs: 0,
+    locGenerated: 0,
     scan: null,
     recentCommits: [],
     scripts: [],
@@ -40,14 +46,15 @@ function makeProject(id: string, name: string): Project {
     license: false,
     pinned: false,
     lastTouchedAt: null,
+    snoozedUntil: null,
+    archivedNote: null,
     goal: null,
     audience: null,
     successMetrics: null,
     publishTarget: null,
     lastScanned: null,
     updatedAt: "2026-01-01",
-    notableFeatures: [],
-    pitch: null,
+    llmError: null,
     liveUrl: null,
     llmGeneratedAt: null,
     openIssues: 0,
@@ -57,7 +64,12 @@ function makeProject(id: string, name: string): Project {
     prsTopJson: null,
     repoVisibility: "not-on-github",
     githubFetchedAt: null,
-  } as Project;
+    actions: [],
+    isSnoozed: false,
+    weekCommits: 0,
+    monthCommits: 0,
+    quarterCommits: 0,
+  };
 }
 
 const projects = [
@@ -76,7 +88,6 @@ describe("ProjectList — keyboard navigation", () => {
         onSelect={onSelect}
         onTogglePin={vi.fn()}
         onTouch={vi.fn()}
-        sanitizePaths={true}
       />
     );
 
@@ -99,7 +110,6 @@ describe("ProjectList — keyboard navigation", () => {
         onSelect={onSelect}
         onTogglePin={vi.fn()}
         onTouch={vi.fn()}
-        sanitizePaths={true}
       />
     );
 
@@ -121,7 +131,6 @@ describe("ProjectList — keyboard navigation", () => {
         onSelect={onSelect}
         onTogglePin={vi.fn()}
         onTouch={vi.fn()}
-        sanitizePaths={true}
       />
     );
 
@@ -142,7 +151,6 @@ describe("ProjectList — keyboard navigation", () => {
         onSelect={vi.fn()}
         onTogglePin={vi.fn()}
         onTouch={vi.fn()}
-        sanitizePaths={true}
       />
     );
 

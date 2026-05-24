@@ -5,13 +5,19 @@ import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
-import type { Project, WorkflowView, SortKey } from "@/lib/types";
+import { useFocusGoals, useShipped, useVisit, useDismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
+import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
+import { DeltaStrip } from "@/components/delta-strip";
+import { ActionList } from "@/components/action-card";
+import { FocusSection } from "@/components/focus-section";
+import { ShippedSection } from "@/components/shipped-section";
+import { LifecycleActions } from "@/components/lifecycle-actions";
 
 import type { SignalFilter } from "@/components/stats-bar";
 import { SettingsModal } from "@/components/settings-modal";
@@ -20,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert, Info } from "lucide-react";
+import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert, Info, Target } from "lucide-react";
 import { formatRelativeTime } from "@/lib/project-helpers";
 
 import { toast } from "sonner";
@@ -150,8 +156,14 @@ export function DashboardPage() {
   const { config, configReady, refetch } = useConfig();
   const refreshHook = useRefresh(fetchProjects);
   const deltaHook = useRefreshDeltas(projects);
+  const focusHook = useFocusGoals();
+  const shippedHook = useShipped();
+  const visitHook = useVisit();
+  const dismissAlert = useDismissAlert();
+
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
+  const [tab, setTab] = useState<"whatnow" | "projects">("whatnow");
   const [sortKey, setSortKey] = useState<SortKey>(() => loadSortKey());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -196,7 +208,7 @@ export function DashboardPage() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Toast: fast scan complete (deterministicReady transition)
+  // Toast: fast scan complete
   const prevDeterministicReady = useRef(false);
   useEffect(() => {
     const dr = refreshHook.state.deterministicReady;
@@ -237,6 +249,24 @@ export function DashboardPage() {
       }
     }
   }, [refreshHook.state]);
+
+  // Save visit snapshot on page visibility change (beforeunload)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        visitHook.saveSnapshot();
+      }
+    };
+    const handleBeforeUnload = () => {
+      visitHook.saveSnapshot();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [visitHook.saveSnapshot]);
 
   const handleFastScan = useCallback(() => {
     deltaHook.snapshot();
@@ -286,6 +316,15 @@ export function DashboardPage() {
       touchProject(id, tool);
     },
     [touchProject]
+  );
+
+  const handleDismissAlert = useCallback(
+    (action: PriorityAction) => {
+      dismissAlert(action.projectId, action.type, () => {
+        fetchProjects(); // Refresh to remove dismissed action
+      });
+    },
+    [dismissAlert, fetchProjects]
   );
 
   const filtered = useMemo(
@@ -339,6 +378,12 @@ export function DashboardPage() {
 
   const lastRefreshed = useMemo(() => getLastRefreshed(projects), [projects]);
 
+  // Aggregate actions for What Now tab (excluding snoozed projects)
+  const visibleActions = useMemo(
+    () => aggregateActions(projects.filter((p) => !p.isSnoozed)),
+    [projects]
+  );
+
   // Tab counts for filter labels
   const tabCounts = useMemo(() => ({
     all: projects.length,
@@ -353,6 +398,13 @@ export function DashboardPage() {
     [projects, selectedId]
   );
 
+  // Focus goal project options (active projects only)
+  const focusProjectOptions = useMemo(
+    () => projects
+      .filter((p) => p.status !== "archived")
+      .map((p) => ({ id: p.id, name: p.name })),
+    [projects]
+  );
 
   if (loading) {
     return (
@@ -482,7 +534,8 @@ export function DashboardPage() {
 
       {/* Full-width scrollable content */}
       <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
             {ghStatus === "no-auth" && (
               <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2.5 text-sm text-muted-foreground">
                 <Info className="size-4 shrink-0 text-amber-500" />
@@ -501,211 +554,265 @@ export function DashboardPage() {
                 </span>
               </div>
             )}
-            <StatsBar
-              projects={projects}
-              activeFilter={signalFilter}
-              onFilter={setSignalFilter}
-              onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
-            />
 
-            {/* Filter tabs + Sort + Search */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Tabs
-                  value={view}
-                  onValueChange={(v) => setView(v as WorkflowView)}
-                >
-                  <TabsList>
-                    <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
-                    <TabsTrigger value="active">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={cn("size-2 rounded-full", STATUS_COLORS.active)} />
-                        Active ({tabCounts.active})
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="completed">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={cn("size-2 rounded-full", STATUS_COLORS.completed)} />
-                        Completed ({tabCounts.completed})
-                      </span>
-                    </TabsTrigger>
-                    {tabCounts.paused > 0 && (
-                      <TabsTrigger value="paused">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className={cn("size-2 rounded-full", STATUS_COLORS.paused)} />
-                          Paused ({tabCounts.paused})
-                        </span>
-                      </TabsTrigger>
-                    )}
-                    <TabsTrigger value="archived">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className={cn("size-2 rounded-full", STATUS_COLORS.archived)} />
-                        Archived ({tabCounts.archived})
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+            {/* ── Tab switcher: What Now / Projects ── */}
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "whatnow" | "projects")}>
+              <TabsList>
+                <TabsTrigger value="whatnow" className="gap-1.5">
+                  <Target className="size-3.5" />
+                  What Now
+                  {visibleActions.length > 0 && (
+                    <span className="ml-1 inline-flex items-center justify-center size-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
+                      {visibleActions.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="projects">
+                  Projects ({projects.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-              <div className="flex items-center gap-2">
-                <select
-                  value={sortKey}
-                  onChange={(e) => handleSortChange(e.target.value as SortKey)}
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+            {/* ── What Now Tab ── */}
+            {tab === "whatnow" && (
+              <div className="space-y-6">
+                <DeltaStrip visit={visitHook.visit} loading={visitHook.loading} />
 
-                <Input
-                  placeholder="Search projects..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-9 w-full sm:w-64"
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Priority Actions
+                  </h2>
+                  <ActionList
+                    projects={projects}
+                    onDismiss={handleDismissAlert}
+                    onSelectProject={(id) => setSelectedId(id)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <FocusSection
+                    goals={focusHook.goals}
+                    loading={focusHook.loading}
+                    onToggle={(id, completed) => focusHook.updateGoal(id, { completed })}
+                    onAdd={focusHook.addGoal}
+                    projects={focusProjectOptions}
+                  />
+                  <ShippedSection shipped={shippedHook.shipped} loading={shippedHook.loading} />
+                </div>
+              </div>
+            )}
+
+            {/* ── Projects Tab ── */}
+            {tab === "projects" && (
+              <div className="space-y-6">
+                <StatsBar
+                  projects={projects}
+                  activeFilter={signalFilter}
+                  onFilter={setSignalFilter}
+                  onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
                 />
-              </div>
-            </div>
 
-            {/* Active filter chips */}
-            {(view !== "all" || search || signalFilter) && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {view !== "all" && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                    {view.charAt(0).toUpperCase() + view.slice(1)}
-                    <button
-                      type="button"
-                      className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
-                      onClick={() => setView("all")}
-                      aria-label="Clear tab filter"
+                {/* Filter tabs + Sort + Search */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Tabs
+                      value={view}
+                      onValueChange={(v) => setView(v as WorkflowView)}
                     >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                )}
-                {signalFilter && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                    {SIGNAL_LABELS[signalFilter]}
-                    <button
-                      type="button"
-                      className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
-                      onClick={() => setSignalFilter(null)}
-                      aria-label="Clear signal filter"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                )}
-                {search && (
-                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                    &ldquo;{search}&rdquo;
-                    <button
-                      type="button"
-                      className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setSearch("")}
-                      aria-label="Clear search"
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-                  onClick={() => { setView("all"); setSearch(""); setSignalFilter(null); handleSortChange("lastCommit"); }}
-                >
-                  Clear all
-                </button>
-                <span className="text-xs text-muted-foreground">
-                  Showing {filtered.length} of {projects.length}
-                </span>
-              </div>
-            )}
+                      <TabsList>
+                        <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
+                        <TabsTrigger value="active">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className={cn("size-2 rounded-full", STATUS_COLORS.active)} />
+                            Active ({tabCounts.active})
+                          </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="completed">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className={cn("size-2 rounded-full", STATUS_COLORS.completed)} />
+                            Completed ({tabCounts.completed})
+                          </span>
+                        </TabsTrigger>
+                        {tabCounts.paused > 0 && (
+                          <TabsTrigger value="paused">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className={cn("size-2 rounded-full", STATUS_COLORS.paused)} />
+                              Paused ({tabCounts.paused})
+                            </span>
+                          </TabsTrigger>
+                        )}
+                        <TabsTrigger value="archived">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className={cn("size-2 rounded-full", STATUS_COLORS.archived)} />
+                            Archived ({tabCounts.archived})
+                          </span>
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
 
-            {filtered.length === 0 && projects.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 px-6">
-                <h2 className="text-lg font-semibold mb-1">Welcome to Sidequests</h2>
-                <p className="text-sm text-muted-foreground mb-6">Get started in 3 steps:</p>
-                <ol className="space-y-4 w-full max-w-sm">
-                  <li className="flex items-start gap-3">
-                    <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">1</span>
-                    <div>
-                      <p className="text-sm font-medium">Open Settings</p>
-                      <p className="text-xs text-muted-foreground mb-1.5">Configure your dev root directory</p>
-                      <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-                        <Settings className="size-3.5 mr-1.5" /> Settings
-                      </Button>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">2</span>
-                    <div>
-                      <p className="text-sm font-medium">Set your Dev Root</p>
-                      <p className="text-xs text-muted-foreground">The directory containing your projects (e.g. <code className="bg-muted px-1 rounded">~/dev</code>)</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">3</span>
-                    <div>
-                      <p className="text-sm font-medium">Run a Scan</p>
-                      <p className="text-xs text-muted-foreground mb-1.5">Discover all git projects in your dev root</p>
-                      <Button size="sm" onClick={handleAiScan}>
-                        Scan Now
-                      </Button>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
-                <p className="text-muted-foreground">
-                  {search ? "No projects match your search." : "No projects in this view."}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pinnedProjects.length > 0 && (
-                  <div>
-                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Pinned
-                    </h2>
-                    <ProjectList
-                      projects={pinnedProjects}
-                      selectedId={selectedId}
-                      onSelect={(p) => setSelectedId(p.id)}
-                      onTogglePin={handleTogglePin}
-                      onTouch={handleTouch}
-                      refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
-                      selectedNames={selectedNames}
-                      onToggleSelect={handleToggleSelect}
-                      onSelectAll={handleSelectAll}
-                      allSelected={selectedNames.size === filtered.length && filtered.length > 0}
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={sortKey}
+                      onChange={(e) => handleSortChange(e.target.value as SortKey)}
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      {SORT_OPTIONS.map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <Input
+                      placeholder="Search projects..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="h-9 w-full sm:w-64"
                     />
                   </div>
-                )}
-                {unpinnedProjects.length > 0 && (
-                  <div>
-                    {pinnedProjects.length > 0 && (
-                      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                        Projects
-                      </h2>
+                </div>
+
+                {/* Active filter chips */}
+                {(view !== "all" || search || signalFilter) && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {view !== "all" && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        {view.charAt(0).toUpperCase() + view.slice(1)}
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
+                          onClick={() => setView("all")}
+                          aria-label="Clear tab filter"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
                     )}
-                    <ProjectList
-                      projects={unpinnedProjects}
-                      selectedId={selectedId}
-                      onSelect={(p) => setSelectedId(p.id)}
-                      onTogglePin={handleTogglePin}
-                      onTouch={handleTouch}
-                      refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
-                      selectedNames={selectedNames}
-                      onToggleSelect={handleToggleSelect}
-                      onSelectAll={handleSelectAll}
-                      allSelected={selectedNames.size === filtered.length && filtered.length > 0}
-                    />
+                    {signalFilter && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        {SIGNAL_LABELS[signalFilter]}
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
+                          onClick={() => setSignalFilter(null)}
+                          aria-label="Clear signal filter"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )}
+                    {search && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
+                        &ldquo;{search}&rdquo;
+                        <button
+                          type="button"
+                          className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => setSearch("")}
+                          aria-label="Clear search"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                      onClick={() => { setView("all"); setSearch(""); setSignalFilter(null); handleSortChange("lastCommit"); }}
+                    >
+                      Clear all
+                    </button>
+                    <span className="text-xs text-muted-foreground">
+                      Showing {filtered.length} of {projects.length}
+                    </span>
+                  </div>
+                )}
+
+                {filtered.length === 0 && projects.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-16 px-6">
+                    <h2 className="text-lg font-semibold mb-1">Welcome to Sidequests</h2>
+                    <p className="text-sm text-muted-foreground mb-6">Get started in 3 steps:</p>
+                    <ol className="space-y-4 w-full max-w-sm">
+                      <li className="flex items-start gap-3">
+                        <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">1</span>
+                        <div>
+                          <p className="text-sm font-medium">Open Settings</p>
+                          <p className="text-xs text-muted-foreground mb-1.5">Configure your dev root directory</p>
+                          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                            <Settings className="size-3.5 mr-1.5" /> Settings
+                          </Button>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">2</span>
+                        <div>
+                          <p className="text-sm font-medium">Set your Dev Root</p>
+                          <p className="text-xs text-muted-foreground">The directory containing your projects (e.g. <code className="bg-muted px-1 rounded">~/dev</code>)</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex items-center justify-center size-6 rounded-full bg-foreground text-background text-xs font-bold shrink-0">3</span>
+                        <div>
+                          <p className="text-sm font-medium">Run a Scan</p>
+                          <p className="text-xs text-muted-foreground mb-1.5">Discover all git projects in your dev root</p>
+                          <Button size="sm" onClick={handleAiScan}>
+                            Scan Now
+                          </Button>
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
+                    <p className="text-muted-foreground">
+                      {search ? "No projects match your search." : "No projects in this view."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pinnedProjects.length > 0 && (
+                      <div>
+                        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                          Pinned
+                        </h2>
+                        <ProjectList
+                          projects={pinnedProjects}
+                          selectedId={selectedId}
+                          onSelect={(p) => setSelectedId(p.id)}
+                          onTogglePin={handleTogglePin}
+                          onTouch={handleTouch}
+                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                          selectedNames={selectedNames}
+                          onToggleSelect={handleToggleSelect}
+                          onSelectAll={handleSelectAll}
+                          allSelected={selectedNames.size === filtered.length && filtered.length > 0}
+                        />
+                      </div>
+                    )}
+                    {unpinnedProjects.length > 0 && (
+                      <div>
+                        {pinnedProjects.length > 0 && (
+                          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                            Projects
+                          </h2>
+                        )}
+                        <ProjectList
+                          projects={unpinnedProjects}
+                          selectedId={selectedId}
+                          onSelect={(p) => setSelectedId(p.id)}
+                          onTogglePin={handleTogglePin}
+                          onTouch={handleTouch}
+                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                          selectedNames={selectedNames}
+                          onToggleSelect={handleToggleSelect}
+                          onSelectAll={handleSelectAll}
+                          allSelected={selectedNames.size === filtered.length && filtered.length > 0}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
+
           </div>
       </main>
 
@@ -735,15 +842,25 @@ export function DashboardPage() {
         <SheetContent>
           <SheetTitle className="sr-only">{selectedProject?.name ?? "Project Details"}</SheetTitle>
           {selectedProject && (
-            <ProjectDetailPane
-              key={selectedProject.id}
-              project={selectedProject}
-              onClose={() => setSelectedId(null)}
-              onUpdateOverride={updateOverride}
-              onTogglePin={handleTogglePin}
-              onTouch={handleTouch}
-              delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
-            />
+            <>
+              <ProjectDetailPane
+                key={selectedProject.id}
+                project={selectedProject}
+                onClose={() => setSelectedId(null)}
+                onUpdateOverride={updateOverride}
+                onTogglePin={handleTogglePin}
+                onTouch={handleTouch}
+                delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
+              />
+              {/* Lifecycle actions in the detail pane */}
+              <div className="px-6 pb-6">
+                <LifecycleActions
+                  project={selectedProject}
+                  onUpdateOverride={updateOverride}
+                  isSnoozed={selectedProject.isSnoozed}
+                />
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>

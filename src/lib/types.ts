@@ -3,6 +3,57 @@ export interface Insight {
   severity: "green" | "amber" | "red";
 }
 
+/** Priority action from the API (computed per project). */
+export type ActionSource = "git" | "issue" | "ai" | "stale";
+export type ActionSeverity = "high" | "med" | "low";
+
+export interface PriorityAction {
+  type: string;
+  label: string;
+  source: ActionSource;
+  severity: ActionSeverity;
+  projectId: string;
+  projectName: string;
+}
+
+/** Focus goal from GET /api/focus. */
+export interface FocusGoal {
+  id: string;
+  projectId: string;
+  projectName: string;
+  goal: string;
+  completed: boolean;
+  weekStart: string;
+  createdAt: string;
+}
+
+/** Shipped history from GET /api/shipped. */
+export interface ShippedData {
+  weekTotal: number;
+  monthTotal: number;
+  quarterTotal: number;
+  projects: Array<{
+    id: string;
+    name: string;
+    weekCommits: number;
+    monthCommits: number;
+    quarterCommits: number;
+  }>;
+}
+
+/** Visit delta from GET /api/visit. */
+export interface VisitDelta {
+  ok: boolean;
+  firstVisit: boolean;
+  current: Array<{ id: string; name: string; status: string; healthScore: number; weekCommits: number; monthCommits: number }>;
+  delta: {
+    added: string[];
+    removed: string[];
+    changed: Array<{ id: string; name: string; field: string; from: unknown; to: unknown }>;
+  } | null;
+  lastVisitAt: string | null;
+}
+
 /** Client-side mirror of MergedProject from the API. */
 export interface Project {
   id: string;
@@ -72,6 +123,15 @@ export interface Project {
   prsTopJson: string | null;
   repoVisibility: string;
   githubFetchedAt: string | null;
+
+  // Phase 2: Computed actions + lifecycle fields
+  actions: PriorityAction[];
+  isSnoozed: boolean;
+  weekCommits: number;
+  monthCommits: number;
+  quarterCommits: number;
+  snoozedUntil: string | null;
+  archivedNote: string | null;
 }
 
 export interface RawScan {

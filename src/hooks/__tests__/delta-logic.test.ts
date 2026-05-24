@@ -16,7 +16,6 @@ function makeSnapshot(overrides: Partial<ProjectSnapshot> = {}): ProjectSnapshot
     ahead: 0,
     llmGeneratedAt: null,
     nextAction: null,
-    purpose: null,
     daysInactive: 0,
     ...overrides,
   };

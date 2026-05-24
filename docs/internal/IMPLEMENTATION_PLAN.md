@@ -279,17 +279,19 @@ GET  /api/shipped
 
 ### New components
 
-- [ ] `DeltaStrip` — "Since last visit" banner with delta items
-- [ ] `ActionCard` — ranked priority action with source badge + copy-paste command
-- [ ] `FocusSection` — weekly goals with checkboxes per project
-- [ ] `ShippedSection` — portfolio-level commit counts (7d/30d/90d)
-- [ ] `LifecycleActions` — snooze/archive/revive buttons in project detail pane
+- [x] `DeltaStrip` — "Since last visit" banner with delta items
+- [x] `ActionCard` — ranked priority action with source badge + copy-paste command
+- [x] `FocusSection` — weekly goals with checkboxes per project
+- [x] `ShippedSection` — portfolio-level commit counts (7d/30d/90d)
+- [x] `LifecycleActions` — snooze/archive/revive buttons in project detail pane
 
 ### Modified components
 
-- [ ] `ProjectDetailPane` — add ShippedSection, LifecycleActions
-- [ ] `ProjectList` — add ShippedSection or ShippedCard
-- [ ] `page.tsx` → `App.tsx` — tab-based layout (What Now / Projects)
+- [x] `ProjectDetailPane` — add LifecycleActions in slide-over panel
+- [ ] `ProjectList` — add ShippedSection or ShippedCard (v2 — per-project shipped in detail pane)
+- [x] `page.tsx` — tab-based layout (What Now / Projects)
+- [x] `use-whatnow-data.ts` — hooks for focus goals, shipped data, visit delta, dismiss alerts
+- [x] `types.ts` — added PriorityAction, FocusGoal, ShippedData, VisitDelta; extended Project with actions[], isSnoozed, weekCommits/monthCommits/quarterCommits, snoozedUntil, archivedNote
 
 ### No hidden sections
 Everything visible. No accordions, no "click to expand." If content is secondary, it goes below the fold, but it's always visible.
