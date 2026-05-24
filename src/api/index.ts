@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { timeout } from "hono/timeout";
 import { projectsRoute } from "./routes/projects";
 import { projectByIdRoute } from "./routes/projects/[id]";
 import { refreshRoute } from "./routes/refresh";
@@ -15,7 +14,8 @@ export const app = new Hono();
 // ── Global middleware ────────────────────────────────────
 app.use("*", logger());
 app.use("*", cors({ origin: "*" }));
-app.use("*", timeout(30_000));
+// Note: no global timeout — SSE streaming for refresh can take minutes.
+// Individual routes can set their own timeouts if needed.
 
 // ── Health check ─────────────────────────────────────────
 app.get("/api/health", (c) => c.json({ ok: true, ts: new Date().toISOString() }));

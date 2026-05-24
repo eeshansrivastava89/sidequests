@@ -4,68 +4,51 @@
 
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
-- Goal: Transform Sidequests from a dashboard into a control center for side projects — the ambient awareness + priority queue + feedback loop that no other tool provides
-- Current phase: v0.3.24 published, Hono+Vite migration + major product redesign planned
+- Goal: Transform Sidequests from a dashboard into a control center for side projects
+- Current phase: Phase 0 COMPLETE (Hono+Vite migration), ready for Phase 1 (data model)
 
 ## Git Snapshot
-- Branch: main
+- Branch: feat/hono-vite-migration
+- Working tree: clean (all changes committed)
 - Recent commits:
-  - ffb20f0 0.3.24
-  - 1c0f05c fix: add content-level secret scanning to privacy gate
-  - 67d07d4 fix: use bg-card for project row background
-  - b03afc0 0.3.22
-  - 8e4ef73 fix: add missing locCode/locDocs/locGenerated to bootstrap-db migration
-- Working tree changes:
-  - M .pi/context.md (context refresh)
-  - M docs/internal/IMPLEMENTATION_PLAN.md (major rewrite — architecture review revision)
-  - D docs/internal/ARCHITECTURE.md (will be replaced after Hono migration)
-  - D docs/internal/codex-review.md (obsolete)
-  - ?? docs/mockups/ (interactive HTML mockups)
+  - 624fdf1 feat: Phase 0a — Hono API scaffold alongside Next.js
 
 ## What We Were Doing
-- Task: Architecture review + implementation plan revision
+- Task: Phase 0 — Hono+Vite migration (COMPLETE)
 - Progress:
-  - [x] Deep audit of codebase: 13 API routes (~560 LOC), pipeline (~1,085 LOC), merge logic (~434 LOC), frontend (~3,900 LOC), 251 tests passing
-  - [x] Found 3 major DRY violations in the original plan:
-    - PriorityAction table → should be computed on-the-fly from existing data
-    - ScanDelta table → replaced by UserVisit snapshot comparison
-    - LifecycleAction table → replaced by 2 columns on Project + existing override API
-  - [x] Found Phase 0 underestimation: missing SSE migration, dev server setup, font/theme migration, integration test rewrite, build pipeline rewrite
-  - [x] Broke Phase 0 into 4 sub-phases (0a-0d) with explicit checklists
-  - [x] Rewrote IMPLEMENTATION_PLAN.md with all review findings
-  - [x] Added design rationale sections explaining "why" for each decision
-  - Stop point: Plan revised and documented, ready to begin Phase 0a
+  - [x] Phase 0a: Hono scaffold + 8 route modules, framework-agnostic api-helpers refactor, 19 integration tests
+  - [x] Phase 0b: SSE streaming (streamSSE), pipeline state management, all routes ported
+  - [x] Phase 0c: Vite SPA (vite.config.ts, App.tsx, entry.tsx, index.html, font-faces.css, server.ts), production build
+  - [x] Phase 0d: CLI update, build-npx rewrite, Next.js removal, cleanup
+  - Result: 5.7MB dist/ (was 252MB .next/), 245 unit tests + 50 integration tests passing
 
 ## Decisions
-- **Priority actions: computed, not stored.** The API computes `actions[]` per project from existing Derived/Llm/GitHub data. Dismissals tracked via lightweight DismissedAlert table.
-- **Snooze/archive/revive: 2 columns on Project.** No new LifecycleAction table. `snoozedUntil` and `archivedNote` on Project, flowing through existing override API.
-- **Since-last-visit: UserVisit snapshot.** Single row storing last-visit merged project state as JSON. Frontend calls POST /api/visit on load, GET /api/visit returns delta.
-- **Shipped history: columns on Derived.** `weekCommits`/`monthCommits`/`quarterCommits` computed during scan from git log date ranges.
-- **Phase 0 split into 0a-0d.** Scaffold → all routes → Vite SPA → CLI migration.
-- **8 new routes reduced to ~4 net-new.** Actions computed in projects response, lifecycle uses existing override API.
-- **Insights endpoint deferred from v1.** Portfolio insights can be computed client-side from project data.
+- Priority actions: computed on-the-fly from existing data, NOT stored in a PriorityAction table
+- Snooze/archive/revive: 2 columns on Project (snoozedUntil, archivedNote) + existing override API
+- Since-last-visit: UserVisit snapshot comparison, NOT ScanDelta table
+- Commit counts: Stored in Derived model (weekCommits/monthCommits/quarterCommits)
+- api-helpers.ts: Framework-agnostic (coercePatchBody returns {error, status}, not NextResponse)
+- Hono routes: All 13 existing endpoints + SSE + health check + 404 fallback
+- Vite build: React plugin + tsconfigPaths, 420KB JS bundle + 66KB CSS
 
 ## Open Items
-- Issue #10 — Hono+Vite migration (starts with Phase 0a)
-- Phase 0 sub-phases each need verification before proceeding
-- SSE streaming in Hono needs `streamSSE()` — different API from Next.js
-- Dev experience needs 2 servers (vite dev + tsx watch) — consider a dev orchestration script
-- node-notifier integration for Phase 4
-- GitHub Actions Node 20 deprecation warnings (upgrade actions/checkout + actions/setup-node to v5 before June 2026)
+- Phase 1: Data model extensions (add columns + new tables)
+- Phase 2: API routes (extend projects response, add focus/visit/shipped endpoints)
+- Phase 3: Frontend redesign (What Now + Projects views)
+- Phase 4: Notifications (node-notifier)
+- end-to-end validation needed: `npm run build:npx` + `npx` startup test
+- GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
 - Standalone Prisma hash fragility root cause unresolved
 
 ## Resume Plan
-1. Start Phase 0a: Create Hono app scaffold, port first 2-3 routes, verify alongside Next.js
-2. Then Phase 0b: Port remaining routes + SSE
-3. Then Phase 0c: Vite SPA + production build
-4. Then Phase 0d: CLI + deployment migration
-5. Then Phase 1: Data model extensions
+1. Validate Phase 0 end-to-end: run `npm run dev`, verify dashboard works through Hono+Vite
+2. Start Phase 1: Prisma schema changes (snoozedUntil, archivedNote, weekCommits, etc.)
+3. Then Phase 2: New API routes (actions in projects response, focus, visit, shipped)
 
 ## Notes
-- `tokens.css` is synced from datascienceapps — do not edit directly, handle conflicts in globals.css
-- bootstrap-db.mjs is the source of truth for runtime DB schema — any future schema changes MUST update both SCHEMA_SQL and MIGRATIONS array, and the EXPECTED_COLUMNS fixture in bin/__tests__/bootstrap-db.test.ts
+- `tokens.css` is synced from datascienceapps — do not edit directly
+- bootstrap-db.mjs is the source of truth for runtime DB schema
 - Publish flow: `npm version patch --no-git-tag-version` → commit → `git tag vX.Y.Z` → `git push origin main && git push origin vX.Y.Z` → CI publishes to npm
-- 251 unit tests + 75 integration tests passing as of v0.3.24
-- Mockups are in `docs/mockups/` — dashboard.html (current v5 minimal design) and menubar.html (menu bar companion mockup)
-- Product vision is in `docs/internal/PRODUCT_VISION.md`
-- Implementation plan is in `docs/internal/IMPLEMENTATION_PLAN.md`
+- `npm run dev` now runs `concurrently "tsx watch src/server.ts" "vite --port 5173"` with proxy from Vite to Hono
+- `npm run build` now runs `vite build && esbuild src/server.ts ...`
+- Old Next.js files removed: src/app/api/, src/app/layout.tsx, src/lib/next-api-helpers.ts, next.config.mjs, .next/
