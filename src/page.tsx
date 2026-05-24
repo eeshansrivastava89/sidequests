@@ -1,11 +1,10 @@
-"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
-import { useFocusGoals, useShipped, useVisit, useDismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
+import { useFocusGoals, useShipped, useVisit, dismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
 import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
 import { StatsBar } from "@/components/stats-bar";
 import { ProjectList } from "@/components/project-list";
@@ -159,7 +158,6 @@ export function DashboardPage() {
   const focusHook = useFocusGoals();
   const shippedHook = useShipped();
   const visitHook = useVisit();
-  const dismissAlert = useDismissAlert();
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
@@ -324,7 +322,7 @@ export function DashboardPage() {
         fetchProjects(); // Refresh to remove dismissed action
       });
     },
-    [dismissAlert, fetchProjects]
+    [fetchProjects]
   );
 
   const filtered = useMemo(

@@ -1,16 +1,16 @@
-"use client";
 
 import type { FocusGoal } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Check, Plus, Target, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import React from "react";
 
 interface FocusSectionProps {
   goals: FocusGoal[];
   loading: boolean;
   onToggle: (id: string, completed: boolean) => void;
-  onAdd: (projectId: string, goal: string) => void;
+  onAdd: (projectId: string, goal: string) => Promise<unknown>;
   onDelete?: (id: string) => void;
   projects: Array<{ id: string; name: string }>;
 }
@@ -79,7 +79,9 @@ export function FocusSection({ goals, loading, onToggle, onAdd, projects, onDele
               className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && newGoal.trim() && selectedProject) {
-                  onAdd(selectedProject, newGoal.trim());
+                  onAdd(selectedProject, newGoal.trim()).then((result) => {
+                    if (!result) toast.error("Failed to add goal");
+                  });
                   setNewGoal("");
                   setShowAdd(false);
                 }
@@ -88,9 +90,10 @@ export function FocusSection({ goals, loading, onToggle, onAdd, projects, onDele
             <Button
               size="sm"
               disabled={!newGoal.trim() || !selectedProject}
-              onClick={() => {
+              onClick={async () => {
                 if (newGoal.trim() && selectedProject) {
-                  onAdd(selectedProject, newGoal.trim());
+                  const result = await onAdd(selectedProject, newGoal.trim());
+                  if (!result) toast.error("Failed to add goal");
                   setNewGoal("");
                   setShowAdd(false);
                 }

@@ -1,4 +1,3 @@
-"use client";
 
 import type { Project } from "@/lib/types";
 import type { ProjectProgress } from "@/hooks/use-refresh";

@@ -5,78 +5,64 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phase 3 IN PROGRESS (frontend redesign)
+- Current phase: Phases 0–4 COMPLETE. Ready for v1 validation + shipping.
 
 ## Git Snapshot
 - Branch: main
 - Recent commits:
-  - (pending commit) feat: Phase 3 — frontend What Now view, action cards, focus, shipped, lifecycle actions
+  - 8b64df7 feat: Phase 4 — native notifications (node-notifier)
+  - 7d63a91 fix: robust dev server with no orphan processes
+  - 0c5b791 fix: dynamic port discovery for dev server
+  - 684aa08 feat: Phase 3 — What Now view, action cards, focus, shipped, lifecycle UI
   - f0e262b docs: update context — Phase 0-2 complete
-  - 5e8c3bb feat: Phase 2 — API routes for actions, lifecycle, focus, visit, and shipped
-  - b9f6749 feat: Phase 1 — data model extensions
-  - 14b3539 chore: clean up Phase 0 dead code and stale Next.js artifacts
-- Working tree: has changes (Phase 3 in progress)
+- Working tree: clean
 - Nothing pushed to origin
 
 ## What We Were Doing
-- Task: Phase 3 frontend redesign — What Now view implementation
+- Task: Phases 0–4 of the implementation plan — ALL COMPLETE
 - Progress:
-  - [x] Phase 0 cleanup: complete
-  - [x] Phase 1 data model: complete
-  - [x] Phase 2 API routes: complete
-  - [x] Phase 3: New types (PriorityAction, FocusGoal, ShippedData, VisitDelta) + extended Project type
-  - [x] Phase 3: `use-whatnow-data.ts` — hooks for focus goals, shipped, visit delta, dismiss/reshow alerts
-  - [x] Phase 3: `DeltaStrip` component — "Since last visit" banner
-  - [x] Phase 3: `ActionCard` + `ActionList` components — ranked priority actions with dismiss + source badges
-  - [x] Phase 3: `FocusSection` component — weekly goals with checkboxes per project
-  - [x] Phase 3: `ShippedSection` component — portfolio commit counts with top contributor bars
-  - [x] Phase 3: `LifecycleActions` component — snooze (7/14/30d), archive, revive buttons
-  - [x] Phase 3: Tab-based layout in `page.tsx` — "What Now" (default) + "Projects" tabs
-  - [x] Phase 3: Project detail pane includes LifecycleActions
-  - [x] Phase 3: Visit snapshot saved on visibility change / beforeunload
-  - [x] Phase 3: Update `merge.ts` ProjectWithRelations type with weekCommits/monthCommits/quarterCommits
-  - [x] Phase 3: Fixed stale test fixtures (project-list-keyboard, attention, delta-logic)
+  - [x] Phase 0: Hono+Vite migration
+  - [x] Phase 1: Data model extensions (4 new tables, 5 new columns)
+  - [x] Phase 2: API routes (actions, lifecycle, focus, visit, shipped)
+  - [x] Phase 3: Frontend (What Now view, action cards, focus, shipped, lifecycle actions)
+  - [x] Phase 4: Notifications (node-notifier, dedup, quiet hours)
 
 ## Decisions
-- **Priority actions: computed, not stored.** API computes `actions[]` per project from existing data. Dismissals tracked via lightweight `DismissedAlert` table.
-- **Snooze/archive/revive: on Project model.** `snoozedUntil` + `archivedNote` flow through PATCH /override, directly updating Project table (not Override table).
-- **Since-last-visit: UserVisit snapshot.** Single row storing `snapshotJson` — GET computes delta, POST saves current state.
-- **Shipped history: Derived columns.** `weekCommits`/`monthCommits`/`quarterCommits` computed during scan via `git rev-list --count HEAD --since=`.
-- **Focus goals: WeeklyFocus table.** Per-project goals with completion toggle, scoped to current week (Monday start).
-- **Actions sorted by severity.** High → med → low, then by type for stable ordering.
-- **DismissedAlert: unique on (projectId, alertType).** One dismissal per alert type per project.
-- **Phase 0 cleanup:** Removed next-env.d.ts, Next.js plugin from tsconfig, consolidated Radix UI imports, removed 5 redundant @radix-ui deps, etc.
-- **Phase 3 "What Now" tab is default view.** Users land on action cards first, then can switch to project list.
+- **Priority actions: computed, not stored.** Dismissals via DismissedAlert table.
+- **Snooze/archive/revive: on Project model.** Flow through PATCH /override.
+- **Since-last-visit: UserVisit snapshot.** Snapshot on visibility change / beforeunload.
+- **Shipped history: Derived columns.** Computed during scan via git rev-list.
+- **Focus goals: WeeklyFocus table.** Scoped to current week (Monday start).
+- **Notifications: pipeline hook.** Best-effort after scan completes. 24h dedup. Quiet hours via UserPreference.
+- **Dev server: bin/dev.mjs.** Dynamic port discovery, no orphans, direct binary spawns.
 
 ## Open Items
-- Phase 3 (remaining): Per-project shipped history in detail pane (deferred to v2 polish)
-- Phase 4: Notifications (node-notifier)
 - End-to-end npx validation needed before shipping
 - GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
 - Standalone Prisma hash fragility root cause unresolved
 - Pre-existing TS strict errors in [id].ts (Hono status code types) — not blocking
-- Packaging integration test fails at server startup (esbuild "Dynamic require of node:path" issue) — pre-existing, not Phase-related
+- Packaging integration test fails at server startup (esbuild "Dynamic require of node:path") — pre-existing
+- Per-project shipped history in detail pane (deferred to v2 polish)
 
 ## Resume Plan
-1. Test Phase 3 UI in browser, iterate on visual polish
-2. Commit Phase 3 changes
-3. Start Phase 4: Notifications (node-notifier)
-4. Then: End-to-end npx validation
+1. End-to-end npx validation: build:npx → run → verify all endpoints
+2. Push to origin
+3. Phase 5+ (future): menu bar companion, CLI shell integration
 
 ## Key Files
-- `docs/internal/IMPLEMENTATION_PLAN.md` — Phase 0-3 checkmarks
-- `docs/internal/PRODUCT_VISION.md` — product vision (unchanged)
-- `src/lib/actions.ts` — priority action computation engine
-- `src/api/routes/dismiss-alert.ts` — dismiss/re-show alert routes
-- `src/api/routes/focus/index.ts` — weekly focus goals CRUD
-- `src/api/routes/visit/index.ts` — since-last-visit delta
-- `src/api/routes/shipped.ts` — portfolio commit aggregates
-- `src/hooks/use-whatnow-data.ts` — hooks for focus, shipped, visit, dismiss (NEW)
-- `src/components/delta-strip.tsx` — "Since last visit" banner (NEW)
-- `src/components/action-card.tsx` — ActionCard + ActionList (NEW)
-- `src/components/focus-section.tsx` — weekly focus goals (NEW)
-- `src/components/shipped-section.tsx` — portfolio shipped history (NEW)
-- `src/components/lifecycle-actions.tsx` — snooze/archive/revive (NEW)
-- `src/app/page.tsx` — tab-based layout with What Now + Projects (MODIFIED)
-- `src/lib/types.ts` — extended with PriorityAction, FocusGoal, ShippedData, VisitDelta, Phase 2 fields (MODIFIED)
-- `src/lib/merge.ts` — added weekCommits/monthCommits/quarterCommits to ProjectWithRelations (MODIFIED)
+- `docs/internal/IMPLEMENTATION_PLAN.md` — Phases 0–4 complete ✅
+- `docs/internal/PRODUCT_VISION.md` — product vision
+- `src/lib/actions.ts` — priority action computation
+- `src/lib/notifications.ts` — notification rules + dedup (NEW Phase 4)
+- `src/api/routes/dismiss-alert.ts` — dismiss/re-show alerts
+- `src/api/routes/focus/index.ts` — weekly focus CRUD
+- `src/api/routes/visit/index.ts` — visit delta
+- `src/api/routes/shipped.ts` — portfolio shipped history
+- `src/hooks/use-whatnow-data.ts` — focus, shipped, visit, dismiss hooks
+- `src/components/delta-strip.tsx` — since-last-visit banner
+- `src/components/action-card.tsx` — ActionCard + ActionList
+- `src/components/focus-section.tsx` — weekly focus goals
+- `src/components/shipped-section.tsx` — portfolio commit counts
+- `src/components/lifecycle-actions.tsx` — snooze/archive/revive
+- `src/app/page.tsx` — tab-based layout (What Now + Projects)
+- `bin/dev.mjs` — dynamic port dev server with no orphans

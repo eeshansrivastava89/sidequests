@@ -1,8 +1,8 @@
-"use client";
 
+import React from "react";
 import type { PriorityAction, Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { copyToClipboard } from "@/lib/project-helpers";
+import { copyToClipboard, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { toast } from "sonner";
 import {
   GitBranch,
@@ -122,17 +122,20 @@ export function ActionCard({ action, project, onDismiss, onSelectProject }: Acti
           )}
 
           {/* GitHub issue link for issue actions */}
-          {action.source === "issue" && project?.scan?.remoteUrl && action.label.includes("open") && (
-            <a
-              href={`https://github.com/${extractOwnerRepo(project.scan.remoteUrl)}/issues`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              <ExternalLink className="size-3" />
-              View on GitHub
-            </a>
-          )}
+          {action.source === "issue" && project?.scan?.remoteUrl && (() => {
+            const ownerRepo = parseGitHubOwnerRepo(project.scan.remoteUrl);
+            return ownerRepo ? (
+              <a
+                href={`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}/issues`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                <ExternalLink className="size-3" />
+                View on GitHub
+              </a>
+            ) : null;
+          })()}
         </div>
 
         {/* Dismiss button */}
@@ -278,12 +281,4 @@ function ActionGroup({
       )}
     </div>
   );
-}
-
-import React from "react";
-
-function extractOwnerRepo(remoteUrl: string | null | undefined): string {
-  if (!remoteUrl) return "";
-  const match = remoteUrl.match(/github\.com[:/]([^/]+\/[^/.]+)/);
-  return match?.[1] ?? "";
 }

@@ -1,4 +1,3 @@
-"use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { RefreshState, ProjectProgress } from "@/hooks/use-refresh";

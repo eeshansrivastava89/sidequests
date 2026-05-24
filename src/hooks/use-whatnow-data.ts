@@ -1,4 +1,3 @@
-"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import type { FocusGoal, ShippedData, VisitDelta, PriorityAction, Project } from "@/lib/types";
@@ -109,30 +108,26 @@ export function useVisit() {
 
 /* ── Dismiss Alert ──────────────────────────────────────── */
 
-export function useDismissAlert() {
-  return useCallback(async (projectId: string, alertType: string, onDismissed?: () => void) => {
-    const res = await fetch(`/api/projects/${projectId}/dismiss-alert`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alertType }),
-    });
-    const data = await res.json();
-    if (data.ok && onDismissed) onDismissed();
-    return data;
-  }, []);
+export async function dismissAlert(projectId: string, alertType: string, onDismissed?: () => void) {
+  const res = await fetch(`/api/projects/${projectId}/dismiss-alert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ alertType }),
+  });
+  const data = await res.json();
+  if (data.ok && onDismissed) onDismissed();
+  return data;
 }
 
 /* ── Re-show Alert ──────────────────────────────────────── */
 
-export function useReshowAlert() {
-  return useCallback(async (projectId: string, alertType: string, onReshown?: () => void) => {
-    const res = await fetch(`/api/projects/${projectId}/dismiss-alert?alertType=${encodeURIComponent(alertType)}`, {
-      method: "DELETE",
-    });
-    const data = await res.json();
-    if (data.ok && onReshown) onReshown();
-    return data;
-  }, []);
+export async function reshowAlert(projectId: string, alertType: string, onReshown?: () => void) {
+  const res = await fetch(`/api/projects/${projectId}/dismiss-alert?alertType=${encodeURIComponent(alertType)}`, {
+    method: "DELETE",
+  });
+  const data = await res.json();
+  if (data.ok && onReshown) onReshown();
+  return data;
 }
 
 /* ── Aggregate Actions ──────────────────────────────────── */

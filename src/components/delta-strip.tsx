@@ -1,4 +1,3 @@
-"use client";
 
 import type { VisitDelta } from "@/lib/types";
 import { ArrowUpRight, ArrowDownRight, Plus, Minus, RefreshCw } from "lucide-react";

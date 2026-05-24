@@ -1,8 +1,7 @@
-"use client";
 
 import { Toaster } from "sonner";
-import { DashboardPage } from "./app/page";
-import "./app/globals.css";
+import { DashboardPage } from "./page";
+import "./styles/globals.css";
 
 export function App() {
   return (
