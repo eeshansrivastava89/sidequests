@@ -14,9 +14,6 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Resolve paths from APP_DATA_DIR (set by CLI launcher) or cwd
-const DATA_DIR = process.env.APP_DATA_DIR ?? process.cwd();
-
 // Serve Vite build assets (CSS, JS, fonts, etc.)
 app.use("/assets/*", serveStatic({ root: "./dist" }));
 app.use("/fonts/*", serveStatic({ root: "./dist" }));

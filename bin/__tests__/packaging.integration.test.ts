@@ -62,21 +62,24 @@ describe("packaging smoke test", () => {
         timeout: 120_000,
       });
 
-      // Verify hashed client packages were copied into standalone
-      const standaloneNM = path.join(PROJECT_ROOT, ".next/standalone/node_modules");
+      // Verify Vite SPA output exists
+      const distDir = path.join(PROJECT_ROOT, "dist");
+      expect(fs.existsSync(path.join(distDir, "index.html"))).toBe(true);
+      expect(fs.existsSync(path.join(distDir, "server.js"))).toBe(true);
 
-      // @prisma/client-<hash>
-      const prismaDir = path.join(standaloneNM, "@prisma");
-      const prismaEntries = fs.readdirSync(prismaDir);
-      const hashedPrisma = prismaEntries.find((e) => e.startsWith("client-"));
-      expect(hashedPrisma).toBeDefined();
-      expect(fs.existsSync(path.join(prismaDir, hashedPrisma!, "runtime/client.js"))).toBe(true);
+      // Verify at least one JS and one CSS asset
+      const assetsDir = path.join(distDir, "assets");
+      expect(fs.existsSync(assetsDir)).toBe(true);
+      const assets = fs.readdirSync(assetsDir);
+      expect(assets.some((f) => f.endsWith(".js"))).toBe(true);
+      expect(assets.some((f) => f.endsWith(".css"))).toBe(true);
 
-      // @libsql/client-<hash>
-      const libsqlDir = path.join(standaloneNM, "@libsql");
-      const libsqlEntries = fs.readdirSync(libsqlDir);
-      const hashedLibsql = libsqlEntries.find((e) => e.startsWith("client-"));
-      expect(hashedLibsql).toBeDefined();
+      // Verify Prisma generated client was copied
+      const nodeModulesDir = path.join(distDir, "node_modules");
+      expect(fs.existsSync(path.join(nodeModulesDir, "@prisma", "client"))).toBe(true);
+
+      // Verify libsql native module was copied
+      expect(fs.existsSync(path.join(nodeModulesDir, "libsql"))).toBe(true);
 
       // 2. Pack
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sq-pkg-test-"));
@@ -93,7 +96,7 @@ describe("packaging smoke test", () => {
       fs.renameSync(tarballSrc, tarballDest);
 
       // 2b. Assert no forbidden files in tarball
-      const forbiddenPatterns = [/\.db$/, /settings\.json$/, /docs\/internal\//,  /\.env\.local$/];
+      const forbiddenPatterns = [/\.db$/, /settings\.json$/, /docs\/internal\//, /\.env\.local$/];
       const fileList = packInfo[0]?.files?.map((f: { path: string }) => f.path) ?? [];
       for (const pattern of forbiddenPatterns) {
         const matches = fileList.filter((f: string) => pattern.test(f));

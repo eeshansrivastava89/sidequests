@@ -1,10 +1,7 @@
 import { Hono } from "hono";
 import { db } from "@/lib/db";
 import { mergeProjectView } from "@/lib/merge";
-import { coercePatchBody, findProject, safeJsonParse } from "@/lib/api-helpers";
-
-// Note: findProject in api-helpers returns Project | null from the DB.
-// For Hono, we inline the 404 pattern since we don't return NextResponse.
+import { coercePatchBody, safeJsonParse } from "@/lib/api-helpers";
 
 export const projectByIdRoute = new Hono();
 

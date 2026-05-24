@@ -1,18 +1,6 @@
 import { db } from "@/lib/db";
 
 /* ------------------------------------------------------------------ */
-/*  Find-or-404 (framework-agnostic)                                   */
-/* ------------------------------------------------------------------ */
-
-/**
- * Find a project by id or return null.
- * Callers handle the null case with their framework's response type.
- */
-export async function findProject(id: string) {
-  return db.project.findUnique({ where: { id } });
-}
-
-/* ------------------------------------------------------------------ */
 /*  PATCH field coercion (framework-agnostic)                          */
 /* ------------------------------------------------------------------ */
 

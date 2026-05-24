@@ -191,7 +191,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
   const rawScan = parseJson<RawScan | null>(scan?.rawJson, null);
   const derivedData = parseJson<Record<string, unknown>>(derived?.derivedJson, {});
 
-  // status: Override > Derived > "archived" (see per-field table in ARCHITECTURE.md)
+  // status: Override > Derived > "archived" (see per-field merge-priority table below)
   const status =
     override?.statusOverride ??
     derived?.statusAuto ??

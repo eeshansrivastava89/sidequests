@@ -29,13 +29,18 @@ if (!existsSync(nodeModulesDir)) {
   mkdirSync(nodeModulesDir, { recursive: true });
 }
 
-const copyMod = (name) =>
-  cpSync(`node_modules/${name}`, join(nodeModulesDir, name), { recursive: true });
+const copyMod = (name) => {
+  const src = `node_modules/${name}`;
+  if (!existsSync(src)) {
+    console.warn(`⚠ Optional module ${name} not found, skipping`);
+    return;
+  }
+  cpSync(src, join(nodeModulesDir, name), { recursive: true });
+};
 
 // Prisma + libsql native bindings
 copyMod("@prisma/client");
 copyMod("@prisma/adapter-libsql");
-copyMod("@prisma/client-libsql");  // may not exist, that's ok
 copyMod("@libsql/core");
 copyMod("@libsql/hrana-client");
 copyMod("libsql");
