@@ -5,63 +5,70 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phase 0 + Phase 1 COMPLETE, ready for Phase 2 (API routes)
+- Current phase: Phase 2 COMPLETE, ready for Phase 3 (frontend redesign)
 
 ## Git Snapshot
 - Branch: main
 - Recent commits:
+  - 5e8c3bb feat: Phase 2 — API routes for actions, lifecycle, focus, visit, and shipped
+  - b9f6749 feat: Phase 1 — data model extensions
   - 14b3539 chore: clean up Phase 0 dead code and stale Next.js artifacts
   - a34cc54 Merge feat/hono-vite-migration into main: Phase 0 complete
-  - 5e1a530 feat: Phase 0 complete — Hono+Vite migration
-- Working tree: has uncommitted Phase 1 changes
+- Working tree: clean
 - Nothing pushed to origin
 
 ## What We Were Doing
-- Task: Phase 0 cleanup → Phase 1 (data model extensions) — COMPLETE
+- Task: Phase 0 cleanup → Phase 1 (data model extensions) → Phase 2 (API routes) — ALL COMPLETE
 - Progress:
   - [x] Phase 0 cleanup: removed stale Next.js artifacts, dead code, redundant deps, rewrote packaging test
-  - [x] Phase 1: Added `snoozedUntil` + `archivedNote` columns to Project model in Prisma schema
-  - [x] Phase 1: Added `weekCommits`/`monthCommits`/`quarterCommits` columns to Derived model
-  - [x] Phase 1: Created `WeeklyFocus` model (goal tracking per project per week)
-  - [x] Phase 1: Created `DismissedAlert` model (unique on projectId + alertType)
-  - [x] Phase 1: Created `UserPreference` model (key-value, replaces settings.json long-term)
-  - [x] Phase 1: Created `UserVisit` model (single-row snapshot for "since last visit")
-  - [x] Phase 1: Updated `bootstrap-db.mjs` with new SCHEMA_SQL (4 new tables) + MIGRATIONS (7 new ALTER TABLEs)
-  - [x] Phase 1: Updated `bootstrap-db.test.ts` with new tables, columns, and indexes
-  - [x] Phase 1: Added `countCommitsSince()` to scan.ts — computes week/month/quarter commit counts via `git log --since`
-  - [x] Phase 1: Updated `pipeline.ts` to store commit counts in Derived upsert
-  - [x] Phase 1: Updated `MergedProject` interface + `buildMergedView()` with snoozedUntil, archivedNote, weekCommits/monthCommits/quarterCommits
-  - [x] Phase 1: Updated integration test bootstrap to run migrations on test DB
-  - [x] Phase 1: All 245 unit tests + 19 integration tests + 5 bootstrap tests passing
+  - [x] Phase 1: 4 new tables (WeeklyFocus, DismissedAlert, UserPreference, UserVisit), 2 new Project columns (snoozedUntil, archivedNote), 3 new Derived columns (weekCommits, monthCommits, quarterCommits), pipeline scan computes commit counts by date range
+  - [x] Phase 2: `src/lib/actions.ts` — priority action computation (5 action types, severity ranking, dismissal filtering, snooze detection)
+  - [x] Phase 2: Extended GET /api/projects with actions[] and isSnoozed per project
+  - [x] Phase 2: Extended PATCH /override to handle snoozedUntil and archivedNote on Project model
+  - [x] Phase 2: POST/DELETE /api/projects/:id/dismiss-alert routes
+  - [x] Phase 2: GET/POST /api/focus routes (weekly focus goals)
+  - [x] Phase 2: PUT /api/focus/:id (update goal/completion)
+  - [x] Phase 2: GET/POST /api/visit routes (since-last-visit delta)
+  - [x] Phase 2: GET /api/shipped route (portfolio commit aggregates)
+  - [x] 260 unit tests + 37 integration tests + 5 bootstrap tests pass
 
 ## Decisions
 - **Priority actions: computed, not stored.** API computes `actions[]` per project from existing data. Dismissals tracked via lightweight `DismissedAlert` table.
-- **Snooze/archive/revive: 2 columns on Project.** `snoozedUntil` + `archivedNote`, flowing through existing override API.
-- **Since-last-visit: UserVisit snapshot.** Single row storing last-visit merged project state as JSON.
-- **Shipped history: columns on Derived.** `weekCommits`/`monthCommits`/`quarterCommits` computed during scan.
-- **Phase 0 cleanup:** Removed next-env.d.ts, Next.js plugin from tsconfig, unused findProject export, unused config import, unused DATA_DIR variable, stale ARCHITECTURE.md reference. Consolidated Radix UI imports to umbrella package. Removed 5 redundant @radix-ui deps + @testing-library/dom. Rewrote packaging test for Vite+Hono.
-- **Radix UI:** Umbrella `radix-ui` package used for all components. `Slot` accessed via `SlotPrimitive.Slot` pattern since umbrella re-exports namespaces.
+- **Snooze/archive/revive: on Project model.** `snoozedUntil` + `archivedNote` flow through PATCH /override, directly updating Project table (not Override table).
+- **Since-last-visit: UserVisit snapshot.** Single row storing `snapshotJson` — GET computes delta, POST saves current state.
+- **Shipped history: Derived columns.** `weekCommits`/`monthCommits`/`quarterCommits` computed during scan via `git rev-list --count HEAD --since=`.
+- **Focus goals: WeeklyFocus table.** Per-project goals with completion toggle, scoped to current week (Monday start).
+- **Actions sorted by severity.** High → med → low, then by type for stable ordering.
+- **DismissedAlert: unique on (projectId, alertType).** One dismissal per alert type per project.
+- **Phase 0 cleanup:** Removed next-env.d.ts, Next.js plugin from tsconfig, consolidated Radix UI imports to umbrella package, removed 5 redundant @radix-ui deps, removed @testing-library/dom, rewrote packaging test for Vite+Hono
 
 ## Open Items
-- Phase 2: API routes (extend projects response with actions, focus, visit, shipped endpoints)
 - Phase 3: Frontend redesign (What Now + Projects views, DeltaStrip, ActionCard, FocusSection, ShippedSection)
 - Phase 4: Notifications (node-notifier)
 - End-to-end npx validation needed before shipping
 - GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
 - Standalone Prisma hash fragility root cause unresolved
-- Pre-existing TypeScript strict errors in [id].ts (Hono status code types) and some test files — not blocking but should be addressed
+- Pre-existing TS strict errors in [id].ts (Hono status code types) — not blocking
+- Packaging integration test fails at server startup (esbuild "Dynamic require of node:path" issue) — pre-existing, not Phase-related
 
 ## Resume Plan
-1. Commit Phase 1 changes
-2. Start Phase 2: Extend projects response with actions, create focus/visit/shipped API routes
-3. Extend override endpoint to handle snooze/archive/revive
-4. Create action computation logic (`src/lib/actions.ts`)
+1. Start Phase 3: Frontend redesign — What Now view with priority action cards, delta strip, focus section, shipped section
+2. Build new UI components: DeltaStrip, ActionCard, FocusSection, ShippedSection, LifecycleActions
+3. Refactor page.tsx into tab-based layout (What Now / Projects)
+4. Then Phase 4: Notifications (node-notifier)
 
 ## Key Files
-- `docs/internal/IMPLEMENTATION_PLAN.md` — revised plan with Phase 0 + Phase 1 checkmarks complete
+- `docs/internal/IMPLEMENTATION_PLAN.md` — Phase 0 + Phase 1 + Phase 2 checkmarks complete
 - `docs/internal/PRODUCT_VISION.md` — product vision (unchanged)
-- `prisma/schema.prisma` — updated with 4 new models + 2 new Project columns + 3 new Derived columns
-- `bin/bootstrap-db.mjs` — updated with new tables and migrations
-- `src/lib/pipeline-native/scan.ts` — now computes weekCommits/monthCommits/quarterCommits
-- `src/lib/merge.ts` — MergedProject + buildMergedView updated with new fields
-- `src/lib/__tests__/helpers/test-db.ts` — exports TEST_DB_PATH, cleanDb handles 12 tables
+- `src/lib/actions.ts` — priority action computation engine (NEW)
+- `src/api/routes/dismiss-alert.ts` — dismiss/re-show alert routes (NEW)
+- `src/api/routes/focus/index.ts` — weekly focus goals CRUD (NEW)
+- `src/api/routes/visit/index.ts` — since-last-visit delta (NEW)
+- `src/api/routes/shipped.ts` — portfolio commit aggregates (NEW)
+- `src/api/routes/projects.ts` — extended with actions + snooze flag (MODIFIED)
+- `src/api/routes/projects/[id].ts` — extended override for snooze/archive/revive (MODIFIED)
+- `prisma/schema.prisma` — 4 new models + 5 new columns (MODIFIED)
+- `bin/bootstrap-db.mjs` — new tables + migrations (MODIFIED)
+- `src/lib/pipeline-native/scan.ts` — countCommitsSince for date-range commit counts (MODIFIED)
+- `src/lib/merge.ts` — MergedProject extended with new fields (MODIFIED)
+- `src/lib/pipeline.ts` — stores commit counts in Derived upsert (MODIFIED)
