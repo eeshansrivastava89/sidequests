@@ -52,11 +52,26 @@ refreshRoute.get("/stream", async (c) => {
   c.req.raw.signal.addEventListener("abort", () => abort.abort());
 
   return streamSSE(c, async (stream) => {
+    // We track pending writes so we can await them before the stream closes.
+    // Without this, the final "done" event can be lost because stream.writeSSE()
+    // is async and the stream callback may return before the write completes.
+    let pendingWrite: Promise<unknown> | null = null;
+
     function emit(event: PipelineEvent) {
-      stream.writeSSE({
+      // Await any previous write before starting a new one to preserve ordering.
+      // Capture the promise so we can await it later.
+      pendingWrite = stream.writeSSE({
         event: event.type,
         data: JSON.stringify(event),
       });
+    }
+
+    // Flush any in-flight write.
+    async function flush() {
+      if (pendingWrite) {
+        await pendingWrite;
+        pendingWrite = null;
+      }
     }
 
     try {
@@ -64,13 +79,16 @@ refreshRoute.get("/stream", async (c) => {
     } catch (err) {
       if (abort.signal.aborted) return;
       const message = err instanceof Error ? err.message : String(err);
-      stream.writeSSE({
+      await stream.writeSSE({
         event: "pipeline_error",
         data: JSON.stringify({ error: message }),
       });
     } finally {
       pipelineRunning = false;
       pipelineAbort = null;
+      // Ensure the final event (done / pipeline_error) is flushed before the
+      // stream callback returns and Hono closes the connection.
+      await flush();
     }
   });
 });

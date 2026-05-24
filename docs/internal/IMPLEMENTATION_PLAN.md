@@ -298,34 +298,30 @@ Everything visible. No accordions, no "click to expand." If content is secondary
 
 ---
 
-## Phase 4: Notifications
+## Phase 4: Notifications — Deprecated
 
-### Backend: node-notifier
-- Uses `node-notifier` npm package — sends native macOS/Windows/Linux notifications
-- No app install required
-- Triggered by pipeline after scan/derive/LLM cycle completes
+System notifications via `node-notifier` have been **removed**. The approach had low signal-to-noise (pop-up per project) and the terminal-notifier proxy message was confusing.
 
-### Notification types (v1)
-- CI failure (project had CI passing, now failing)
-- Stale threshold crossed (project went from active → paused, or crossed 30/60/90 day thresholds)
-- Unpushed commits aging (commits ahead > 0 and days inactive > 7)
+**Replaced by:**
+- In-app attention signals: the What Now tab surfaces priority actions, delta indicators, focus goals, and shipped counts — all visible when you open the dashboard
+- Future menu bar companion (Phase 5) will use badge count changes on the icon, which is subtler and more appropriate than system notifications
 
-### Not in v1 (deferred)
-- Time-based notifications ("Monday 9am focus reminder") — requires a scheduler
-- New GitHub issue notifications — requires webhook or polling separate from scan cycle
-- Notification center UI — Activity log + toasts suffice for v1
+**Deprecated and removed:**
+- `node-notifier` dependency (uninstalled)
+- `src/lib/notifications.ts` (deleted)
+- `src/types/node-notifier.d.ts` (deleted)
+- Pipeline notification step (removed — done event now fires immediately after project processing)
+- `Activity` rows with `type: "notification"` are cleaned up on each scan
 
-### Notification deduplication
-- Each notification type per project is tracked in `Activity` table (`type: "notification"`)
-- Only send once per state transition (don't re-notify about same CI failure)
-- Quiet hours configurable via `UserPreference`
+Notification rule logic (CI failure transitions, stale thresholds, unpushed aging) may be revived as in-app badges or menu bar indicators in a future phase, but system notification pop-ups are not the right UX.
 
 ### Checklist
-- [x] Install `node-notifier` dependency
-- [x] Create `src/lib/notifications.ts` — notification rules + deduplication logic
-- [x] Hook into pipeline: after scan completes, evaluate notification rules
-- [x] Track sent notifications in `Activity` table
-- [x] Quiet hours check via `UserPreference`
+- [x] Remove `node-notifier` dependency
+- [x] Delete `src/lib/notifications.ts`
+- [x] Delete `src/types/node-notifier.d.ts`
+- [x] Remove notification step from pipeline (done event now fires immediately)
+- [x] Clean up old notification Activity rows on scan
+- [ ] Delete `src/lib/__tests__/notifications.test.ts` (done)
 
 ---
 

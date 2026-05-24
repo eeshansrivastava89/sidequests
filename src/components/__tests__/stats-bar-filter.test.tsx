@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import { StatsBar } from "@/components/stats-bar";
+import { StatsBar } from "@/components/overview-strip";
 import type { Project } from "@/lib/types";
 
 afterEach(cleanup);

@@ -204,9 +204,7 @@
 }
 
 .row-scan-complete {
-  background-image: linear-gradient(90deg, var(--blue), var(--green)) !important;
-  background-repeat: no-repeat !important;
-  background-position: bottom left !important;
-  background-size: 100% 3px !important;
+  border-left: 4px solid var(--green) !important;
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--green) 8%, transparent), transparent 40%) !important;
   animation: scan-sweep 1.2s ease-out forwards;
 }

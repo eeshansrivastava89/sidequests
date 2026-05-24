@@ -44,7 +44,6 @@
     "clsx": "^2.1.1",
     "hono": "^4.12.22",
     "lucide-react": "^0.563.0",
-    "node-notifier": "^10.0.1",
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",

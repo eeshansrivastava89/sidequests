@@ -5,64 +5,64 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phases 0–4 COMPLETE. Ready for v1 validation + shipping.
+- Current phase: Phases 0–4 complete, Phase 4 (notifications) DEPRECATED. UI redesign + bugfix in progress.
 
 ## Git Snapshot
 - Branch: main
 - Recent commits:
-  - 8b64df7 feat: Phase 4 — native notifications (node-notifier)
-  - 7d63a91 fix: robust dev server with no orphan processes
-  - 0c5b791 fix: dynamic port discovery for dev server
-  - 684aa08 feat: Phase 3 — What Now view, action cards, focus, shipped, lifecycle UI
-  - f0e262b docs: update context — Phase 0-2 complete
-- Working tree: clean
+  - 17d0652 chore: code review cleanup — dead code, DRY violations, stale artifacts
+- Working tree: modified (multiple files: pipeline, refresh, UI components, notifications removed)
 - Nothing pushed to origin
 
 ## What We Were Doing
-- Task: Phases 0–4 of the implementation plan — ALL COMPLETE
-- Progress:
-  - [x] Phase 0: Hono+Vite migration
-  - [x] Phase 1: Data model extensions (4 new tables, 5 new columns)
-  - [x] Phase 2: API routes (actions, lifecycle, focus, visit, shipped)
-  - [x] Phase 3: Frontend (What Now view, action cards, focus, shipped, lifecycle actions)
-  - [x] Phase 4: Notifications (node-notifier, dedup, quiet hours)
+- Task 1 (DONE): Redesigned the What Now tab — replaced accordions with flat feed, moved stats to top, densified action rows, removed red borders
+- Task 2 (DONE): Fixed fast scan `done` event not reaching client — root cause was `stream.writeSSE()` not being awaited, and notifications step blocking the `done` emit
+- Task 3 (DONE): Added per-project logging during store phase in pipeline
+- Task 4 (DONE): Deprecated system notifications (node-notifier) — removed package, module, type declaration, pipeline step; in-app + menu bar badges are the right UX
 
 ## Decisions
-- **Priority actions: computed, not stored.** Dismissals via DismissedAlert table.
-- **Snooze/archive/revive: on Project model.** Flow through PATCH /override.
-- **Since-last-visit: UserVisit snapshot.** Snapshot on visibility change / beforeunload.
-- **Shipped history: Derived columns.** Computed during scan via git rev-list.
-- **Focus goals: WeeklyFocus table.** Scoped to current week (Monday start).
-- **Notifications: pipeline hook.** Best-effort after scan completes. 24h dedup. Quiet hours via UserPreference.
-- **Dev server: bin/dev.mjs.** Dynamic port discovery, no orphans, direct binary spawns.
+- **What Now redesign**: No accordions (all severity groups visible), stats/delta/focus/shipped at top in compact overview strip, action rows instead of cards, no red borders, severity as small dots
+- **SSE done event bug**: `stream.writeSSE()` must be awaited; done event must fire BEFORE notifications/cleanup
+- **Notifications deprecated**: node-notifier removed. In-app attention signals (What Now tab) and future menu bar badge are the replacement. `Activity` rows with `type: "notification"` are cleaned up on each scan.
+- Priority actions: computed, not stored. Dismissals via DismissedAlert table.
+- Snooze/archive/revive: on Project model. Flow through PATCH /override.
+- Since-last-visit: UserVisit snapshot. Snapshot on visibility change / beforeunload.
+- Shipped history: Derived columns. Computed during scan via git rev-list.
+- Focus goals: WeeklyFocus table. Scoped to current week (Monday start).
+- Dev server: bin/dev.mjs. Dynamic port discovery, no orphans, direct binary spawns.
+- attention.ts deleted: fully replaced by actions.ts (Phase 2).
+- dismissAlert/reshowAlert: plain functions, not hooks.
 
 ## Open Items
 - End-to-end npx validation needed before shipping
+- page.tsx still 876 lines — should be split into useDashboardState hook + WhatNowView + ProjectsView components
+- LifecycleActions prompt() should use a modal instead
+- beforeunload visit save should use navigator.sendBeacon() for reliability
 - GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
 - Standalone Prisma hash fragility root cause unresolved
 - Pre-existing TS strict errors in [id].ts (Hono status code types) — not blocking
 - Packaging integration test fails at server startup (esbuild "Dynamic require of node:path") — pre-existing
 - Per-project shipped history in detail pane (deferred to v2 polish)
+- Old stats-bar.tsx and delta-strip.tsx files are dead code — can be deleted
 
 ## Resume Plan
-1. End-to-end npx validation: build:npx → run → verify all endpoints
-2. Push to origin
-3. Phase 5+ (future): menu bar companion, CLI shell integration
+1. Visual QA of the What Now redesign on dev server
+2. Refactor page.tsx into smaller pieces (useDashboardState + WhatNowView + ProjectsView)
+3. End-to-end npx validation
+4. Push to origin
+5. Phase 5 (menu bar companion) / Phase 6 (CLI shell integration) when ready
 
 ## Key Files
-- `docs/internal/IMPLEMENTATION_PLAN.md` — Phases 0–4 complete ✅
-- `docs/internal/PRODUCT_VISION.md` — product vision
-- `src/lib/actions.ts` — priority action computation
-- `src/lib/notifications.ts` — notification rules + dedup (NEW Phase 4)
-- `src/api/routes/dismiss-alert.ts` — dismiss/re-show alerts
-- `src/api/routes/focus/index.ts` — weekly focus CRUD
-- `src/api/routes/visit/index.ts` — visit delta
-- `src/api/routes/shipped.ts` — portfolio shipped history
-- `src/hooks/use-whatnow-data.ts` — focus, shipped, visit, dismiss hooks
-- `src/components/delta-strip.tsx` — since-last-visit banner
-- `src/components/action-card.tsx` — ActionCard + ActionList
-- `src/components/focus-section.tsx` — weekly focus goals
-- `src/components/shipped-section.tsx` — portfolio commit counts
-- `src/components/lifecycle-actions.tsx` — snooze/archive/revive
-- `src/app/page.tsx` — tab-based layout (What Now + Projects)
-- `bin/dev.mjs` — dynamic port dev server with no orphans
+- `src/page.tsx` — tab-based layout (What Now + Projects) with new OverviewStrip
+- `src/components/overview-strip.tsx` — NEW: consolidated delta/shipped/focus/stats at top of What Now
+- `src/components/action-card.tsx` — redesigned: flat ActionFeed rows (no accordions, no red borders)
+- `src/components/focus-section.tsx` — made more compact
+- `src/components/shipped-section.tsx` — made more compact
+- `src/api/routes/refresh.ts` — FIXED: SSE done event now awaited before stream closes
+- `src/lib/pipeline.ts` — FIXED: done event emits before notifications; per-project store logging; notifications step REMOVED
+- `src/lib/notifications.ts` — DELETED
+- `src/types/node-notifier.d.ts` — DELETED
+- `src/lib/__tests__/notifications.test.ts` — DELETED
+- `src/components/stats-bar.tsx` — dead code (superseded by overview-strip.tsx), can delete
+- `src/components/delta-strip.tsx` — dead code (superseded by overview-strip.tsx), can delete
+- `docs/internal/IMPLEMENTATION_PLAN.md` — Phase 4 updated to deprecation status

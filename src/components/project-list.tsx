@@ -50,11 +50,16 @@ function VisibilityIcon({ visibility }: { visibility: string }) {
 function getRowShimmerClass(project: Project, refreshProgress?: Map<string, ProjectProgress>): string {
   const prog = refreshProgress?.get(project.pathHash);
   if (!prog) return "";
+  // LLM enrichment running — purple glow
   if (prog.llmStatus === "running") return "row-enriching";
+  // Store/scan running — blue shimmer
   if (prog.storeStatus === "running") return "row-scanning";
+  // LLM error — red border
   if (prog.llmStatus === "error") return "row-error";
-  // Only show "done" when the LLM step completed (not just store)
+  // LLM completed — green sweep
   if (prog.llmStatus === "done") return "row-done";
+  // Fast scan completed (store done, no LLM) — green sweep
+  if (prog.storeStatus === "done" && prog.llmStatus === "pending") return "row-scan-complete";
   return "";
 }
 
@@ -105,7 +110,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         const prog = refreshProgress?.get(project.pathHash);
         const shimmerClass = getRowShimmerClass(project, refreshProgress);
         const lastActive = project.lastTouchedAt ?? project.scan?.lastCommitDate ?? "";
-        const scanDelay = shimmerClass === "row-scan-complete" && prog?.storeOrder != null
+        const scanDelay = (shimmerClass === "row-scan-complete" || shimmerClass === "row-done") && prog?.storeOrder != null
           ? { animationDelay: `${prog.storeOrder * 150}ms`, animationFillMode: "backwards" as const }
           : undefined;
 

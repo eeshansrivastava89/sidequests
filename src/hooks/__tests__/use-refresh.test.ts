@@ -17,7 +17,8 @@ function makeActiveState(overrides: Partial<RefreshState> = {}): RefreshState {
 describe("parseSSE", () => {
   it("should parse a single SSE frame", () => {
     const result = parseSSE("event: enumerate_complete\ndata: {}\n\n");
-    expect(result).toEqual([{ type: "enumerate_complete", data: "{}" }]);
+    expect(result.events).toEqual([{ type: "enumerate_complete", data: "{}" }]);
+    expect(result.remainder).toBe("");
   });
 
   it("should parse multiple SSE frames in one chunk", () => {
@@ -25,28 +26,31 @@ describe("parseSSE", () => {
       'event: enumerate_complete\ndata: {"projectCount":5}\n\n' +
       'event: project_start\ndata: {"name":"a","step":"store","index":0,"total":5}\n\n';
     const result = parseSSE(chunk);
-    expect(result).toHaveLength(2);
-    expect(result[0].type).toBe("enumerate_complete");
-    expect(result[1].type).toBe("project_start");
+    expect(result.events).toHaveLength(2);
+    expect(result.events[0].type).toBe("enumerate_complete");
+    expect(result.events[1].type).toBe("project_start");
+    expect(result.remainder).toBe("");
   });
 
   it("should default event type to 'message' when missing", () => {
     const result = parseSSE('data: {"hello":true}\n\n');
-    expect(result).toEqual([{ type: "message", data: '{"hello":true}' }]);
+    expect(result.events).toEqual([{ type: "message", data: '{"hello":true}' }]);
+    expect(result.remainder).toBe("");
   });
 
-  it("should return empty array for empty/whitespace input", () => {
-    expect(parseSSE("")).toEqual([]);
-    expect(parseSSE("  \n\n  ")).toEqual([]);
+  it("should return empty events for empty/whitespace input", () => {
+    expect(parseSSE("").events).toEqual([]);
+    expect(parseSSE("  \n\n  ").events).toEqual([]);
   });
 
   it("should ignore blocks without data lines", () => {
-    expect(parseSSE("event: heartbeat\n\n")).toEqual([]);
+    expect(parseSSE("event: heartbeat\n\n").events).toEqual([]);
   });
 
-  it("should handle incomplete frames (no trailing double newline)", () => {
+  it("should keep incomplete frames in remainder (no trailing double newline)", () => {
     const result = parseSSE('event: done\ndata: {"projectCount":3}');
-    expect(result).toEqual([{ type: "done", data: '{"projectCount":3}' }]);
+    expect(result.events).toEqual([]);
+    expect(result.remainder).toBe('event: done\ndata: {"projectCount":3}');
   });
 });
 

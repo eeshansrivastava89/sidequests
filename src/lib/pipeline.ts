@@ -174,6 +174,9 @@ export async function runRefreshPipeline(
     const name = dir.name;
 
     emit({ type: "project_start", name, pathHash: dir.pathHash, index: i, total, step: "store" });
+    if (process.env.NODE_ENV !== "test") {
+      console.log(`[pipeline] [store] ${name} (${i + 1}/${total})`);
+    }
 
     // 3a. Scan
     const scanned = scanProject(dir.absPath);
@@ -541,44 +544,27 @@ export async function runRefreshPipeline(
     });
   }
 
-  // 5. Evaluate and send notifications
-  if (process.env.NODE_ENV !== "test") {
-    try {
-      const { sendNotifications } = await import("./notifications");
-      const { mergeAllProjects } = await import("./merge");
-      const mergedProjects = await mergeAllProjects();
-      const result = await sendNotifications(mergedProjects);
-      if (result.sent.length > 0) {
-        console.log(`[pipeline] Notifications sent: ${result.sent.length}`);
-      }
-    } catch (err) {
-      // Notifications are best-effort — don't fail the pipeline
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[pipeline] Notification error: ${msg}`);
-    }
-  }
-
-  // 6. Cleanup: delete Activity records older than 90 days
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-  await db.activity.deleteMany({
-    where: { createdAt: { lt: ninetyDaysAgo } },
-  });
-
+  // 5. Emit done IMMEDIATELY — don't let notifications/cleanup delay it
+  //    The UI needs this event to transition out of "active" state.
   if (signal?.aborted) {
     return { projectCount: projectDirs.length };
   }
 
   const durationMs = Date.now() - startTime;
   if (process.env.NODE_ENV !== "test") {
+    const scanType = options?.skipLlm ? "Fast scan" : "AI scan";
     console.log(
-      `[pipeline] Complete in ${(durationMs / 1000).toFixed(1)}s — ` +
-      `${projectDirs.length} projects, ` +
-      `LLM: ${llmSucceeded} ok / ${llmFailed} failed / ${llmSkipped} skipped` +
+      `[pipeline] ${scanType} complete in ${(durationMs / 1000).toFixed(1)}s — ` +
+      `${projectDirs.length} projects` +
+      (llmSkipped > 0 ? "" : `, LLM: ${llmSucceeded} ok / ${llmFailed} failed`) +
       (providerName ? ` (${providerName})` : ""),
     );
     if (llmFailedNames.length > 0) {
       console.log(`[pipeline] Failed projects: ${llmFailedNames.join(", ")}`);
     }
+  }
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[pipeline] Emitting done event`);
   }
   emit({
     type: "done",
@@ -589,6 +575,23 @@ export async function runRefreshPipeline(
     llmSkipped,
     durationMs,
     provider: providerName ?? undefined,
+  });
+
+  // 6. Notifications are deprecated — in-app attention signals (What Now tab)
+  //    and future menu bar badges replace system notifications.
+  //    Cleanup old notification Activity records:
+  if (process.env.NODE_ENV !== "test") {
+    try {
+      await db.activity.deleteMany({ where: { type: "notification" } });
+    } catch {
+      // Best-effort
+    }
+  }
+
+  // 7. Cleanup: delete Activity records older than 90 days
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  await db.activity.deleteMany({
+    where: { createdAt: { lt: ninetyDaysAgo } },
   });
 
   return { projectCount: projectDirs.length };

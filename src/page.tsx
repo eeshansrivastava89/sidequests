@@ -6,19 +6,19 @@ import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import { useFocusGoals, useShipped, useVisit, dismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
 import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
-import { StatsBar } from "@/components/stats-bar";
+import { StatsBar } from "@/components/overview-strip";
 import { ProjectList } from "@/components/project-list";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
-import { DeltaStrip } from "@/components/delta-strip";
-import { ActionList } from "@/components/action-card";
+import { ActionFeed } from "@/components/action-card";
+import { OverviewStrip } from "@/components/overview-strip";
 import { FocusSection } from "@/components/focus-section";
 import { ShippedSection } from "@/components/shipped-section";
 import { LifecycleActions } from "@/components/lifecycle-actions";
 
-import type { SignalFilter } from "@/components/stats-bar";
+import type { StatsBarSignalFilter as SignalFilter } from "@/components/overview-strip";
 import { SettingsModal } from "@/components/settings-modal";
 import { ActivityLogPanel } from "@/components/activity-log-panel";
 import { Button } from "@/components/ui/button";
@@ -271,6 +271,7 @@ export function DashboardPage() {
     const names = selectedNames.size > 0 ? [...selectedNames] : undefined;
     refreshHook.start({ skipLlm: true, selectedNames: names });
     setSelectedNames(new Set());
+    setTab("projects");
   }, [deltaHook, refreshHook, selectedNames]);
 
   const handleAiScan = useCallback(() => {
@@ -278,6 +279,7 @@ export function DashboardPage() {
     const names = selectedNames.size > 0 ? [...selectedNames] : undefined;
     refreshHook.start({ selectedNames: names });
     setSelectedNames(new Set());
+    setTab("projects");
   }, [deltaHook, refreshHook, selectedNames]);
 
   const handleToggleSelect = useCallback((name: string) => {
@@ -574,20 +576,36 @@ export function DashboardPage() {
             {/* ── What Now Tab ── */}
             {tab === "whatnow" && (
               <div className="space-y-6">
-                <DeltaStrip visit={visitHook.visit} loading={visitHook.loading} />
+                {/* Overview strip: delta + shipped + focus at a glance */}
+                <OverviewStrip
+                  projects={projects}
+                  focusGoals={focusHook.goals}
+                  shipped={shippedHook.shipped}
+                  visit={visitHook.visit}
+                  visitLoading={visitHook.loading}
+                  focusLoading={focusHook.loading}
+                  shippedLoading={shippedHook.loading}
+                  onAddFocusGoal={() => setTab("whatnow")}
+                  onToggleFocusGoal={(id, completed) => focusHook.updateGoal(id, { completed })}
+                  activeFilter={signalFilter}
+                  onFilter={(f) => { setSignalFilter(f); setTab("projects"); }}
+                  onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
+                />
 
+                {/* Priority actions feed */}
                 <div>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Priority Actions
                   </h2>
-                  <ActionList
+                  <ActionFeed
                     projects={projects}
                     onDismiss={handleDismissAlert}
                     onSelectProject={(id) => setSelectedId(id)}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Expanded goals & shipped below actions */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <FocusSection
                     goals={focusHook.goals}
                     loading={focusHook.loading}
@@ -777,7 +795,7 @@ export function DashboardPage() {
                           onSelect={(p) => setSelectedId(p.id)}
                           onTogglePin={handleTogglePin}
                           onTouch={handleTouch}
-                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                          refreshProgress={refreshHook.state.projects.size > 0 ? refreshHook.state.projects : undefined}
                           selectedNames={selectedNames}
                           onToggleSelect={handleToggleSelect}
                           onSelectAll={handleSelectAll}
@@ -798,7 +816,7 @@ export function DashboardPage() {
                           onSelect={(p) => setSelectedId(p.id)}
                           onTogglePin={handleTogglePin}
                           onTouch={handleTouch}
-                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
+                          refreshProgress={refreshHook.state.projects.size > 0 ? refreshHook.state.projects : undefined}
                           selectedNames={selectedNames}
                           onToggleSelect={handleToggleSelect}
                           onSelectAll={handleSelectAll}

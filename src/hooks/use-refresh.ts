@@ -57,10 +57,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Parse a single SSE frame: "event: <type>\ndata: <json>\n\n" */
-export function parseSSE(chunk: string): Array<{ type: string; data: string }> {
+/** Parse complete SSE frames from a buffer.
+ * Only processes blocks terminated by \n\n — the incomplete tail
+ * is returned so the caller can prepend it to the next chunk.
+ */
+export function parseSSE(buffer: string): { events: Array<{ type: string; data: string }>; remainder: string } {
   const events: Array<{ type: string; data: string }> = [];
-  const blocks = chunk.split("\n\n");
+  const lastDoubleNewline = buffer.lastIndexOf("\n\n");
+
+  // If no complete frame terminator, the entire buffer is incomplete
+  if (lastDoubleNewline < 0) {
+    return { events: [], remainder: buffer };
+  }
+
+  // Everything up to (and including) the last \n\n is complete
+  const complete = buffer.slice(0, lastDoubleNewline + 2); // +2 to include \n\n
+  const remainder = buffer.slice(lastDoubleNewline + 2);
+
+  const blocks = complete.split("\n\n");
   for (const block of blocks) {
     if (!block.trim()) continue;
     let type = "message";
@@ -71,7 +85,8 @@ export function parseSSE(chunk: string): Array<{ type: string; data: string }> {
     }
     if (data) events.push({ type, data });
   }
-  return events;
+
+  return { events, remainder };
 }
 
 function getActiveProvider(projects: Map<string, ProjectProgress>, fallback?: string): string {
@@ -102,9 +117,17 @@ function buildLlmPhase(projects: Map<string, ProjectProgress>, provider?: string
 
 /** Pure state reducer for SSE events — testable without React. */
 export function reduceRefreshEvent(state: RefreshState, type: string, raw: string): RefreshState {
+  // Safety: if JSON parsing fails for any reason, don't crash — return unchanged state
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let d: any;
+  try {
+    d = JSON.parse(raw);
+  } catch {
+    return state;
+  }
+
   switch (type) {
     case "enumerate_complete": {
-      const d = JSON.parse(raw);
       // Pre-populate all projects as "pending" so the activity log shows the full list
       const projects = new Map(state.projects);
       const names: string[] = d.names ?? [];
@@ -118,18 +141,18 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       return { ...state, projects, phase: `Found ${d.projectCount} projects. Scanning...` };
     }
     case "project_start": {
-      const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
       const key = d.pathHash ?? d.name!;
       const existing = projects.get(key) ?? {
         name: d.name!,
         storeStatus: "pending" as const,
         llmStatus: "pending" as const,
+        provider: undefined as string | undefined,
       };
       if (d.step === "store") existing.storeStatus = "running";
       else if (d.step === "llm") {
         existing.llmStatus = "running";
-        existing.provider = d.provider ?? existing.provider;
+        existing.provider = d.provider as string | undefined ?? undefined;
       }
       projects.set(key, existing);
       const phase = d.step === "llm"
@@ -138,7 +161,6 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       return { ...state, projects, phase };
     }
     case "project_complete": {
-      const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
       const key = d.pathHash ?? d.name!;
       const existing = projects.get(key);
@@ -146,7 +168,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
         if (d.step === "store") {
           existing.storeStatus = "done";
           existing.detail = d.detail;
-          existing.lastCommitDate = d.lastCommitDate ?? undefined;
+          existing.lastCommitDate = (d.lastCommitDate as string | null | undefined) ?? undefined;
           // Track completion order for staggered animation
           const doneCount = [...projects.values()].filter(p => p.storeStatus === "done").length;
           existing.storeOrder = doneCount;
@@ -164,7 +186,6 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       return { ...state, projects, deterministicReady, phase };
     }
     case "project_error": {
-      const d: RefreshEvent = JSON.parse(raw);
       const projects = new Map(state.projects);
       const key = d.pathHash ?? d.name!;
       const existing = projects.get(key);
@@ -177,7 +198,6 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       return { ...state, projects, phase: buildLlmPhase(projects, d.provider) };
     }
     case "done": {
-      const d: RefreshEvent = JSON.parse(raw);
       return {
         ...state,
         active: false,
@@ -187,7 +207,6 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       };
     }
     case "pipeline_error": {
-      const d = JSON.parse(raw);
       return { ...state, active: false, phase: "Error", error: d.error };
     }
     default:
@@ -288,13 +307,11 @@ export function useRefresh(onComplete: () => void) {
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          // Process complete SSE frames (delimited by \n\n)
-          const frames = parseSSE(buffer);
-          // Keep any trailing incomplete frame in the buffer
-          const lastDoubleNewline = buffer.lastIndexOf("\n\n");
-          buffer = lastDoubleNewline >= 0 ? buffer.slice(lastDoubleNewline + 2) : buffer;
+          // Process only complete SSE frames; incomplete frames stay in the buffer
+          const { events, remainder } = parseSSE(buffer);
+          buffer = remainder;
 
-          for (const frame of frames) {
+          for (const frame of events) {
             try {
               handleEvent(frame.type, frame.data);
             } catch {
