@@ -144,7 +144,7 @@ function getLastRefreshed(projects: Project[]): string | null {
 
 /* ── Page ───────────────────────────────────────────────── */
 
-export default function DashboardPage() {
+export function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
   const { config, configReady, refetch } = useConfig();

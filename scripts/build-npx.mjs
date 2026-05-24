@@ -2,37 +2,45 @@
 
 /**
  * Build script for NPX distribution.
- * Platform-aware: copies the correct @libsql native binding for the current OS/arch.
+ * Builds the Vite SPA + bundles the Hono server for production.
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, rmSync, chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, rmSync, chmodSync, existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 
-// 1. Next.js build
-run("next build");
+// 1. Vite build (SPA)
+run("npx vite build");
 
-// 2. Copy static assets
-cpSync(".next/static", ".next/standalone/.next/static", { recursive: true });
-rmSync(".next/standalone/public", { recursive: true, force: true });
-cpSync("public", ".next/standalone/public", { recursive: true });
+// 2. Bundle Hono server with tsx/esbuild
+run("npx esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --external:@prisma/adapter-libsql --external:libsql --external:better-sqlite3 --external:cpu-features --external:encoding");
 
-// 3. Copy node_modules that Next.js standalone misses
-run("cp -rL .next/node_modules/* .next/standalone/node_modules/");
+// 3. Copy Vite SPA assets to dist/
+// Vite puts assets in dist/assets already, but we need index.html at dist/index.html
+// (Vite build already puts it there)
+
+// 4. Copy node_modules that the server needs
+// The bundled server.js still needs native modules at runtime
+const distDir = "dist";
+const nodeModulesDir = join(distDir, "node_modules");
+if (!existsSync(nodeModulesDir)) {
+  mkdirSync(nodeModulesDir, { recursive: true });
+}
 
 const copyMod = (name) =>
-  cpSync(`node_modules/${name}`, `.next/standalone/node_modules/${name}`, {
-    recursive: true,
-  });
+  cpSync(`node_modules/${name}`, join(nodeModulesDir, name), { recursive: true });
 
+// Prisma + libsql native bindings
+copyMod("@prisma/client");
+copyMod("@prisma/adapter-libsql");
+copyMod("@prisma/client-libsql");  // may not exist, that's ok
 copyMod("@libsql/core");
 copyMod("@libsql/hrana-client");
 copyMod("libsql");
-copyMod("cross-fetch");
 
-// 4. Platform-aware native binding
+// Platform-aware native binding for libsql
 const platformMap = {
   "darwin-arm64": "@libsql/darwin-arm64",
   "darwin-x64": "@libsql/darwin-x64",
@@ -50,63 +58,38 @@ if (nativePackage && existsSync(`node_modules/${nativePackage}`)) {
   console.warn(`⚠ No native @libsql binding found for ${key}, skipping`);
 }
 
-// 5. Strip private/dev files from standalone
+// 5. Copy Prisma generated client
+cpSync("src/generated/prisma", join(nodeModulesDir, "src", "generated", "prisma"), { recursive: true });
+
+// 6. Clean up dev-only files from dist
 const stripFiles = [
-  ".next/standalone/.env",
-  ".next/standalone/.env.local",
-  ".next/standalone/settings.json",
+  join(distDir, ".env"),
+  join(distDir, ".env.local"),
+  join(distDir, "settings.json"),
 ];
 
 for (const f of stripFiles) {
   rmSync(f, { force: true });
 }
 
-// Remove ALL .db files (dev.db, test.db, any stray databases)
-const standaloneRoot = ".next/standalone";
-for (const entry of readdirSync(standaloneRoot)) {
+// Remove any stray .db files
+for (const entry of readdirSync(distDir)) {
   if (entry.endsWith(".db") || entry.endsWith(".db-journal") || entry.endsWith(".db-wal") || entry.endsWith(".db-shm")) {
-    rmSync(join(standaloneRoot, entry), { force: true });
-  }
-}
-const prismaDir = join(standaloneRoot, "prisma");
-if (existsSync(prismaDir)) {
-  for (const entry of readdirSync(prismaDir)) {
-    if (entry.endsWith(".db") || entry.endsWith(".db-journal") || entry.endsWith(".db-wal") || entry.endsWith(".db-shm")) {
-      rmSync(join(prismaDir, entry), { force: true });
-    }
+    rmSync(join(distDir, entry), { force: true });
   }
 }
 
-// Remove internal docs (may be copied by Next.js standalone)
-rmSync(".next/standalone/docs/internal", { recursive: true, force: true });
+// Remove internal docs
+rmSync(join(distDir, "docs"), { recursive: true, force: true });
 
-// Scrub build-machine absolute paths from server.js
-const serverJs = join(standaloneRoot, "server.js");
-if (existsSync(serverJs)) {
-  const projectRoot = resolve(".");
-  let content = readFileSync(serverJs, "utf-8");
-  content = content.replaceAll(projectRoot, ".");
-  writeFileSync(serverJs, content);
-}
+// 7. Create package.json for the dist directory (needed for ESM resolution)
+const distPkg = {
+  name: "sidequests-server",
+  type: "module",
+};
+writeFileSync(join(distDir, "package.json"), JSON.stringify(distPkg, null, 2));
 
+// 8. Make CLI executable
 chmodSync("bin/cli.mjs", 0o755);
-
-// 6. Validate: every @prisma/client-* hash referenced by server chunks must exist
-const chunksDir = ".next/standalone/.next/server/chunks";
-const hashPattern = /@prisma\/client-[a-f0-9]+/g;
-const requiredHashes = new Set();
-for (const f of readdirSync(chunksDir)) {
-  if (!f.endsWith(".js")) continue;
-  for (const m of readFileSync(join(chunksDir, f), "utf-8").matchAll(hashPattern)) {
-    requiredHashes.add(m[0]);
-  }
-}
-for (const ref of requiredHashes) {
-  const dest = join(standaloneRoot, "node_modules", ref);
-  if (!existsSync(dest)) {
-    console.error(`✗ Missing ${ref} in standalone node_modules`);
-    process.exit(1);
-  }
-}
 
 console.log("✓ NPX bundle built successfully");

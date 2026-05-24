@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { Hono } from "hono";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -27,7 +27,7 @@ async function fetchLatestVersion(): Promise<string | null> {
     const timeout = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       "https://registry.npmjs.org/@eeshans/sidequests/latest",
-      { signal: controller.signal }
+      { signal: controller.signal },
     );
     clearTimeout(timeout);
 
@@ -52,7 +52,10 @@ function isNewer(latest: string, current: string): boolean {
   return false;
 }
 
-export async function GET() {
+export const versionRoute = new Hono();
+
+// GET /api/version — current + latest version info
+versionRoute.get("/", async (c) => {
   const current = getCurrentVersion();
   const latest = await fetchLatestVersion();
 
@@ -62,5 +65,5 @@ export async function GET() {
     updateAvailable: latest ? isNewer(latest, current) : false,
   };
 
-  return NextResponse.json(info);
-}
+  return c.json(info);
+});

@@ -1,15 +1,17 @@
-import { NextResponse } from "next/server";
+import { Hono } from "hono";
 import fs from "node:fs";
 import os from "node:os";
 import { config } from "@/lib/config";
 import { type AppSettings, getSettings, writeSettings, clearSettingsCache } from "@/lib/settings";
-/** GET — returns all effective config (settings.json defaults). Masks API keys for UI display. */
-export async function GET() {
-  return NextResponse.json({
+
+export const settingsRoute = new Hono();
+
+// GET /api/settings — returns all effective config (masks API keys for UI display)
+settingsRoute.get("/", (c) => {
+  return c.json({
     devRoot: config.devRoot,
     excludeDirs: config.excludeDirs.join(", "),
     llmProvider: config.llmProvider,
-
     llmTimeout: config.llmTimeout / 1000,
     llmConcurrency: config.llmConcurrency,
     llmOverwriteMetadata: config.llmOverwriteMetadata,
@@ -27,8 +29,9 @@ export async function GET() {
     hasCompletedOnboarding: config.hasCompletedOnboarding,
     includeNonGitDirs: config.includeNonGitDirs,
   });
-}
+});
 
+// PUT /api/settings — merge incoming fields into settings.json
 const BOOL_KEYS: (keyof AppSettings)[] = [
   "llmOverwriteMetadata", "llmAllowUnsafe", "llmDebug",
   "hasCompletedOnboarding", "includeNonGitDirs",
@@ -40,10 +43,9 @@ const STR_KEYS: (keyof AppSettings)[] = [
 ];
 const NUM_KEYS: (keyof AppSettings)[] = ["llmTimeout", "llmConcurrency"];
 
-/** PUT — merge incoming fields into settings.json. */
-export async function PUT(req: Request) {
+settingsRoute.put("/", async (c) => {
   try {
-    const body = await req.json();
+    const body = await c.req.json();
     clearSettingsCache();
     const current = getSettings();
     const updated: AppSettings = { ...current };
@@ -73,8 +75,8 @@ export async function PUT(req: Request) {
     writeSettings(updated);
     const resolvedRoot = (updated.devRoot ?? "~/dev").replace(/^~(?=$|\/)/, os.homedir());
     const devRootExists = fs.existsSync(resolvedRoot) && fs.statSync(resolvedRoot).isDirectory();
-    return NextResponse.json({ ok: true, devRootExists });
+    return c.json({ ok: true, devRootExists });
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return c.json({ ok: false, error: "Invalid request body" }, 400);
   }
-}
+});

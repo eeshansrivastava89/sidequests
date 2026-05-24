@@ -2,8 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/db", () => ({ db: {} }));
 
-import { coercePatchBody, safeJsonParse, withErrorHandler } from "@/lib/api-helpers";
-import { NextResponse } from "next/server";
+import { coercePatchBody, safeJsonParse, isMissingTableError, errorMessage } from "@/lib/api-helpers";
 
 const OVERRIDE_SPEC = {
   jsonFields: new Set(["tagsOverride"]),
@@ -32,15 +31,21 @@ describe("coercePatchBody", () => {
     expect(result.data).toEqual({ tagsOverride: '["a"]' });
   });
 
-  it("returns 400 on wrong type for string field", () => {
+  it("returns error on wrong type for string field", () => {
     const result = coercePatchBody({ statusOverride: 123 }, OVERRIDE_SPEC);
     expect(result.error).toBeDefined();
     expect(result.data).toBeUndefined();
+    if (result.error) {
+      expect(result.status).toBe(400);
+    }
   });
 
-  it("returns 400 on empty body", () => {
+  it("returns error on empty body", () => {
     const result = coercePatchBody({}, OVERRIDE_SPEC);
     expect(result.error).toBeDefined();
+    if (result.error) {
+      expect(result.status).toBe(400);
+    }
   });
 
   it("ignores unknown fields", () => {
@@ -52,54 +57,22 @@ describe("coercePatchBody", () => {
   });
 });
 
-describe("withErrorHandler", () => {
-  it("passes through a successful response", async () => {
-    const handler = withErrorHandler(async () =>
-      NextResponse.json({ ok: true }),
-    );
-    const res = await handler();
-    const body = await res.json();
-    expect(body.ok).toBe(true);
+describe("isMissingTableError", () => {
+  it("detects no such table errors", () => {
+    expect(isMissingTableError(new Error("SQLITE_ERROR: no such table: main.Project"))).toBe(true);
+    expect(isMissingTableError(new Error("no such table: Scan"))).toBe(true);
+    expect(isMissingTableError(new Error("connection refused"))).toBe(false);
+  });
+});
+
+describe("errorMessage", () => {
+  it("extracts message from Error", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
   });
 
-  it("catches thrown error and returns 500", async () => {
-    const handler = withErrorHandler(async () => {
-      throw new Error("boom");
-    });
-    const res = await handler();
-    expect(res.status).toBe(500);
-    const body = await res.json();
-    expect(body.ok).toBe(false);
-    expect(body.error).toBe("boom");
-  });
-
-  it("returns 503 for missing table errors without fallback", async () => {
-    const handler = withErrorHandler(async () => {
-      throw new Error("SQLITE_ERROR: no such table: main.Project");
-    });
-    const res = await handler();
-    expect(res.status).toBe(503);
-    const body = await res.json();
-    expect(body.ok).toBe(false);
-    expect(body.error).toContain("Database tables not found");
-  });
-
-  it("returns fallback response for missing table errors when missingTableFallback is provided", async () => {
-    const handler = withErrorHandler(
-      async () => {
-        throw new Error("SQLITE_ERROR: no such table: main.Project");
-      },
-      {
-        missingTableFallback: () =>
-          NextResponse.json({ ok: true, projects: [], lastRefreshedAt: null }),
-      },
-    );
-    const res = await handler();
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.ok).toBe(true);
-    expect(body.projects).toEqual([]);
-    expect(body.lastRefreshedAt).toBeNull();
+  it("stringifies non-Error values", () => {
+    expect(errorMessage("hello")).toBe("hello");
+    expect(errorMessage(42)).toBe("42");
   });
 });
 

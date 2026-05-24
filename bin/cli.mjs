@@ -5,7 +5,6 @@
  * Usage: npx @eeshans/sidequests [--port <n>] [--no-open] [--help] [--version]
  */
 
-import { fork } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -91,26 +90,34 @@ console.log(green("Database ready."));
 // ── Find free port ─────────────────────────────────────
 const port = await findFreePort(requestedPort);
 
-// ── Start Next.js standalone server ────────────────────
-const serverPath = path.join(__dirname, "..", ".next", "standalone", "server.js");
+// ── Start Hono server ──────────────────────────────────
+const serverPath = path.join(__dirname, "..", "dist", "server.js");
 if (!fs.existsSync(serverPath)) {
-  console.error(red("Standalone server not found. Run `npm run build:npx` first."));
+  console.error(red("Server not found. Run `npm run build:npx` first."));
   process.exit(1);
 }
 
+// Set environment for the server process
+const serverEnv = {
+  ...process.env,
+  PORT: String(port),
+  HOSTNAME: "127.0.0.1",
+  APP_DATA_DIR: dataDir,
+  DATABASE_URL: `file:${dbPath}`,
+  NODE_ENV: "production",
+};
+
+// Dynamic import the server — it's ESM
+const serverUrl = `http://127.0.0.1:${port}`;
+
+// Start server as a subprocess so we can handle signals
+const { fork } = await import("node:child_process");
 const serverProcess = fork(serverPath, [], {
-  env: {
-    ...process.env,
-    PORT: String(port),
-    HOSTNAME: "127.0.0.1",
-    APP_DATA_DIR: dataDir,
-    DATABASE_URL: `file:${dbPath}`,
-    NODE_ENV: "production",
-  },
+  env: serverEnv,
   stdio: "pipe",
 });
 
-// Forward server stdout and stderr (for debugging)
+// Forward server stdout and stderr
 serverProcess.stdout?.on("data", (chunk) => {
   process.stdout.write(chunk);
 });
@@ -119,10 +126,8 @@ serverProcess.stderr?.on("data", (chunk) => {
 });
 
 // ── Wait for server readiness ──────────────────────────
-const serverUrl = `http://127.0.0.1:${port}`;
-
 try {
-  await waitForServer(`${serverUrl}/api/preflight`);
+  await waitForServer(`${serverUrl}/api/health`);
 } catch (err) {
   console.error(red(err.message));
   serverProcess.kill();
@@ -138,7 +143,7 @@ console.log(`\n${bold("Sidequests")} is running at ${green(serverUrl)}\n`);
     const timeout = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       "https://registry.npmjs.org/@eeshans/sidequests/latest",
-      { signal: controller.signal }
+      { signal: controller.signal },
     );
     clearTimeout(timeout);
     if (!res.ok) return;

@@ -1,314 +1,416 @@
-# Sidequests — Implementation Plan
+# Sidequests — Architecture & Implementation Plan
 
-## Status (2026-02-22)
-
-- [Completed] v1 delivery (Phases 0-51W): infrastructure, scan pipeline, NPX distribution, first publish
-- [Completed] Phase 52W: GitHub data collection (#001→#002)
-- [Completed] Phase 53W: LLM prompt redesign (#003→#004)
-- [Completed] Phase 54W: Unified scan UX (#005→#006→#007→#008)
-- [Completed] Phase 55W: Project list row redesign (#009→#010)
-- [Completed] Phase 56W: Stats cards + header redesign (#011→#012)
-- [Completed] Phase 57W: Project drawer cleanup (#013→#014)
-- [Completed] Phase 58W: Reliability + onboarding flow (#007→#015)
-- [Completed] Phase 59W: Project workspace redesign (#017→#020)
-- [Completed] Phase 60W: Signal clarity + interaction polish (#021→#024)
-- [Completed] v0.3 UX recovery: phases 58W-60W
-- [Completed] Phase 61W: LLM-sourced framework/language + consolidated insights
-
-## v0.2 Vision
-
-Transform Sidequests from an observation dashboard into a hands-off action recommender. LLM enrichment becomes the core value prop. GitHub state (issues, PRs, CI) is integrated. The UI shows what to DO, not what to SCORE.
-
-Design principles:
-1. LLM enrichment is the product — not optional, not secondary
-2. Single view, two scan modes — Fast Scan (deterministic) and AI Scan (fast + LLM)
-3. Hands-off — system figures everything out from code, git, GitHub, and LLM
-4. Show actions, not metrics — replace scores with verbs
+**Updated:** 2026-05-24
+**Status:** Revised plan — post architecture review, DRY/KISS-optimized
 
 ---
 
-## Phase 52W — GitHub Data Collection ✓
+## Guiding Principle
 
-**What:** Add read-only GitHub state to each project via `gh` CLI.
-**Status:** Complete (reviewed #001→#002, approved 2026-02-21)
+The product is a **control center for side projects**, not a dashboard. Every feature should answer one of two questions: "What should I work on right now?" or "Am I making progress?" If it doesn't serve either, it doesn't ship.
 
-**Deliverables:**
-- [x] New `src/lib/pipeline-native/github.ts` — fetches issues, PRs, CI status per project
-- [x] New `GitHub` Prisma model (openIssues, openPrs, ciStatus, issuesJson, prsJson, repoVisibility)
-- [x] Runtime migration via bootstrap-db.mjs (no Prisma migration file needed)
-- [x] Preflight check for `gh` CLI auth status
-- [x] Graceful fallback when no remote URL or `gh` not available
-- [x] 18 unit tests for GitHub data collection
+### Secondary Principles
 
-## Phase 53W — LLM Prompt Redesign ✓
+- **Don't store what you can compute.** If data already exists in the DB, derive it on-the-fly rather than persisting a redundant copy.
+- **Add columns before adding tables.** A column on an existing model beats a new model + relation + join.
+- **Extend existing endpoints before creating new ones.** Adding a field to `GET /api/projects` beats a new `/api/actions` endpoint.
 
-**What:** Redesign LLM input/output to produce actionable next steps instead of abstract analysis.
-**Status:** Complete (reviewed #003→#004, approved 2026-02-21)
+---
 
-**Deliverables:**
-- [x] Richer LLM input: scan data + GitHub state + previous analysis
-- [x] New output schema: `nextAction`, `status` (building/shipping/maintaining/blocked/stale/idea), `statusReason`, `risks[]`, `summary`, `tags[]`, `recommendations[]`
-- [x] Deprecated from output: `pitch`, `aiInsight` (score/confidence), `purpose` (kept in schema for rollback)
-- [x] Stopped populating: `goal`, `audience`, `successMetrics`, `publishTarget` (metadata write removed from pipeline)
-- [x] Updated `LlmEnrichment` interface in `provider.ts`
-- [x] Updated Llm Prisma model (5 new columns, old columns kept as deprecated)
-- [x] Updated `merge.ts` merge logic (summary fallback chain, metadata.nextAction > llm.nextAction)
-- [x] Rewrote prompt in `prompt.ts` with GitHub-aware context
-- [x] 15 unit tests for new prompt parsing + buildPrompt
+## Phase 0: Hono+Vite Migration (Issue #10)
 
-## Phase 54W — Unified Scan UX ✓
+**Why first:** We're about to add significant new backend and frontend code. Building on Next.js when we plan to migrate means building on a foundation we'll demolish. Better to migrate first, then add features on the new stack.
 
-**What:** Merge Scan + Enrich into a single "Refresh" action with per-row progress.
-**Status:** Complete (reviewed #005→#006→#007→#008, approved 2026-02-21)
+**Current state:** Next.js 16 (App Router) + React 19 + Prisma 7.4 + libSQL/SQLite + Tailwind CSS v4 + shadcn/ui
 
-**Deliverables:**
-- [x] ~~Single "Refresh" button~~ → replaced by Fast Scan + AI Scan buttons (v0.3.0)
-- [x] Two-pass pipeline: pass 1 fast scans all projects (scan → derive → store → GitHub), pass 2 LLM one-by-one (v0.3.1)
-- [x] **Server-side pipeline mutex:** module-level lock in `/api/refresh/stream` with 409 rejection + timestamp-based staleness guard (10-min auto-recovery)
-- [x] Per-row progress indicators (spinner during scan, sparkle during LLM enrichment)
-- [x] Rows update in-place as each project completes (no overlay list)
-- [x] Toast when all enrichment done, auto-dismiss progress
-- [x] Update `pipeline.ts` orchestration
-- [x] Update `/api/refresh/stream` SSE route (switched to fetch-based SSE for 409 handling)
-- [x] Remove `refresh-panel.tsx` overlay
+**Target state:** Hono (API) + Vite (SPA) + React 19 + Prisma 7.4 + libSQL/SQLite + Tailwind CSS v4 + shadcn/ui
 
-## Phase 55W — Project List Row Redesign ✓
+### What stays identical
+- All React components, hooks, shadcn/ui, Tailwind
+- Prisma schema, SQLite database, all data models
+- Pipeline logic (scan → derive → GitHub → LLM)
+- LLM provider abstraction (5 adapters)
+- CLI entry point (`bin/cli.mjs`)
 
-**What:** Replace metric-heavy rows with two-line actionable layout.
-**Status:** Complete (reviewed #009→#010, approved 2026-02-21)
+### What changes
+| Component | From | To |
+|---|---|---|
+| API server | Next.js route handlers (`app/api/.../route.ts`) | Hono routes (`src/api/...ts`) |
+| Build | `next build` + standalone output | `vite build` (SPA) + Hono server |
+| SSR | Next.js server components | None — pure SPA |
+| `next/font/local` | Next.js font optimization | CSS `@font-face` |
+| Error middleware | `withErrorHandler` wrapper (Next.js) | Hono middleware |
+| Dev server | `next dev` (single process) | `vite dev` + `tsx watch` for Hono (two processes in dev) |
+| SSE streaming | Next.js `ReadableStream` | Hono `streamSSE()` |
+| Theme/Toaster | `layout.tsx` (root layout) | `App.tsx` (Vite root) |
 
-**New row format:**
+### Migration sub-phases
+
+**0a — Hono scaffold + first routes (1-2 days)**
+
+- [x] Create `src/api/index.ts` — Hono app with CORS + logger + timeout middleware
+- [x] Create `src/api/routes/projects.ts` — port `GET /api/projects`
+- [x] Create `src/api/routes/projects/[id].ts` — port `GET /api/projects/:id`, PATCH override/metadata/pin, POST touch, GET activity
+- [x] Create `src/api/routes/refresh.ts` — port `POST /api/refresh` (without SSE)
+- [x] Create `src/api/routes/config.ts`, `src/api/routes/preflight.ts`, `src/api/routes/version.ts` — simple GET routes
+- [x] Create `src/api/routes/settings.ts` — port GET/PUT settings
+- [x] Refactor `src/lib/api-helpers.ts` — extract framework-agnostic `coercePatchBody`, `findProject`, `safeJsonParse`, `isMissingTableError`
+- [x] Create `src/lib/next-api-helpers.ts` — Next.js-specific `withErrorHandler`, `notFound`, `patchErrorToNextResponse`
+- [x] Update existing Next.js route imports to use `next-api-helpers` for NextResponse-based helpers
+- [x] Write 19 Hono integration tests covering all ported routes
+- [x] Verify: all 251 unit tests + 93 integration tests (incl. 19 Hono) pass
+
+**0b — All routes + SSE** ✅
+
+- [x] Port SSE endpoint: `GET /api/refresh/stream` → Hono `streamSSE()` with pipeline state management
+- [x] Port `POST /api/refresh/stream` (cancel) → Hono route
+- [x] Remove global route timeout (SSE streams can take minutes)
+- [x] All integration tests passing (19 Hono + existing)
+
+**0c — Vite SPA + production build** ✅
+
+- [x] Create `vite.config.ts` with React plugin + `resolve.tsconfigPaths: true`
+- [x] Create `src/App.tsx` — import `DashboardPage` + `Toaster` + `globals.css`
+- [x] Create `src/entry.tsx` — React root mount
+- [x] Create `src/index.html` — Vite HTML entry with anti-FOUC theme script
+- [x] Create `src/styles/font-faces.css` — `@font-face` for Geist Sans/Mono (replaces `next/font/local`)
+- [x] Create `src/server.ts` — Hono server serving Vite build as static + API routes
+- [x] Install: vite, @vitejs/plugin-react, esbuild, tsx, concurrently
+- [x] Remove: next, eslint-config-next, vite-tsconfig-paths
+- [x] Vite build produces: `dist/` = 5.7MB total (vs 252MB `.next/`)
+- [x] Production build: `vite build + esbuild` bundles server.js (5.2MB)
+- [x] Dev scripts: `npm run dev` (concurrently api+spa), `npm run dev:api`, `npm run dev:spa`
+
+**0d — CLI + deployment migration** ✅
+
+- [x] Update `bin/cli.mjs` — start Hono server via `fork()` with env vars
+- [x] Rewrite `scripts/build-npx.mjs` — vite build + esbuild server + copy native bindings
+- [x] Delete `.next/`, `next.config.mjs`, `src/app/api/`, `src/app/layout.tsx`, `src/lib/next-api-helpers.ts`
+- [x] Remove `next` and `eslint-config-next` from package.json dependencies
+- [x] Remove `src/app/api/__tests__/` (old Next.js route integration tests)
+- [x] Update `api-helpers.test.ts` — test only framework-agnostic functions
+- [x] Change `DashboardPage` export from `export default` to named `export`
+- [x] Add `"type": "module"` to package.json
+- [x] Update `package.json` scripts and files array for Vite+Hono
+- [x] Clean `public/` — remove Vite template SVG files
+- [x] All 245 unit tests + 50 integration tests pass
+- [x] Build output: 5.7MB dist/ (was 252MB .next/)
+
+### Size impact
+| | Before | After |
+|---|---|---|
+| Framework | 255MB (Next + @next/swc) | ~3MB (Hono) |
+| Build output | 252MB (`.next/`) | 5.7MB (`dist/`)* |
+| Installed via npx | ~620MB | ~170MB (target) |
+
+*`dist/` includes: 420KB JS bundle, 66KB CSS, 5.2MB server.js, fonts. Production npx build adds node_modules for native bindings.
+
+---
+
+## Phase 1: Data Model Extensions
+
+### Design rationale
+
+The original plan proposed 5 new tables. This revision cuts it to 4, with 3 being trivial (3-4 columns each). The key design decisions:
+
+1. **No PriorityAction table.** Priority actions are computed on-the-fly from existing data (git state, LLM nextAction, GitHub issues, stale thresholds). Persisting them creates a stale-data problem and a DRY violation. Instead, compute `actions[]` in the API response from existing tables. Dismissals are tracked with a lightweight `DismissedAlert` table (2 columns + unique constraint).
+
+2. **No LifecycleAction table.** Snooze/archive/revive are project-level state changes. Adding `snoozedUntil` and `archivedNote` columns to Project eliminates an entire table + relation, and lets snooze/archive/revive flow through the existing `PUT /api/projects/:id/override` endpoint.
+
+3. **No ScanDelta table.** "Since last visit" deltas are computed by comparing current project state to a stored snapshot from the user's last visit. A single `UserVisit` row (one row, not many) replaces what would be many ScanDelta rows per scan.
+
+4. **Commit counts belong in Derived, not Project.** `weekCommits`/`monthCommits`/`quarterCommits` are scan-derived metrics — they belong alongside the other derived scores. The scan module needs a small enhancement to count commits by date range.
+
+### Schema changes to existing tables
+
 ```
-Line 1: [status dot] [name] [language] [git badges] [quick actions]
-Line 2: [LLM next action] • [issues] • [PRs] • [CI status]
-```
+Project
+  + snoozedUntil    DateTime?    // When snooze expires (null = not snoozed)
+  + archivedNote    String?      // "What did you learn?" retirement note
 
-**Deliverables:**
-- [x] Redesign `project-list.tsx` with two-line row layout
-- [x] LLM next action as primary second-line text
-- [x] GitHub badges: issue count, PR count, CI status (✓/✗/○)
-- [x] Remove: hygiene column, momentum column, LOC column, days inactive column
-- [x] Keep: status dot (color from LLM status), name, language, git badges, quick actions
-- [ ] Update `MergedProject` type in `types.ts` — not needed (type already had fields from Phase 53W)
-- [x] Responsive breakpoints for new layout (simplified grid, lang badge hidden on sm)
-
-## Phase 56W — Stats Cards + Header Redesign ✓
-
-**What:** Replace abstract stats with actionable signals.
-**Status:** Complete (reviewed #011→#012, approved 2026-02-21)
-
-**New cards:**
-| Card | Signal |
-|------|--------|
-| Projects | Total count |
-| Uncommitted | Dirty working trees |
-| Open Issues | Total across all GitHub repos |
-| CI Failing | Projects with failing CI |
-| Not on GitHub | Projects missing a remote |
-
-**Deliverables:**
-- [x] Update `stats-bar.tsx` with new card definitions
-- [x] Cards are clickable — filter project list to matching projects (with amber ring highlight + filter chip)
-- [x] Remove "Scoring Methodology" button from header
-- [x] Remove `methodology-modal.tsx`
-
-## Phase 57W — Project Drawer Cleanup ✓
-
-**What:** Simplify drawer to match new data model.
-**Status:** Complete (reviewed #013→#014, approved 2026-02-21)
-
-**Deliverables:**
-- [x] **Summary** section: LLM summary with status badge + statusReason
-- [x] **Next Action + Insights** section: prominent, consolidated observations
-- [x] **GitHub** section: issues/PRs/CI/visibility + top issues/PRs lists
-- [x] **Details** section: collapsed by default, compact 4-column grid
-- [x] **Timeline**: collapsed by default, paginated git commits + activity events
-- [x] Remove: hygiene/momentum score display, AI Insight section, attention banner, notableFeatures, StructuredData
-- [x] Update `project-drawer.tsx`
-
----
-
-## v0.3 UX Recovery (3 phases total)
-
-Goal: resolve the current real-world UX friction without a long rewrite. Keep implementation fast by using existing stack only: Tailwind + shadcn/ui + existing Radix primitives already in repo.
-
-Constraints:
-1. No net-new UI dependency unless absolutely required.
-2. Prefer composition of existing components over custom abstractions.
-3. Ship incrementally with user-visible value each phase.
-
-## Phase 58W — Reliability + Onboarding Flow
-
-**What:** Fix blocking/buggy first-run behavior and remove onboarding friction.
-**Status:** Complete (reviewed #007→#015, approved 2026-02-22)
-
-**Deliverables:**
-- [x] Onboarding provider/model state is deterministic (no missing model dropdown on first provider selection)
-- [x] First scan is two-stage in UI:
-  1) deterministic scan + GitHub sync (fast)
-  2) LLM enrichment continues in background
-- [x] Onboarding Step 4 allows "Open Dashboard Now" immediately after stage (1), while stage (2) runs
-- [x] Refresh cancel/restart handshake is robust (no stuck "in progress" toast loop after cancel)
-- [x] Diagnostics UI shows required vs optional checks clearly
-- [x] Onboarding modal spacing/typography tightened (less cramped, better scanability)
-
-**Primary files:**
-- `src/hooks/use-refresh.ts`
-- `src/app/api/refresh/stream/route.ts`
-- `src/components/onboarding-wizard.tsx`
-- `src/components/settings-fields.tsx`
-- `src/app/api/preflight/route.ts`
-
-## Phase 59W — Project Workspace Redesign (Replace Current Modal UX)
-
-**What:** Replace text-heavy modal with a more functional project workspace.
-**Status:** Complete (reviewed #017→#020, approved 2026-02-22)
-
-**Decision (lock for v0.3):**
-- Use a **split workspace on the main page** (left project list rail + right project detail pane) instead of full-page route migration. This keeps scope smaller and faster than route-level rewrite.
-
-**Deliverables:**
-- [x] Project click opens persistent right detail pane (not centered modal)
-- [x] GitHub block is top-priority in detail pane
-- [x] Issues/PRs/CI actions are clickable (direct GitHub links)
-- [x] Details section moved higher; all major sections expanded by default
-- [x] Content density improved: less wall-of-text, more compact action rows/chips
-- [x] Mobile behavior: pane becomes full-screen sheet with clear close/back affordance
-
-**Primary files:**
-- `src/app/page.tsx`
-- `src/components/project-list.tsx`
-- `src/components/project-drawer.tsx` (migrate to pane/sheet pattern)
-- `src/components/ui/*` (reuse existing shadcn primitives)
-
-## Phase 60W — Signal Clarity + Interaction Polish
-
-**What:** Make status/filter semantics obvious and interaction model predictable.
-**Status:** Complete (reviewed #021→#024, approved 2026-02-22)
-
-**Deliverables:**
-- [x] Status color legend integrated into top filter tabs (dot colors match row status dots)
-- [x] Stats cards interaction consistency:
-  - Projects card explicitly clears filters
-  - active filter state is visually obvious
-- [x] "Needs Attention" and other status/filter chips have consistent color language
-- [x] Improve keyboard and focus behavior for list → detail interactions
-- [x] Add regression tests for:
-  - cancel then refresh
-  - first-scan unblock behavior
-  - provider/model conditional rendering
-
-**Primary files:**
-- `src/app/page.tsx`
-- `src/components/stats-bar.tsx`
-- `src/components/project-list.tsx`
-- `src/lib/status-colors.ts`
-- `src/hooks/use-refresh.ts`
-- `src/components/__tests__/onboarding-wizard.test.ts`
-- `src/components/__tests__/stats-bar-filter.test.tsx`
-- `src/components/__tests__/project-list-keyboard.test.tsx`
-- `src/hooks/__tests__/use-refresh-restart.test.tsx`
-
-## Phase 61W — LLM-Sourced Framework/Language + Consolidated Insights
-
-**What:** Move framework/language detection from hardcoded maps to LLM enrichment. Consolidate risks + recommendations into unified insights.
-**Status:** Complete
-
-**Deliverables:**
-- [x] Added `framework` and `primaryLanguage` to LLM output schema — LLM determines these from scan context
-- [x] Removed deterministic framework detection (`FRAMEWORK_MAP_JS`, `FRAMEWORK_MAP_RUST`, `FRAMEWORK_MAP_PYTHON`, `detectFramework()`) from `scan.ts`
-- [x] Removed `FRAMEWORK_LABELS` map from `project-list.tsx` — LLM returns human-readable labels directly
-- [x] Consolidated `risks[]` + `recommendations[]` into single `insights[]` field — each insight combines concern + action
-- [x] Updated LLM prompt to request distinct, non-redundant insights (3-5 bullets)
-- [x] Added `insightsJson`, `framework`, `primaryLanguage` columns to Llm DB model
-- [x] Backward compat: merge layer falls back to legacy risksJson + recommendationsJson when insightsJson is null
-- [x] Aligned `prisma` CLI version to `^7.3.0` (matching `@prisma/client`)
-
-**Primary files:**
-- `src/lib/llm/provider.ts`, `src/lib/llm/prompt.ts`
-- `src/lib/pipeline-native/scan.ts`
-- `src/lib/pipeline.ts`, `src/lib/merge.ts`
-- `src/lib/types.ts`, `src/components/project-list.tsx`, `src/components/project-detail-pane.tsx`
-- `prisma/schema.prisma`, `bin/bootstrap-db.mjs`
-
----
-
-## Implementation Sequence
-
-Current execution state:
-- Completed: 52W, 53W, 54W, 55W, 56W, 57W, 58W, 59W, 60W, 61W
-- Next: roadmap decision for v0.4 scope
-
-Historical execution order (reference):
-```mermaid
-flowchart LR
-  A[52W GitHub Data] --> C[54W Unified Scan]
-  B[53W LLM Prompt] --> C
-  C --> D[55W Row Redesign]
-  D --> E[56W Stats Cards]
-  E --> F[57W Drawer Cleanup]
-  F --> G[v0.2 Release]
-  G --> H[58W Reliability + Onboarding]
-  H --> I[59W Workspace Redesign]
-  I --> J[60W Signal + Interaction Polish]
-  J --> K[v0.3 UX Release]
-  K --> L[61W Framework/Language + Insights]
+Derived
+  + weekCommits     Int  @default(0)   // Commits in last 7 days
+  + monthCommits    Int  @default(0)   // Commits in last 30 days
+  + quarterCommits  Int  @default(0)   // Commits in last 90 days
 ```
 
-## Verification (v0.2)
+### New tables
 
-1. `npm test` — all tests pass
-2. `npm run test:integration` — integration tests pass
-3. `npm run check:privacy` — privacy gate passes
-4. Manual: `npm run dev` → click Refresh → fast scan results appear → GitHub data appears → LLM enrichment streams per-row → new row layout → drawer sections → stats cards filter
-5. `npm run build:npx` → `npx @eeshans/sidequests` from clean dir works
-6. User path demo: open dashboard → read one project row → know what to do next in <10s
+```
+WeeklyFocus
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  goal         String    // What you want to accomplish this week
+  completed    Boolean   @default(false)
+  weekStart    DateTime  // Monday 00:00 of the week
+  createdAt    DateTime  @default(now())
 
-## Verification (v0.3 UX recovery)
+DismissedAlert
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  alertType    String    // "git-urgent" | "git-warning" | "issue" | "stale-decision"
+  dismissedAt  DateTime  @default(now())
+  @@unique([projectId, alertType])  // one dismissal per alert type per project
 
-1. Onboarding:
-   - provider switch matrix works on first try (`claude-cli`, `codex-cli`, back to `claude-cli`)
-   - first scan unblocks to dashboard right after deterministic phase
-2. Refresh:
-   - click Refresh → Cancel → Refresh again succeeds within 2 retries
-3. Detail workspace:
-   - GitHub actions (Issues/PRs/CI) are clickable
-   - sections default expanded
-   - mobile sheet behavior is usable
-4. Signals:
-   - status colors in tabs match row status dots
-   - Projects card clears all signal filters
-5. Quality gate:
-   - `npm test`
-   - `npm run test:integration`
-   - `npm run build`
+UserPreference
+  id           String    @id @default(cuid())
+  key          String    @unique // e.g. "notification.quietHours" | "staleness.threshold"
+  value        String    // JSON string
+  updatedAt    DateTime  @updatedAt
+
+UserVisit
+  id           String    @id @default(cuid())
+  key          String    @unique // "lastVisit"
+  snapshotJson String    // Serialized MergedProject[] at last visit
+  updatedAt    DateTime  @updatedAt
+```
+
+### Checklist
+
+- [ ] Add `snoozedUntil` and `archivedNote` columns to `Project` model in Prisma schema
+- [ ] Add `weekCommits`, `monthCommits`, `quarterCommits` columns to `Derived` model
+- [ ] Create `WeeklyFocus` model
+- [ ] Create `DismissedAlert` model with unique constraint on `[projectId, alertType]`
+- [ ] Create `UserPreference` model (gradually replaces `settings.json` file)
+- [ ] Create `UserVisit` model (single-row table for last-visit snapshot)
+- [ ] Update `bootstrap-db.mjs` with new SCHEMA_SQL and MIGRATIONS array
+- [ ] Update `bootstrap-db.test.ts` EXPECTED_COLUMNS fixture
+- [ ] Update `scanProject()` in `pipeline-native/scan.ts` to compute commit counts by date range
+- [ ] Update `pipeline.ts` to store `weekCommits`/`monthCommits`/`quarterCommits` in Derived
 
 ---
 
-<details>
-<summary>Historical: v1 Implementation (Phases 0-51W)</summary>
+## Phase 2: API Routes
 
-**Completed phases:**
-- Phases 0-40: Initial development (scan pipeline, Prisma storage, UI, LLM providers)
-- Phases 41-44: Runtime and pipeline foundation
-- Phases 45-46: Safety and onboarding baseline
-- Phase 47W: NPX pivot direction lock + docs realignment
-- Phase 48W: CLI launcher + NPX bootstrap (`bin/cli.mjs`, `bin/cli-helpers.mjs`)
-- Phase 49W: Web/CLI QA gate (CI, bootstrap tests, CLI helper tests)
-- Phase 50W: Electron deprecation + release transition
-- Phase 51W: Pre-publish polish (toast system, attention UX, package rename to `@eeshans/sidequests`, model selection, preflight improvements)
+### Design rationale
 
-**Post-51W fixes (pre-publish):**
-- Prisma 7 hashed client packaging fix (#023-#026)
-- FEATURE_LLM removal (#027-#028)
-- Platform-aware build script (`scripts/build-npx.mjs`)
-- OIDC trusted publishing workflow
-- Privacy/security hardening (tarball content gate, build-path scrubbing)
-- Data directory renamed to `~/.sidequests`
-- CI + Publish merged into single workflow
+The original plan proposed 8 new route groups. After review, the actual net-new surface area is much smaller:
 
-**Key decisions:**
-- Prisma bootstrap: Option A (pre-generated client + runtime CREATE TABLE IF NOT EXISTS)
-- Distribution: npm with OIDC trusted publishing + provenance
-- Release flow: `npm version patch && git push --tags`
-</details>
+- **Priority actions** are computed on-the-fly and included in the existing `GET /api/projects` response. No new table, no new endpoints.
+- **Snooze/archive/revive** flow through the existing `PUT /api/projects/:id/override` endpoint with new fields. No new `/api/lifecycle/` routes.
+- **"Since last visit" delta** uses `UserVisit` snapshot comparison. Two endpoints: load snapshot and save snapshot.
+- **Shipped history** is an aggregate query on Derived. Single endpoint or just a field in the projects response.
+
+### Extended existing routes
+
+```
+GET /api/projects
+  → Add computed `actions[]` array per project:
+    - git-urgent: isDirty && daysInactive > 7, or ahead > 0 && daysInactive > 7
+    - git-warning: no remote, dirty tree < 7 days
+    - issue: GitHub issues with bug labels (highest priority), features, chores
+    - llm-suggestion: from Llm.nextAction
+    - stale-decision: statusAuto crossed threshold (30/60/90 days)
+  → Add `weekCommits`, `monthCommits`, `quarterCommits` per project
+  → Filter out actions where DismissedAlert exists for (projectId, alertType)
+  → Filter out projects where Project.snoozedUntil > now
+
+PUT /api/projects/:id/override
+  → Extend to handle snooze/archive/revive:
+    - { statusOverride: "archived", archivedNote: "learned X" } → archive
+    - { snoozedUntil: "2026-06-01T00:00:00Z" } → snooze
+    - { statusOverride: null, snoozedUntil: null } → revive
+```
+
+### New routes
+
+```
+POST /api/projects/:id/dismiss-alert
+  Body: { alertType: string }
+  → Create DismissedAlert row, silencing that alert type for that project
+  DELETE variant: clear dismissal to re-show the alert
+
+GET  /api/focus
+  → Weekly focus goals for current week
+
+POST /api/focus
+  Body: { projectId, goal }
+  → Create new weekly focus goal
+
+PUT  /api/focus/:id
+  Body: { goal?, completed? }
+  → Update goal text or toggle completion
+
+GET  /api/visit
+  → Returns delta between current project state and last-visit snapshot
+  → Frontend calls this on dashboard load
+
+POST /api/visit
+  → Saves current merged project state as snapshot (UserVisit row with key "lastVisit")
+  → Frontend calls this on dashboard close/unload
+
+GET  /api/shipped
+  → Aggregate commit counts across portfolio: { weekTotal, monthTotal, quarterTotal, projects: [...] }
+```
+
+### Checklist
+
+- [ ] Extend `mergeAllProjects()` and `buildMergedView()` to include `actions[]`, `weekCommits`/`monthCommits`/`quarterCommits`, and `snoozedUntil`/`archivedNote`
+- [ ] Create `src/lib/actions.ts` — pure function that computes priority actions from a MergedProject + GitHub data
+- [ ] Extend `PUT /api/projects/:id/override` handler to accept `snoozedUntil` and `archivedNote`
+- [ ] Create `POST /api/projects/:id/dismiss-alert` route
+- [ ] Create `GET/POST /api/focus` routes
+- [ ] Create `GET/POST /api/visit` routes (snapshot save + diff)
+- [ ] Create `GET /api/shipped` route (aggregate commit counts)
+- [ ] Add tests for action computation, dismissal, snooze/archive/revive, and visit snapshot
+
+---
+
+## Phase 3: Frontend Architecture
+
+### Two-view structure
+
+**View: What Now (default)**
+- Delta strip: "Since last visit (2 days ago)" — what changed
+- Priority action cards: full-width, ranked, with copy-paste commands and source badges
+- Weekly Focus section: goals per project with checkboxes
+- Shipped section: 7d / 30d / 90d commit counts with week-over-week delta
+- No "insights" section in v1 — portfolio insights can be computed client-side from project data when needed
+
+**View: Projects**
+- Project list with all current columns (status, momentum, issues, git state)
+- Click a project → side drawer opens with:
+  - Full project detail (LLM summary, next action, insights, GitHub issues)
+  - Shipped history for that project (7d/30d/90d commit counts)
+  - Lifecycle actions (snooze, archive, revive buttons)
+  - All project metadata (override status, tags, notes)
+
+### New components
+
+- [ ] `DeltaStrip` — "Since last visit" banner with delta items
+- [ ] `ActionCard` — ranked priority action with source badge + copy-paste command
+- [ ] `FocusSection` — weekly goals with checkboxes per project
+- [ ] `ShippedSection` — portfolio-level commit counts (7d/30d/90d)
+- [ ] `LifecycleActions` — snooze/archive/revive buttons in project detail pane
+
+### Modified components
+
+- [ ] `ProjectDetailPane` — add ShippedSection, LifecycleActions
+- [ ] `ProjectList` — add ShippedSection or ShippedCard
+- [ ] `page.tsx` → `App.tsx` — tab-based layout (What Now / Projects)
+
+### No hidden sections
+Everything visible. No accordions, no "click to expand." If content is secondary, it goes below the fold, but it's always visible.
+
+---
+
+## Phase 4: Notifications
+
+### Backend: node-notifier
+- Uses `node-notifier` npm package — sends native macOS/Windows/Linux notifications
+- No app install required
+- Triggered by pipeline after scan/derive/LLM cycle completes
+
+### Notification types (v1)
+- CI failure (project had CI passing, now failing)
+- Stale threshold crossed (project went from active → paused, or crossed 30/60/90 day thresholds)
+- Unpushed commits aging (commits ahead > 0 and days inactive > 7)
+
+### Not in v1 (deferred)
+- Time-based notifications ("Monday 9am focus reminder") — requires a scheduler
+- New GitHub issue notifications — requires webhook or polling separate from scan cycle
+- Notification center UI — Activity log + toasts suffice for v1
+
+### Notification deduplication
+- Each notification type per project is tracked in `Activity` table (`type: "notification"`)
+- Only send once per state transition (don't re-notify about same CI failure)
+- Quiet hours configurable via `UserPreference`
+
+### Checklist
+- [ ] Install `node-notifier` dependency
+- [ ] Create `src/lib/notifications.ts` — notification rules + deduplication logic
+- [ ] Hook into pipeline: after scan completes, evaluate notification rules
+- [ ] Track sent notifications in `Activity` table
+- [ ] Quiet hours check via `UserPreference`
+
+---
+
+## Phase 5: Menu Bar Companion (Future)
+
+**Architecture:** Thin Swift + AppKit menu bar app (~800 lines)
+- Polls `localhost:PORT/api/projects` every 5 minutes, extracts top actions
+- Shows badge count on menu bar icon
+- Dropdown shows top 3-5 priority actions
+- Click action → opens browser to `localhost:PORT` with project pre-selected
+- Click "Open Dashboard" → opens full web UI
+- Snooze/Archive/Revive send PUT to existing override API
+
+**Distribution:** Homebrew cask or DMG download
+**Not in scope for initial build** — ships after the web UI and notifications are working.
+
+---
+
+## Phase 6: CLI & Shell Integration (Future)
+
+### `sq` CLI commands
+```
+sq status          → One-line summary: "3 active, 2 stalling, 1 needs attention"
+sq next            → Top 3 priority actions with commands
+sq focus           → This week's focus goals
+sq archive <name>   → Archive a stale project with retirement note
+sq snooze <name>   → Snooze a project for 2 weeks
+sq revive <name>    → Revive a stale project
+```
+
+### `cd` hook
+- `sq hook` installs a shell function in `.zshrc`/`.bashrc`
+- After every `cd`, if the directory is a tracked project:
+  - Prints one line: "sidequests: 1 modified, 3 ahead. Next: fix auth bug (#42)"
+
+---
+
+## Implementation Order
+
+```
+Phase 0: Hono+Vite migration              ← Foundation — must be first
+    │
+Phase 1: Data model extensions            ← Add columns + new tables
+    │
+Phase 2: API routes (extend + new)         ← Compute actions in-project, add new endpoints
+    │
+Phase 3: Frontend (What Now + Projects)    ← New views using new data
+    │
+Phase 4: Notifications (node-notifier)     ← Push, don't pull
+    │
+Phase 5: Menu bar companion               ← Future
+Phase 6: CLI + Shell integration          ← Future
+```
+
+Phases 0-4 are the initial build. Phases 5-6 are follow-ups.
+
+---
+
+## What We're Not Building (YAGNI)
+
+Explicitly out of scope for v1:
+
+- **Per-project detail pages** — the side drawer is enough
+- **Charts/graphs** — sparklines and commit counts tell the story, no chart libraries
+- **Lifecycle kanban board** — the lifecycle actions in the project detail pane are enough
+- **PriorityAction table** — computed on-the-fly from existing data, not stored
+- **ScanDelta table** — replaced by UserVisit snapshot comparison
+- **LifecycleAction table** — replaced by 2 columns on Project + existing override API
+- **`/api/actions` endpoint family** — actions are a field in the projects response
+- **`/api/lifecycle/:id/*` routes** — uses existing override endpoint
+- **`/api/insights` endpoint** — portfolio insights are computed client-side from project data
+- **`/api/notifications` read/dismiss endpoint** — notifications fire from pipeline, Activity log + toasts suffice for v1
+- **Settings panels for notification thresholds** — config file / UserPreference is fine for v1
+- **Onboarding wizard for new features** — existing wizard stays, new features are self-explanatory
+- **MCP server** — table-stakes for AI workflows, but not blocking for v1
+- **User accounts / cloud sync** — local-first, single user
+- **Time-based notification scheduler** — requires cron/scheduler infrastructure, defer to v2
+
+---
+
+## Success Criteria for v1
+
+1. Open the app → immediately see ranked actions with copy-paste commands
+2. See what changed since last visit (delta strip)
+3. See GitHub issues merged into the priority queue with issue numbers
+4. See shipped history (commits this week/month/quarter)
+5. Weekly focus goals persist across sessions
+6. Stale project decisions (snooze/archive/revive) persist and re-surface after snooze expires
+7. Native macOS notifications fire on CI failures and stale thresholds
+8. Package size reduced by ~75% after Hono+Vite migration

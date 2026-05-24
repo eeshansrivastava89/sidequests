@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { Hono } from "hono";
 import { execSync } from "node:child_process";
 import { config } from "@/lib/config";
 
@@ -6,9 +6,7 @@ interface PreflightCheck {
   name: string;
   ok: boolean;
   message: string;
-  /** "required" = blocks core functionality, "optional" = enhances experience */
   tier: "required" | "optional";
-  /** True when this check corresponds to the currently selected provider. */
   active?: boolean;
 }
 
@@ -38,7 +36,6 @@ async function checkUrl(name: string, url: string, tier: "required" | "optional"
   }
 }
 
-/** Map from provider setting value → preflight check name */
 const PROVIDER_CHECK_NAME: Record<string, string> = {
   "claude-cli": "claude",
   "openrouter": "openrouter",
@@ -47,14 +44,17 @@ const PROVIDER_CHECK_NAME: Record<string, string> = {
   "qwen-cli": "qwen",
 };
 
-export async function GET() {
+export const preflightRoute = new Hono();
+
+// GET /api/preflight — check dependencies and LLM providers
+preflightRoute.get("/", async (c) => {
   const checks: PreflightCheck[] = [];
   const activeProvider = config.llmProvider;
 
-  // Core dependencies — required for basic functionality
+  // Core dependencies
   checks.push(checkBinary("git", "git", "required"));
 
-  // GitHub CLI — optional (enables GitHub data: issues, PRs, CI status)
+  // GitHub CLI
   const ghCheck = checkBinary("gh", "gh", "optional", "Install with: brew install gh (enables GitHub integration)");
   checks.push(ghCheck);
   if (ghCheck.ok) {
@@ -66,24 +66,16 @@ export async function GET() {
     }
   }
 
-  // ── LLM Providers ──
+  // LLM Providers
+  checks.push(checkBinary("claude", "claude", "optional", "Install with: npm install -g @anthropic-ai/claude-code"));
 
-  // Claude CLI
-  const claudeCheck = checkBinary("claude", "claude", "optional", "Install with: npm install -g @anthropic-ai/claude-code");
-  checks.push(claudeCheck);
-
-  // OpenRouter (API key check)
+  // OpenRouter
   {
     const hasKey = !!config.openrouterApiKey;
-    checks.push({
-      name: "openrouter",
-      ok: hasKey,
-      message: hasKey ? "API key configured" : "No API key set",
-      tier: "optional",
-    });
+    checks.push({ name: "openrouter", ok: hasKey, message: hasKey ? "API key configured" : "No API key set", tier: "optional" });
   }
 
-  // Ollama (local server reachability)
+  // Ollama
   {
     const url = config.ollamaUrl || "http://localhost:11434";
     checks.push(await checkUrl("ollama", url, "optional", "Is Ollama running? Try: ollama serve"));
@@ -98,9 +90,9 @@ export async function GET() {
   // Tag the active provider
   const activeCheckName = PROVIDER_CHECK_NAME[activeProvider];
   if (activeCheckName) {
-    const match = checks.find((c) => c.name === activeCheckName);
+    const match = checks.find((ch) => ch.name === activeCheckName);
     if (match) match.active = true;
   }
 
-  return NextResponse.json({ checks });
-}
+  return c.json({ checks });
+});
