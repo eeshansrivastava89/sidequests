@@ -110,6 +110,8 @@ export interface Project {
   audience: string | null;
   successMetrics: string | null;
   publishTarget: string | null;
+  // Timestamps
+  createdAt: string;
   lastScanned: string | null;
   updatedAt: string;
 

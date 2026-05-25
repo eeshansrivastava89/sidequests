@@ -294,7 +294,7 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
       // TS scanner has additional keys not in Python scanner (e.g. locBreakdown)
       const tsKeys = Object.keys(tsProject).sort();
       const pyKeys = Object.keys(pyProject).sort();
-      const tsOnly = new Set(["locBreakdown", "weekCommits", "monthCommits", "quarterCommits"]); // TS-only fields
+      const tsOnly = new Set(["locBreakdown", "weekCommits", "monthCommits", "quarterCommits", "weeklyCommitHistory", "dailyCommitCounts"]); // TS-only fields
       expect(tsKeys.filter(k => !tsOnly.has(k))).toEqual(pyKeys);
     }
   });

@@ -37,6 +37,8 @@ export interface ScannedProject extends ScanProject {
   locBreakdown: { code?: number; docs?: number; generated?: number };
   packageManager: string | null;
   license: boolean;
+  weeklyCommitHistory: Array<{ week: string; count: number }>;
+  dailyCommitCounts: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +184,42 @@ function countCommitsSince(projectPath: string, days: number): number {
   return result ? parseInt(result, 10) : 0;
 }
 
+/** Get commit counts per ISO week for the last 12 weeks. */
+function getWeeklyCommitHistory(projectPath: string): Array<{ week: string; count: number }> {
+  const days = getDailyCommitCounts(projectPath, 84);
+  const weeks: Record<string, number> = {};
+  for (const [dateStr, count] of Object.entries(days)) {
+    const d = new Date(dateStr);
+    const weekKey = getISOWeek(d);
+    weeks[weekKey] = (weeks[weekKey] ?? 0) + count;
+  }
+  return Object.entries(weeks)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, count]) => ({ week, count }));
+}
+
+/** Get daily commit counts for the last N days using a single git log call. */
+function getDailyCommitCounts(projectPath: string, days: number): Record<string, number> {
+  const since = new Date(Date.now() - days * 86400000).toISOString().split("T")[0];
+  const result = runGit(projectPath, "log", "--format=%ad", "--date=short", `--since=${since}`);
+  const counts: Record<string, number> = {};
+  if (result) {
+    for (const line of result.split("\n")) {
+      const d = line.trim();
+      if (d) counts[d] = (counts[d] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+function getISOWeek(date: Date): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
 interface GitInfo {
   isRepo: boolean;
   lastCommitDate: string | null;
@@ -202,6 +240,8 @@ interface GitInfo {
   recentCommits: { hash: string; date: string; message: string }[];
   branchCount: number;
   stashCount: number;
+  weeklyCommitHistory: Array<{ week: string; count: number }>;
+  dailyCommitCounts: Record<string, number>;
 }
 
 function getGitInfo(projectPath: string): GitInfo {
@@ -226,6 +266,8 @@ function getGitInfo(projectPath: string): GitInfo {
       recentCommits: [],
       branchCount: 0,
       stashCount: 0,
+      weeklyCommitHistory: [],
+      dailyCommitCounts: {},
     };
   }
 
@@ -240,6 +282,12 @@ function getGitInfo(projectPath: string): GitInfo {
   const weekCommits = countCommitsSince(projectPath, 7);
   const monthCommits = countCommitsSince(projectPath, 30);
   const quarterCommits = countCommitsSince(projectPath, 90);
+
+  // Weekly commit history (last 12 weeks) for sparklines/heatmap
+  const weeklyCommitHistory = getWeeklyCommitHistory(projectPath);
+
+  // Daily commit counts (last 365 days) for GitHub-style contribution graph
+  const dailyCommitCounts = getDailyCommitCounts(projectPath, 365);
 
   let daysInactive: number | null = null;
   if (lastDate) {
@@ -323,6 +371,8 @@ function getGitInfo(projectPath: string): GitInfo {
     recentCommits,
     branchCount,
     stashCount,
+    weeklyCommitHistory,
+    dailyCommitCounts,
   };
 }
 

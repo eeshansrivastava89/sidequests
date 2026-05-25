@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type { Project } from "@/lib/types";
+import type { PortfolioStats } from "@/lib/merge";
 import { cn } from "@/lib/utils";
 import { formatLastVisit } from "@/lib/project-helpers";
 import {
   BarChart3,
   Activity,
-  Heart,
-  Rocket,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -16,80 +15,40 @@ import {
   ArrowDownRight,
   Plus,
   Minus as MinusIcon,
-  Zap,
-  AlertCircle,
   GitBranch,
-  Eye,
+  Heart,
+  Code2,
+  Layers,
+  AlertCircle,
+  Github,
+  GitMerge,
 } from "lucide-react";
 import {
-  BarChart,
   Bar,
+  BarChart,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
   Area,
+  AreaChart,
+  Cell,
+  Pie,
+  PieChart,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { ShippedSection } from "@/components/shipped-section";
-import type { VisitDelta, ShippedData, FocusGoal } from "@/lib/types";
-
-/* ── Types ──────────────────────────────────────────────── */
-
-interface PortfolioStats {
-  ok: boolean;
-  statusCounts: Record<string, number>;
-  velocity: Array<{
-    id: string;
-    name: string;
-    week: number;
-    month: number;
-    quarter: number;
-    healthScore: number;
-    status: string;
-  }>;
-  totals: {
-    projects: number;
-    weekCommits: number;
-    monthCommits: number;
-    quarterCommits: number;
-  };
-  momentum: {
-    accelerating: number;
-    steady: number;
-    decelerating: number;
-    stalled: number;
-  };
-  momentumProjects: Record<string, string[]>;
-  signals: {
-    dirty: number;
-    ciFailing: number;
-    openIssues: number;
-    notOnGitHub: number;
-  };
-  topActive: Array<{
-    id: string;
-    name: string;
-    week: number;
-    month: number;
-    quarter: number;
-    healthScore: number;
-    status: string;
-  }>;
-  stalled: Array<{
-    id: string;
-    name: string;
-    week: number;
-    month: number;
-    quarter: number;
-    healthScore: number;
-    status: string;
-  }>;
-}
+import { TreemapChart } from "@/components/treemap";
+import { LifecycleTimeline } from "@/components/lifecycle-timeline";
+import { GitHubSignals } from "@/components/github-signals";
+import type { VisitDelta, ShippedData } from "@/lib/types";
+import { SECTION_LABEL } from "@/lib/status-colors";
 
 interface AnalyticsTabProps {
   projects: Project[];
@@ -99,16 +58,6 @@ interface AnalyticsTabProps {
   visitLoading: boolean;
   onSelectProject: (id: string) => void;
 }
-
-/* ── Chart colors ──────────────────────────────────────── */
-
-const COLORS = {
-  chart1: "var(--chart-1)",
-  chart2: "var(--chart-2)",
-  chart3: "var(--chart-3)",
-  chart4: "var(--chart-4)",
-  chart5: "var(--chart-5)",
-};
 
 const STATUS_COLORS_MAP: Record<string, string> = {
   building: "#22c55e",
@@ -136,8 +85,6 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "Archived",
 };
 
-/* ── Momentum ──────────────────────────────────────────── */
-
 type Momentum = "accelerating" | "steady" | "decelerating" | "stalled";
 
 const MOMENTUM_CONFIG: Record<Momentum, { icon: typeof TrendingUp; label: string; color: string; bg: string }> = {
@@ -147,25 +94,24 @@ const MOMENTUM_CONFIG: Record<Momentum, { icon: typeof TrendingUp; label: string
   stalled: { icon: Clock, label: "Stalled", color: "text-muted-foreground", bg: "bg-muted" },
 };
 
-/* ── Custom tooltip ─────────────────────────────────────── */
+const VELOCITY_CHART_CONFIG: ChartConfig = {
+  week: { label: "This week", color: "var(--chart-1)" },
+  monthPrior: { label: "Rest of month", color: "var(--chart-2)" },
+  quarterPrior: { label: "Prior 60d", color: "var(--chart-3)" },
+};
 
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-border/50 bg-background px-3 py-2 text-xs shadow-xl">
-      {label && <p className="font-medium mb-1 truncate max-w-[200px]">{label}</p>}
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="size-2 rounded-full shrink-0" style={{ background: p.color }} />
-          <span className="text-muted-foreground">{p.name}</span>
-          <span className="font-mono font-medium ml-auto tabular-nums">{p.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+const HEALTH_HIST_CONFIG: ChartConfig = {
+  count: { label: "Projects", color: "var(--chart-1)" },
+};
 
-/* ── Visit Delta ─────────────────────────────────────────── */
+const LANGUAGE_CONFIG: ChartConfig = {
+  weekCommits: { label: "7d commits", color: "var(--chart-1)" },
+  count: { label: "Projects", color: "var(--chart-2)" },
+};
+
+const COMMIT_TREND_CONFIG: ChartConfig = {
+  totalCommits: { label: "Total commits", color: "var(--chart-1)" },
+};
 
 function VisitDeltaDetail({ visit, projects, loading }: { visit: VisitDelta | null; projects: Project[]; loading: boolean }) {
   if (loading) return <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>;
@@ -233,7 +179,190 @@ function VisitDeltaDetail({ visit, projects, loading }: { visit: VisitDelta | nu
   );
 }
 
-/* ── Analytics Tab ──────────────────────────────────────── */
+function ContributionHeatmap({ dailyCommitCounts }: { dailyCommitCounts: Record<string, number> }) {
+  const days = Object.keys(dailyCommitCounts);
+  if (days.length === 0) {
+    return <p className="text-xs text-muted-foreground py-4">No commit history yet. Run a scan to see your activity pattern.</p>;
+  }
+
+  const maxCommits = Math.max(1, ...Object.values(dailyCommitCounts));
+  const today = new Date();
+  const CELL_SIZE = 11;
+  const CELL_GAP = 2;
+  const WEEKS = 53;
+
+  const startDay = new Date(today);
+  startDay.setDate(startDay.getDate() - (WEEKS * 7 - 1 + startDay.getDay()));
+  startDay.setHours(0, 0, 0, 0);
+
+  const dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""];
+
+  const weeks: Array<Array<{ date: string; count: number; isFuture: boolean }>> = [];
+  for (let w = 0; w < WEEKS; w++) {
+    const week: Array<{ date: string; count: number; isFuture: boolean }> = [];
+    for (let d = 0; d < 7; d++) {
+      const cellDate = new Date(startDay);
+      cellDate.setDate(cellDate.getDate() + w * 7 + d);
+      const dateStr = cellDate.toISOString().split("T")[0];
+      const isFuture = cellDate > today;
+      week.push({ date: dateStr, count: dailyCommitCounts[dateStr] ?? 0, isFuture });
+    }
+    weeks.push(week);
+  }
+
+  const monthLabels: Array<{ label: string; weekIdx: number }> = [];
+  let lastMonth = -1;
+  for (let w = 0; w < weeks.length; w++) {
+    const firstDay = new Date(weeks[w][0].date);
+    const month = firstDay.getMonth();
+    if (month !== lastMonth) {
+      monthLabels.push({ label: firstDay.toLocaleString("en", { month: "short" }), weekIdx: w });
+      lastMonth = month;
+    }
+  }
+
+  function getOpacity(count: number): number {
+    if (count === 0) return 0.06;
+    const ratio = count / maxCommits;
+    if (ratio < 0.15) return 0.2;
+    if (ratio < 0.4) return 0.4;
+    if (ratio < 0.7) return 0.65;
+    return 1;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[680px]">
+        <div className="flex gap-0">
+          <div className="flex flex-col shrink-0" style={{ width: "28px" }}>
+            {dayLabels.map((label, i) => (
+              <div key={i} className="text-[9px] text-muted-foreground" style={{ height: `${CELL_SIZE + CELL_GAP}px`, lineHeight: `${CELL_SIZE + CELL_GAP}px` }}>
+                {label}
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="flex" style={{ gap: `${CELL_GAP}px` }}>
+              {monthLabels.map((ml, i) => (
+                <span
+                  key={i}
+                  className="text-[9px] text-muted-foreground"
+                  style={{
+                    marginLeft: ml.weekIdx === 0 ? 0 : `${(ml.weekIdx - (monthLabels[i - 1]?.weekIdx ?? 0)) * (CELL_SIZE + CELL_GAP) - (i > 0 ? (ml.weekIdx - (monthLabels[i - 1]?.weekIdx ?? 0) - 1) * CELL_GAP : 0)}px`,
+                  }}
+                >
+                  {ml.label}
+                </span>
+              ))}
+            </div>
+            <div className="flex" style={{ gap: `${CELL_GAP}px` }}>
+              {weeks.map((week, wIdx) => (
+                <div key={wIdx} className="flex flex-col" style={{ gap: `${CELL_GAP}px` }}>
+                  {week.map((day) => (
+                    <div
+                      key={day.date}
+                      className="rounded-[2px]"
+                      style={{
+                        width: `${CELL_SIZE}px`,
+                        height: `${CELL_SIZE}px`,
+                        backgroundColor: day.isFuture
+                          ? "transparent"
+                          : `oklch(from var(--chart-1) l c h / ${getOpacity(day.count)})`,
+                      }}
+                      title={`${day.date}: ${day.count} commit${day.count !== 1 ? "s" : ""}`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-1 mt-2 text-[9px] text-muted-foreground">
+          <span>Less</span>
+          {[0.06, 0.2, 0.4, 0.65, 1].map((o) => (
+            <div
+              key={o}
+              className="rounded-[2px]"
+              style={{ width: `${CELL_SIZE}px`, height: `${CELL_SIZE}px`, backgroundColor: `oklch(from var(--chart-1) l c h / ${o})` }}
+            />
+          ))}
+          <span>More</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StaleTracker({
+  staleProjects,
+  onSelect,
+}: {
+  staleProjects: Array<{ id: string; name: string; daysInactive: number; healthScore: number; status: string }>;
+  onSelect: (id: string) => void;
+}) {
+  if (staleProjects.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5">
+      {staleProjects.slice(0, 10).map((p) => {
+        let color: string;
+        let label: string;
+        if (p.daysInactive > 60) {
+          color = "text-red-500";
+          label = "Dead";
+        } else if (p.daysInactive > 30) {
+          color = "text-red-400";
+          label = "Stale";
+        } else if (p.daysInactive > 14) {
+          color = "text-amber-500";
+          label = "Cooling";
+        } else {
+          color = "text-emerald-500";
+          label = "Active";
+        }
+        return (
+          <button
+            key={p.id}
+            type="button"
+            className="w-full text-left flex items-center gap-3 py-1 hover:bg-muted/30 transition-colors rounded-md px-1"
+            onClick={() => onSelect(p.id)}
+          >
+            <span className="text-xs font-medium min-w-[100px] max-w-[140px] truncate">{p.name}</span>
+            <div className="flex-1" />
+            <span className={cn("text-[11px] font-semibold tabular-nums", color)}>{p.daysInactive}d</span>
+            <span className={cn("text-[10px] font-medium uppercase tracking-wider", color)}>{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function LanguageBreakdown({
+  languages,
+}: {
+  languages: Array<{ language: string; count: number; weekCommits: number }>;
+}) {
+  if (languages.length === 0) return null;
+
+  const data = languages.slice(0, 8).map((l) => ({
+    language: l.language.length > 12 ? l.language.slice(0, 10) + "…" : l.language,
+    weekCommits: l.weekCommits,
+    count: l.count,
+  }));
+
+  return (
+    <ChartContainer config={LANGUAGE_CONFIG} className="min-h-[200px] w-full">
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+        <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+        <YAxis type="category" dataKey="language" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={80} />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <Bar dataKey="weekCommits" fill="var(--color-weekCommits)" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
 
 export function AnalyticsTab({
   projects,
@@ -266,9 +395,15 @@ export function AnalyticsTab({
 
   if (!stats) return null;
 
-  const { totals, statusCounts, momentum, momentumProjects, signals, topActive, velocity } = stats;
+  const { totals, statusCounts, momentum, momentumProjects, signals, topActive, languages, staleProjects, weeklyCommitHistory, healthDistribution, dailyCommitCounts } = stats;
 
-  // Pie chart data for status distribution
+  const barData = topActive.slice(0, 8).map((p) => ({
+    name: p.name.length > 14 ? p.name.slice(0, 12) + "…" : p.name,
+    week: p.week,
+    monthPrior: p.month - p.week,
+    quarterPrior: Math.max(0, p.quarter - p.month),
+  }));
+
   const pieData = Object.entries(statusCounts)
     .filter(([, count]) => count > 0)
     .map(([status, count]) => ({
@@ -277,24 +412,9 @@ export function AnalyticsTab({
       fill: STATUS_COLORS_MAP[status] ?? "#9ca3af",
     }));
 
-  // Bar chart data for top active projects (commits)
-  const barData = topActive.slice(0, 6).map((p) => ({
-    name: p.name.length > 14 ? p.name.slice(0, 12) + "…" : p.name,
-    week: p.week,
-    monthPrior: p.month - p.week, // commits in rest-of-month excluding this week
-    quarterPrior: Math.max(0, p.quarter - p.month), // commits in rest-of-quarter excluding month
-  }));
-
-  // Total commits across time periods
-  const commitTrend = [
-    { period: "7d", commits: totals.weekCommits },
-    { period: "30d", commits: totals.monthCommits },
-    { period: "90d", commits: totals.quarterCommits },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* ── Snapshot Hero ── */}
+      {/* ── Summary Cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="rounded-xl border border-border bg-card px-4 py-3">
           <div className="text-2xl font-bold tracking-tight tabular-nums">{totals.projects}</div>
@@ -318,96 +438,92 @@ export function AnalyticsTab({
         </div>
       </div>
 
-      {/* ── Commit Velocity ── */}
+      {/* ── Contribution Heatmap ── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
-          <BarChart3 className="size-3.5 text-blue-500" />
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Commit Velocity</h3>
+          <Activity className="size-3.5 text-emerald-500" />
+          <h3 className={SECTION_LABEL}>Contribution Rhythm</h3>
         </div>
         <div className="px-5 py-4">
-          <div className="h-[220px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <ContributionHeatmap dailyCommitCounts={dailyCommitCounts} />
+        </div>
+      </div>
+
+      {/* ── Commit Velocity + Trend (side by side) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+            <BarChart3 className="size-3.5 text-blue-500" />
+            <h3 className={SECTION_LABEL}>Commit Velocity</h3>
+          </div>
+          <div className="px-5 py-3">
+            <ChartContainer config={VELOCITY_CHART_CONFIG} className="min-h-[180px] w-full">
               <BarChart data={barData} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis
                   dataKey="name"
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                 />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="week" stackId="a" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} name="This week" />
-                <Bar dataKey="monthPrior" stackId="a" fill="hsl(var(--chart-2))" radius={[0, 0, 0, 0]} name="Rest of month" />
-                <Bar dataKey="quarterPrior" stackId="a" fill="hsl(var(--chart-3))" radius={[0, 0, 2, 2]} name="Prior 60d" />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar dataKey="week" stackId="a" fill="var(--color-week)" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="monthPrior" stackId="a" fill="var(--color-monthPrior)" />
+                <Bar dataKey="quarterPrior" stackId="a" fill="var(--color-quarterPrior)" radius={[0, 0, 2, 2]} />
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2 rounded" style={{ background: "hsl(var(--chart-1))" }} /> This week</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2 rounded" style={{ background: "hsl(var(--chart-2))" }} /> Rest of month</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2 rounded" style={{ background: "hsl(var(--chart-3))" }} /> Prior 60d</span>
+            </ChartContainer>
           </div>
         </div>
+
+        {weeklyCommitHistory.length > 0 && (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+              <TrendingUp className="size-3.5 text-chart-1" />
+              <h3 className={SECTION_LABEL}>Commit Trend (12 weeks)</h3>
+            </div>
+            <div className="px-5 py-3">
+              <ChartContainer config={COMMIT_TREND_CONFIG} className="min-h-[180px] w-full">
+                <AreaChart data={weeklyCommitHistory} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis
+                    dataKey="week"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                    tickFormatter={(v: string) => v.replace(/^\d{4}-W/, "W")}
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <defs>
+                    <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-totalCommits)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--color-totalCommits)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="totalCommits" stroke="var(--color-totalCommits)" fill="url(#trendFill)" strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Portfolio Health + Momentum ── */}
+      {/* ── Momentum + Stale Tracker ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Status distribution pie */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
-            <Heart className="size-3.5 text-red-400" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Portfolio Health</h3>
-          </div>
-          <div className="px-5 py-4">
-            {pieData.length > 0 ? (
-              <div className="flex items-center gap-4">
-                <div className="h-[160px] w-[160px] shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={45}
-                        outerRadius={72}
-                        paddingAngle={2}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={index} fill={entry.fill} stroke="transparent" />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<ChartTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  {pieData.map((d) => (
-                    <div key={d.name} className="flex items-center gap-2">
-                      <div className="size-2.5 rounded-full shrink-0" style={{ background: d.fill }} />
-                      <span className="text-xs font-medium">{d.name}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums ml-auto">{d.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">No status data yet. Run an AI scan to see health distribution.</p>
-            )}
-          </div>
-        </div>
-
-        {/* Momentum */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
             <Activity className="size-3.5 text-amber-500" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Momentum</h3>
+            <h3 className={SECTION_LABEL}>Momentum</h3>
           </div>
           <div className="px-5 py-4 space-y-3">
             {(Object.entries(momentum) as [Momentum, number][]).filter(([, count]) => count > 0).map(([m, count]) => {
@@ -430,7 +546,7 @@ export function AnalyticsTab({
                           key={name}
                           className="text-[11px] bg-muted px-2 py-0.5 rounded-md font-medium cursor-pointer hover:bg-muted/80 transition-colors"
                           onClick={() => {
-                            const p = projects.find((p) => p.name === name);
+                            const p = projects.find((proj) => proj.name === name);
                             if (p) onSelectProject(p.id);
                           }}
                         >
@@ -445,21 +561,165 @@ export function AnalyticsTab({
             })}
           </div>
         </div>
+
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+            <Clock className="size-3.5 text-red-400" />
+            <h3 className={SECTION_LABEL}>Stale Tracker</h3>
+          </div>
+          <div className="px-5 py-3">
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2">
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-emerald-500" /> Active (&lt;14d)</span>
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-amber-500" /> Cooling (14-30d)</span>
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-red-400" /> Stale (30-60d)</span>
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-red-500" /> Dead (&gt;60d)</span>
+            </div>
+            <StaleTracker staleProjects={staleProjects} onSelect={onSelectProject} />
+          </div>
+        </div>
       </div>
 
-      {/* ── Shipped ── */}
-      <ShippedSection shipped={shipped} loading={shippedLoading} />
+      {/* ── Health Distribution Histogram + Portfolio Health ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+            <Heart className="size-3.5 text-red-400" />
+            <h3 className={SECTION_LABEL}>Health Distribution</h3>
+          </div>
+          <div className="px-5 py-4">
+            <ChartContainer config={HEALTH_HIST_CONFIG} className="min-h-[200px] w-full">
+              <BarChart data={healthDistribution} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis
+                  dataKey="range"
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickFormatter={(v: string) => v.split("-")[0]}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  allowDecimals={false}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" fill="var(--color-count)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </div>
+        </div>
 
-      {/* ── Since Last Visit ── */}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+            <Layers className="size-3.5 text-purple-400" />
+            <h3 className={SECTION_LABEL}>Portfolio Status</h3>
+          </div>
+          <div className="px-5 py-4">
+            {pieData.length > 0 ? (
+              <div className="flex items-start gap-4">
+                <div className="min-w-[160px] min-h-[160px]">
+                  <ChartContainer
+                    config={Object.fromEntries(pieData.map((d) => [d.name.toLowerCase().replace(/\s/g, ""), { label: d.name, color: d.fill }]))}
+                    className="min-h-[160px] w-[160px]"
+                  >
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={72}
+                        paddingAngle={2}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={index} fill={entry.fill} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ChartContainer>
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  {pieData.map((d) => (
+                    <div key={d.name} className="flex items-center gap-2">
+                      <div className="size-2.5 rounded-full shrink-0" style={{ background: d.fill }} />
+                      <span className="text-xs font-medium">{d.name}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No status data yet. Run an AI scan to see health distribution.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Language/Framework Breakdown ── */}
+      {languages.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+              <Code2 className="size-3.5 text-chart-1" />
+              <h3 className={SECTION_LABEL}>Languages</h3>
+            </div>
+            <div className="px-5 py-4">
+              <LanguageBreakdown languages={languages} />
+            </div>
+          </div>
+
+          {stats.frameworks && stats.frameworks.length > 0 && stats.frameworks.some((f) => f.framework !== "None detected") && (
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+                <Layers className="size-3.5 text-chart-2" />
+                <h3 className={SECTION_LABEL}>Frameworks</h3>
+              </div>
+              <div className="px-5 py-4">
+                <LanguageBreakdown languages={stats.frameworks.filter((f) => f.framework !== "None detected").map((f) => ({ language: f.framework, count: f.count, weekCommits: f.weekCommits }))} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Portfolio Allocation Treemap ── */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
-          <Eye className="size-3.5 text-emerald-500" />
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Since Last Visit</h3>
+          <Layers className="size-3.5 text-chart-1" />
+          <h3 className={SECTION_LABEL}>Portfolio Allocation</h3>
         </div>
         <div className="px-5 py-4">
-          <VisitDeltaDetail visit={visit} projects={projects} loading={visitLoading} />
+          <TreemapChart projects={projects} onSelect={onSelectProject} />
         </div>
       </div>
+
+      {/* ── Lifecycle Timeline ── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+          <GitMerge className="size-3.5 text-blue-400" />
+          <h3 className={SECTION_LABEL}>Lifecycle Timeline</h3>
+        </div>
+        <div className="px-5 py-4">
+          <LifecycleTimeline projects={projects} onSelect={onSelectProject} />
+        </div>
+      </div>
+
+      {/* ── GitHub Signal Dashboard ── */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
+          <Github className="size-3.5" />
+          <h3 className={SECTION_LABEL}>GitHub Signals</h3>
+        </div>
+        <div className="px-5 py-4">
+          <GitHubSignals projects={projects} onSelect={onSelectProject} />
+        </div>
+      </div>
+
+      <ShippedSection shipped={shipped} loading={shippedLoading} />
     </div>
   );
 }

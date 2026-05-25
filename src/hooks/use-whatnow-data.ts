@@ -1,6 +1,6 @@
 
 import { useCallback, useEffect, useState } from "react";
-import type { FocusGoal, ShippedData, VisitDelta, PriorityAction, Project } from "@/lib/types";
+import type { FocusGoal, ShippedData, VisitDelta } from "@/lib/types";
 
 /* ── Focus Goals ───────────────────────────────────────── */
 
@@ -122,12 +122,3 @@ export async function reshowAlert(projectId: string, alertType: string, onReshow
   return data;
 }
 
-/* ── Aggregate Actions ──────────────────────────────────── */
-
-/** Collect all priority actions from all projects, sorted by severity. */
-export function aggregateActions(projects: Project[]): PriorityAction[] {
-  const all = projects.flatMap((p) => p.actions ?? []);
-  const severityRank: Record<string, number> = { high: 0, med: 1, low: 2 };
-  all.sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || a.type.localeCompare(b.type));
-  return all;
-}

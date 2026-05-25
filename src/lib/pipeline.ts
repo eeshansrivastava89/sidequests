@@ -265,6 +265,8 @@ export async function runRefreshPipeline(
       fixmeCount: scanned.fixmeCount ?? 0,
       stashCount: scanned.stashCount ?? 0,
       commitCount: scanned.commitCount ?? 0,
+      weeklyCommitHistory: scanned.weeklyCommitHistory ?? [],
+      dailyCommitCounts: scanned.dailyCommitCounts ?? {},
     });
 
     await db.scan.upsert({

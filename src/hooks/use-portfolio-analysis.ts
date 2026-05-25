@@ -1,25 +1,52 @@
 import { useCallback, useEffect, useState } from "react";
 
+export type Urgency = "now" | "this-week" | "soon";
+
 export interface PortfolioRecommendation {
   projectName: string;
   reasoning: string;
   quickAction: string;
+  urgency?: Urgency;
+}
+
+export interface PortfolioSecondaryPick {
+  projectName: string;
+  reason: string;
+  urgency?: Urgency;
 }
 
 export interface PortfolioAnalysis {
   recommendation: PortfolioRecommendation | null;
-  secondary: Array<{ projectName: string; reason: string }>;
+  secondary: PortfolioSecondaryPick[];
   portfolioInsights: string[];
   generatedAt: string | null;
+  extras: Record<string, unknown>;
 }
 
 interface AnalysisResponse {
   ok: boolean;
   recommendation?: PortfolioRecommendation | null;
-  secondary?: Array<{ projectName: string; reason: string }>;
+  secondary?: PortfolioSecondaryPick[];
   portfolioInsights?: string[];
   generatedAt?: string | null;
   error?: string;
+  [key: string]: unknown;
+}
+
+const KNOWN_KEYS = new Set(["ok", "recommendation", "secondary", "portfolioInsights", "generatedAt", "error", "cached"]);
+
+function parseAnalysis(data: AnalysisResponse): PortfolioAnalysis {
+  const extras: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (!KNOWN_KEYS.has(key)) extras[key] = value;
+  }
+  return {
+    recommendation: data.recommendation ?? null,
+    secondary: data.secondary ?? [],
+    portfolioInsights: data.portfolioInsights ?? [],
+    generatedAt: data.generatedAt ?? null,
+    extras,
+  };
 }
 
 export function usePortfolioAnalysis() {
@@ -34,12 +61,7 @@ export function usePortfolioAnalysis() {
       const res = await fetch("/api/portfolio/analysis");
       const data: AnalysisResponse = await res.json();
       if (data.ok) {
-        setAnalysis({
-          recommendation: data.recommendation ?? null,
-          secondary: data.secondary ?? [],
-          portfolioInsights: data.portfolioInsights ?? [],
-          generatedAt: data.generatedAt ?? null,
-        });
+        setAnalysis(parseAnalysis(data));
       } else {
         setError(data.error || "Analysis unavailable");
       }
@@ -62,12 +84,7 @@ export function usePortfolioAnalysis() {
       const res = await fetch("/api/portfolio/analysis", { method: "POST" });
       const data: AnalysisResponse = await res.json();
       if (data.ok) {
-        setAnalysis({
-          recommendation: data.recommendation ?? null,
-          secondary: data.secondary ?? [],
-          portfolioInsights: data.portfolioInsights ?? [],
-          generatedAt: data.generatedAt ?? null,
-        });
+        setAnalysis(parseAnalysis(data));
       } else {
         setError(data.error || "Analysis failed");
       }

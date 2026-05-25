@@ -184,6 +184,35 @@ export function DashboardPage() {
     [fetchProjects]
   );
 
+  const handleSnoozeProject = useCallback(
+    (id: string, days: number) => {
+      const until = new Date();
+      until.setDate(until.getDate() + days);
+      until.setHours(0, 0, 0, 0);
+      updateOverride(id, { snoozedUntil: until.toISOString() }).then((d) => {
+        if ((d as { ok?: boolean })?.ok) {
+          toast.success(`Snoozed for ${days} days`);
+        } else {
+          toast.error("Failed to snooze project");
+        }
+      }).catch(() => toast.error("Failed to snooze project"));
+    },
+    [updateOverride]
+  );
+
+  const handleMarkDone = useCallback(
+    (id: string) => {
+      updateOverride(id, { statusOverride: "completed" }).then((d) => {
+        if ((d as { ok?: boolean })?.ok) {
+          toast.success("Marked as completed");
+        } else {
+          toast.error("Failed to update status");
+        }
+      }).catch(() => toast.error("Failed to update status"));
+    },
+    [updateOverride]
+  );
+
   const filtered = useMemo(
     () => sortProjects(filterBySignal(filterBySearch(filterByView(projects, view), search), signalFilter), sortKey),
     [projects, view, search, signalFilter, sortKey]
@@ -353,6 +382,8 @@ export function DashboardPage() {
                 analysisLoading={portfolioHook.loading}
                 analysisError={portfolioHook.error}
                 onSelectProject={setSelectedId}
+                onSnoozeProject={handleSnoozeProject}
+                onMarkDone={handleMarkDone}
               />
             )}
 

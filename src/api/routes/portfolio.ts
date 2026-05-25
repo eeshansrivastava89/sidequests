@@ -85,7 +85,7 @@ portfolioRoute.post("/analysis", async (_req, res) => {
 
 // GET /api/portfolio/stats — compute portfolio statistics (no LLM, deterministic)
 portfolioRoute.get("/stats", async (_req, res) => {
-  const projects = await mergeAllProjectsLean();
+  const projects = await mergeAllProjects();
   const stats = computePortfolioStats(projects);
   res.json({ ok: true, ...stats });
 });

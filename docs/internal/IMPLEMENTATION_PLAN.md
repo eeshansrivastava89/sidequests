@@ -1,7 +1,7 @@
 # Sidequests — Architecture & Implementation Plan
 
 **Updated:** 2026-05-25
-**Status:** Phase 7 (polish) complete. Phase 8 (What Now rebuild + Analytics) in progress.
+**Status:** Phase 9 (What Now v2 + Analytics v2) complete. Phase 10 (Ship) next.
 
 ---
 
@@ -46,7 +46,7 @@ The product is a **control center for side projects**, not a dashboard. Every fe
 
 ---
 
-## Phase 8: What Now Rebuild + Analytics
+## Phase 8: What Now Rebuild + Analytics ✅
 
 Replaces the flat Priority Actions feed with an AI-powered recommendation card and adds a dedicated Analytics tab.
 
@@ -54,20 +54,20 @@ Replaces the flat Priority Actions feed with an AI-powered recommendation card a
 
 The current What Now tab just regurgitates git hygiene data ("3 uncommitted files", "no remote"). That's sorted data, not a recommendation. The rebuild focuses on answering one question: **"What should I work on right now and why?"**
 
-- [ ] **Top recommendation card** — One card with the single most important thing to do, synthesized from `nextAction` + `status` + `statusReason` + open issues + git state + momentum. Secondary suggestions as "while you're at it" items.
-- [ ] **Why this?** — Short reasoning drawing from actual signals: open bugs, stale git state, LLM-identified purpose, activity drop-off. Trust comes from transparency.
-- [ ] **Quick actions** — "Open in terminal", "Open on GitHub", "Snooze 7d", "Mark done" — directly actionable, not just "copy cd path".
-- [ ] **Remove flat Priority Actions feed** — the severity-sorted list of git warnings is redundant with the Projects tab filters. Replace with the recommendation card.
+- [x] **Top recommendation card** — One card with the single most important thing to do, synthesized from `nextAction` + `status` + `statusReason` + open issues + git state + momentum. Secondary suggestions as "while you're at it" items.
+- [x] **Why this?** — Short reasoning drawing from actual signals: open bugs, stale git state, LLM-identified purpose, activity drop-off. Trust comes from transparency.
+- [x] **Quick actions** — "Open in terminal", "Open on GitHub", "Snooze 7d", "Mark done" — directly actionable, not just "copy cd path".
+- [x] **Remove flat Priority Actions feed** — the severity-sorted list of git warnings is redundant with the Projects tab filters. Replaced with the recommendation card. Removed `aggregateActions()` dead code.
 
 ### Analytics Tab — Development Activity
 
 New tab replacing the current What Now's numbers-without-insight role. Gives detailed insight into development activity and momentum.
 
-- [ ] **Activity bars for all projects** — Per-project commit counts (7d/30d/90d), visualized as proportional bars (generalize the ShippedSection pattern)
-- [ ] **Health distribution** — Active/paused/stale/archived counts with average health scores
-- [ ] **Momentum signals** — Projects accelerating (week >> quarter/12), decelerating, or stalled. Compare week vs month vs quarter commit rates.
-- [ ] **Shipped card** — Move existing ShippedSection here (already good)
-- [ ] **Visit delta detail** — Move existing delta chips here with more detail (which projects changed, what changed)
+- [x] **Activity bars for all projects** — Per-project commit counts (7d/30d/90d), visualized as proportional stacked bars (scrollable list, clickable to project detail)
+- [x] **Health distribution** — Active/paused/stale/archived counts with average health scores per status group
+- [x] **Momentum signals** — Projects accelerating (week >> quarter/12), decelerating, or stalled. Compare week vs month vs quarter commit rates.
+- [x] **Shipped card** — Move existing ShippedSection here (already good)
+- [x] **Visit delta detail** — Move existing delta chips here with more detail (which projects changed, what changed)
 
 ### Tab Structure
 
@@ -85,18 +85,43 @@ New tab replacing the current What Now's numbers-without-insight role. Gives det
 
 ---
 
-## Phase 9: Menu Bar Companion
+## Phase 9: What Now v2 + Analytics v2
 
-Swift `MenuBarExtra` app that talks to the Sidequests localhost API.
+Redesign both tabs for schema flexibility, richer data, and professional charting.
 
-- [ ] Create Xcode project: SwiftUI `MenuBarExtra` app
-- [ ] Poll `GET /api/health` for server status, show badge count
-- [ ] Dropdown: top recommendation from What Now
-- [ ] "Open Dashboard" → opens `localhost:PORT` in browser
-- [ ] "Refresh" → `POST /api/refresh/stream` to trigger scan
-- [ ] Auto-launch on login (`SMAppService`)
-- [ ] If server not running, start it via `Process` (`npx @eeshans/sidequests`)
-- [ ] Distribution: Homebrew cask or DMG
+### What Now v2
+
+- [x] **Schema-flexible AI response** — Parse portfolio AI response generically. Unknown fields in the AI response flow into `extras` catch-all (same pattern as `Llm.extrasJson`), rendered as a "More from AI" section.
+- [x] **Ambient context on What Now** — Focus goals (with progress), shipped this week, and visit deltas shown in a 3-column strip on the What Now page. No tab-switching needed.
+- [x] **Urgency from AI** — `urgency` field (now/this-week/soon) added to portfolio prompt output. Rendered with colored border glow (red/amber/blue) + badge on recommendation card.
+- [x] **Update `PortfolioAnalysis` TypeScript type** — Added `extras`, `Urgency`, `PortfolioSecondaryPick` types. Backward compat with old shape.
+
+### Analytics v2
+
+- [x] **Install shadcn chart component** — `pnpm dlx shadcn@latest add chart`. Replaces raw Recharts usage with `ChartContainer`, `ChartTooltip`, `ChartConfig`, CSS variable theming.
+- [x] **Contribution heatmap** — Weekly heatmap across all projects with intensity-based opacity and legend.
+- [x] **Commit velocity + trend** — Stacked bar chart for top projects (via shadcn chart) + area chart showing 12-week commit trend.
+- [x] **Health distribution histogram** — Bar histogram of health scores in 10-point buckets. Replaces old pie chart.
+- [x] **Stale tracker** — Sorted list by days inactive with thresholds: Active (<14d), Cooling (14-30d), Stale (30-60d), Dead (>60d).
+- [x] **Language/framework breakdown** — Horizontal bar charts for language and framework distribution by 7d commits.
+- [x] **Remove old chart code** — Stripped raw Recharts Tooltip, hand-rolled ProjectActivityRow, old pie chart. All replaced with shadcn chart + ChartContainer.
+- [x] **Portfolio allocation treemap** — Squarified treemap: rectangle size proportional to commit count, color by health score implemented with SVG (no D3 dependency).
+- [x] **Project lifecycle timeline** — Horizontal bars showing project age, activity windows (week/month/quarter), status indicators.
+- [x] **GitHub signal dashboard** — CI status breakdown, failing projects, top issues, open PRs, visibility. Only shows when GitHub-connected projects exist.
+
+### Data Layer Extensions
+
+- [x] **Weekly commit history** — Scanner now captures `weeklyCommitHistory` (12 weeks of per-ISO-week commit counts). Stored in `Scan.metaJson`. Consumed by `/api/portfolio/stats`.
+- [x] **Language/framework counts** — `computePortfolioStats` now returns `languages[]` and `frameworks[]` with project counts and week commit totals.
+- [x] **Stale projects** — `computePortfolioStats` now returns `staleProjects[]` with `daysInactive` per project.
+- [x] **Health distribution** — `computePortfolioStats` now returns `healthDistribution[]` with 10-point bucket counts.
+- [x] **Weekly commit trend** — `computePortfolioStats` now returns `weeklyCommitHistory[]` with per-week total commits and per-project breakdown.
+
+### Dependencies
+
+- shadcn chart component (wraps Recharts v3 — already a dependency) ✅
+- `computePortfolioStats` extended with all new fields ✅
+- D3 may still be needed for treemap/lifecycle timeline (future)
 
 ---
 
@@ -115,9 +140,9 @@ Packaging, CI, distribution.
 ```
 Phases 0–5: Complete ✅
 Phase 7: Polish ✅
-Phase 8: What Now + Analytics  ← Current
-Phase 9: Menu bar companion    ← After
-Phase 10: Ship                ← Last
+Phase 8: What Now + Analytics ✅
+Phase 9: What Now v2 + Analytics v2 ✅
+Phase 10: Ship                       ← Current
 ```
 
 ---
@@ -137,12 +162,13 @@ These were considered and deliberately excluded. They won't be added later unles
 - **`/api/notifications` read/dismiss endpoint** — notifications deprecated
 - **Settings panels for notification thresholds** — config file is enough
 - **Onboarding wizard for new features** — existing wizard stays
-- **System notifications via node-notifier** — deprecated, replaced by in-app signals + menu bar badge
+- **System notifications via node-notifier** — deprecated, replaced by in-app signals
+- **Menu bar companion** — deprecated. Native macOS app requires separate distribution (Homebrew cask, code signing, Sparkle), adds complexity without improving the core dashboard. The web SPA is the control center.
 - **User accounts / cloud sync** — local-first, single user
 - **Time-based notification scheduler** — requires cron infrastructure
 - **Tauri/Electron desktop wrapper** — localhost web server + menu bar client, not a desktop app
 - **Hono web framework** — removed. Sidequests needs direct HTTP stream control
-- **Charts/graphs** — sparklines and commit counts tell the story (if we add sparklines later, that's a UI enhancement, not a charting library)
+- **Charts/graphs** — ~~sparklines and commit counts tell the story~~ Phase 9 adds professional charting via shadcn chart
 
 ---
 
@@ -155,5 +181,5 @@ These were considered and deliberately excluded. They won't be added later unles
 5. Weekly focus goals persist across sessions ✅
 6. Stale project decisions (snooze/archive/revive) persist and re-surface ✅
 7. Fast scan progress arrives one project at a time ✅
-8. Menu bar companion shows badge count and top actions — **Phase 8**
+8. Web dashboard is the sole control center — no native companion app ✅
 9. Package size ≤ 170MB installed via npx ✅

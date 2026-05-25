@@ -98,6 +98,7 @@ export interface MergedProject {
   meta: Record<string, unknown>;
 
   // Timestamps
+  createdAt: string;
   lastScanned: string | null;
   updatedAt: string;
 }
@@ -139,6 +140,12 @@ export interface PortfolioStats {
   };
   topActive: VelocityEntry[];
   stalled: VelocityEntry[];
+  languages: Array<{ language: string; count: number; weekCommits: number }>;
+  frameworks: Array<{ framework: string; count: number; weekCommits: number }>;
+  staleProjects: Array<{ id: string; name: string; daysInactive: number; healthScore: number; status: string }>;
+  weeklyCommitHistory: Array<{ week: string; totalCommits: number; projects: Record<string, number> }>;
+  healthDistribution: Array<{ range: string; count: number }>;
+  dailyCommitCounts: Record<string, number>;
 }
 
 /**
@@ -209,6 +216,86 @@ export function computePortfolioStats(projects: MergedProject[]): PortfolioStats
   const topActive = velocity.filter((p) => p.quarter > 0).slice(0, 8);
   const stalled = velocity.filter((p) => p.quarter === 0);
 
+  // Language breakdown
+  const langMap: Record<string, { count: number; weekCommits: number }> = {};
+  for (const p of projects) {
+    if (p.status === "archived") continue;
+    const lang = p.primaryLanguage ?? "Unknown";
+    if (!langMap[lang]) langMap[lang] = { count: 0, weekCommits: 0 };
+    langMap[lang].count++;
+    langMap[lang].weekCommits += p.weekCommits;
+  }
+  const languages = Object.entries(langMap)
+    .map(([language, d]) => ({ language, ...d }))
+    .sort((a, b) => b.weekCommits - a.weekCommits);
+
+  // Framework breakdown
+  const fwMap: Record<string, { count: number; weekCommits: number }> = {};
+  for (const p of projects) {
+    if (p.status === "archived") continue;
+    const fw = p.framework ?? "None detected";
+    if (!fwMap[fw]) fwMap[fw] = { count: 0, weekCommits: 0 };
+    fwMap[fw].count++;
+    fwMap[fw].weekCommits += p.weekCommits;
+  }
+  const frameworks = Object.entries(fwMap)
+    .map(([framework, d]) => ({ framework, ...d }))
+    .sort((a, b) => b.weekCommits - a.weekCommits);
+
+  // Stale projects (days inactive)
+  const staleProjects = projects
+    .filter((p) => p.status !== "archived")
+    .map((p) => {
+      const daysInactive = p.lastCommitDate
+        ? Math.floor((Date.now() - new Date(p.lastCommitDate).getTime()) / 86400000)
+        : 999;
+      return { id: p.id, name: p.name, daysInactive, healthScore: p.healthScore, status: p.llmStatus ?? p.status };
+    })
+    .sort((a, b) => b.daysInactive - a.daysInactive);
+
+  // Weekly commit history — aggregate from per-project meta.weeklyCommitHistory
+  const weekBuckets: Record<string, Record<string, number>> = {};
+  for (const p of projects) {
+    if (p.status === "archived") continue;
+    const history = Array.isArray((p.meta as Record<string, unknown>)?.weeklyCommitHistory)
+      ? (p.meta as Record<string, unknown>).weeklyCommitHistory as Array<{ week: string; count: number }>
+      : [];
+    for (const entry of history) {
+      if (!weekBuckets[entry.week]) weekBuckets[entry.week] = {};
+      weekBuckets[entry.week][p.name] = entry.count;
+    }
+  }
+  const weeklyCommitHistory = Object.entries(weekBuckets)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([week, projectsMap]) => ({
+      week,
+      totalCommits: Object.values(projectsMap).reduce((s, c) => s + c, 0),
+      projects: projectsMap,
+    }));
+
+  // Health score distribution (10-point buckets)
+  const healthBuckets: Record<string, number> = {};
+  for (const p of projects) {
+    const bucket = `${Math.floor(p.healthScore / 10) * 10}-${Math.floor(p.healthScore / 10) * 10 + 9}`;
+    healthBuckets[bucket] = (healthBuckets[bucket] ?? 0) + 1;
+  }
+  const healthDistribution = ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-99", "100-100"].map((range) => ({
+    range,
+    count: healthBuckets[range] ?? 0,
+  }));
+
+  // Daily commit counts (365d) — aggregate across projects for heatmap
+  const dailyAgg: Record<string, number> = {};
+  for (const p of projects) {
+    if (p.status === "archived") continue;
+    const counts = (p.meta as Record<string, unknown>)?.dailyCommitCounts;
+    if (counts && typeof counts === "object") {
+      for (const [date, cnt] of Object.entries(counts as Record<string, number>)) {
+        dailyAgg[date] = (dailyAgg[date] ?? 0) + (typeof cnt === "number" ? cnt : 0);
+      }
+    }
+  }
+
   return {
     statusCounts,
     velocity,
@@ -218,6 +305,12 @@ export function computePortfolioStats(projects: MergedProject[]): PortfolioStats
     signals: { dirty, ciFailing, openIssues, notOnGitHub },
     topActive,
     stalled,
+    languages,
+    frameworks,
+    staleProjects,
+    weeklyCommitHistory,
+    healthDistribution,
+    dailyCommitCounts: dailyAgg,
   };
 }
 
@@ -362,6 +455,7 @@ export async function mergeAllProjectsLean(): Promise<MergedProject[]> {
 
 export type ProjectWithRelations = Project & {
   scan: { rawJson?: string; metaJson?: string | null; scannedAt: Date } | null;
+  // Note: project.createdAt is available via the Project base type
   derived: {
     statusAuto: string;
     healthScoreAuto: number;
@@ -564,6 +658,7 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
       ...parseJson(llm?.extrasJson, {} as Record<string, unknown>),
     },
 
+    createdAt: project.createdAt.toISOString(),
     lastScanned: scan?.scannedAt?.toISOString() ?? null,
     updatedAt: project.updatedAt.toISOString(),
   };

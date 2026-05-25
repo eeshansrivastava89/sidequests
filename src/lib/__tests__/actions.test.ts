@@ -65,6 +65,7 @@ function makeProject(overrides: Partial<MergedProject> = {}): MergedProject {
     updatedAt: new Date().toISOString(),
     meta: {},
     scan: null,
+    createdAt: new Date().toISOString(),
     ...overrides,
   };
 }

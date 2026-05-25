@@ -5,18 +5,25 @@ Respond ONLY with valid JSON (no markdown fences, no commentary):
   "recommendation": {
     "projectName": "name of the ONE project they should focus on this week",
     "reasoning": "2-3 sentences explaining WHY this project deserves focus right now, considering momentum, blocking issues, and shipping potential",
-    "quickAction": "one concrete thing to do first (e.g. 'Fix the failing CI on main branch' or 'Ship the auth feature you were building last week')"
+    "quickAction": "one concrete thing to do first (e.g. 'Fix the failing CI on main branch' or 'Ship the auth feature you were building last week')",
+    "urgency": "now | this-week | soon"
   },
   "secondary": [
     {
       "projectName": "name",
-      "reason": "1 sentence why it's worth attention"
+      "reason": "1 sentence why it's worth attention",
+      "urgency": "now | this-week | soon"
     }
   ],
   "portfolioInsights": [
     "2-4 high-signal observations about the portfolio as a whole, e.g. '3 of 8 projects are stalled — consider archiving' or 'You're spread thin across 5 active projects; deep focus on 1-2 would move the needle more'"
   ]
 }
+
+Urgency levels:
+- "now": requires immediate action (CI failing, blocking bug, deadline this week)
+- "this-week": important to address this week (stalled project with clear next step, feature close to shipping)
+- "soon": worth attention but not time-critical (idea phase, maintenance needed)
 
 Prioritization principles:
 - Prefer projects with recent momentum (commits this week) over stalled ones

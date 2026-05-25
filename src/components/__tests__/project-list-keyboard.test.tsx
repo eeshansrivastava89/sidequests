@@ -69,6 +69,7 @@ function makeProject(id: string, name: string): Project {
     weekCommits: 0,
     monthCommits: 0,
     quarterCommits: 0,
+    createdAt: "2026-01-01",
   };
 }
 
