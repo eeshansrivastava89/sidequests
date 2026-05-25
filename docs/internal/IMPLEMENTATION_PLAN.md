@@ -1,7 +1,7 @@
 # Sidequests — Architecture & Implementation Plan
 
 **Updated:** 2026-05-25
-**Status:** Phase 7 (polish) complete. Phase 8 (menu bar) and Phase 9 (ship) remain.
+**Status:** Phase 7 (polish) complete. Phase 8 (What Now rebuild + Analytics) in progress.
 
 ---
 
@@ -46,13 +46,52 @@ The product is a **control center for side projects**, not a dashboard. Every fe
 
 ---
 
-## Phase 8: Menu Bar Companion
+## Phase 8: What Now Rebuild + Analytics
+
+Replaces the flat Priority Actions feed with an AI-powered recommendation card and adds a dedicated Analytics tab.
+
+### What Now Tab — AI-Powered Recommendation
+
+The current What Now tab just regurgitates git hygiene data ("3 uncommitted files", "no remote"). That's sorted data, not a recommendation. The rebuild focuses on answering one question: **"What should I work on right now and why?"**
+
+- [ ] **Top recommendation card** — One card with the single most important thing to do, synthesized from `nextAction` + `status` + `statusReason` + open issues + git state + momentum. Secondary suggestions as "while you're at it" items.
+- [ ] **Why this?** — Short reasoning drawing from actual signals: open bugs, stale git state, LLM-identified purpose, activity drop-off. Trust comes from transparency.
+- [ ] **Quick actions** — "Open in terminal", "Open on GitHub", "Snooze 7d", "Mark done" — directly actionable, not just "copy cd path".
+- [ ] **Remove flat Priority Actions feed** — the severity-sorted list of git warnings is redundant with the Projects tab filters. Replace with the recommendation card.
+
+### Analytics Tab — Development Activity
+
+New tab replacing the current What Now's numbers-without-insight role. Gives detailed insight into development activity and momentum.
+
+- [ ] **Activity bars for all projects** — Per-project commit counts (7d/30d/90d), visualized as proportional bars (generalize the ShippedSection pattern)
+- [ ] **Health distribution** — Active/paused/stale/archived counts with average health scores
+- [ ] **Momentum signals** — Projects accelerating (week >> quarter/12), decelerating, or stalled. Compare week vs month vs quarter commit rates.
+- [ ] **Shipped card** — Move existing ShippedSection here (already good)
+- [ ] **Visit delta detail** — Move existing delta chips here with more detail (which projects changed, what changed)
+
+### Tab Structure
+
+**What Now → Projects → Analytics** (three tabs)
+
+- What Now: AI recommendation + quick actions
+- Projects: Current project list (unchanged)
+- Analytics: Activity metrics, momentum, health distribution
+
+### What Gets Removed
+
+- Flat Priority Actions feed (ActionFeed component)
+- Overview strip moves insights to Analytics, keeps signal chips on What Now
+- Focus goals stay on What Now (they're intent, not analytics)
+
+---
+
+## Phase 9: Menu Bar Companion
 
 Swift `MenuBarExtra` app that talks to the Sidequests localhost API.
 
 - [ ] Create Xcode project: SwiftUI `MenuBarExtra` app
 - [ ] Poll `GET /api/health` for server status, show badge count
-- [ ] Dropdown: top 3 "What Now" priority actions from `GET /api/projects`
+- [ ] Dropdown: top recommendation from What Now
 - [ ] "Open Dashboard" → opens `localhost:PORT` in browser
 - [ ] "Refresh" → `POST /api/refresh/stream` to trigger scan
 - [ ] Auto-launch on login (`SMAppService`)
@@ -61,7 +100,7 @@ Swift `MenuBarExtra` app that talks to the Sidequests localhost API.
 
 ---
 
-## Phase 9: Ship
+## Phase 10: Ship
 
 Packaging, CI, distribution.
 
@@ -76,8 +115,9 @@ Packaging, CI, distribution.
 ```
 Phases 0–5: Complete ✅
 Phase 7: Polish ✅
-Phase 8: Menu bar companion  ← Next
-Phase 9: Ship                ← After menu bar
+Phase 8: What Now + Analytics  ← Current
+Phase 9: Menu bar companion    ← After
+Phase 10: Ship                ← Last
 ```
 
 ---

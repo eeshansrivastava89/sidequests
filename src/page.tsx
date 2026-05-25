@@ -23,9 +23,8 @@ import { StatsBar } from "@/components/overview-strip";
 import { OverviewStrip } from "@/components/overview-strip";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
-import { ActionFeed } from "@/components/action-card";
-import { FocusSection } from "@/components/focus-section";
-import { ShippedSection } from "@/components/shipped-section";
+import { WhatNowTab } from "@/components/whatnow-tab";
+import { AnalyticsTab } from "@/components/analytics-tab";
 import { LifecycleActions } from "@/components/lifecycle-actions";
 import { SettingsModal } from "@/components/settings-modal";
 import { ActivityLogPanel } from "@/components/activity-log-panel";
@@ -34,7 +33,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Target, TriangleAlert, Info, X, Settings } from "lucide-react";
+import { Target, TriangleAlert, Info, BarChart3, X, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 export function DashboardPage() {
@@ -74,7 +73,7 @@ export function DashboardPage() {
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
-  const [tab, setTab] = useState<"whatnow" | "projects">("whatnow");
+  const [tab, setTab] = useState<"whatnow" | "projects" | "analytics">("whatnow");
   const [sortKey, setSortKey] = useState<SortKey>(() => loadSortKey());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -349,49 +348,44 @@ export function DashboardPage() {
                 <TabsTrigger value="projects">
                   Projects ({projects.length})
                 </TabsTrigger>
+                <TabsTrigger value="analytics">
+                  <BarChart3 className="size-3.5" />
+                  Analytics
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
             {/* ── What Now Tab ── */}
             {tab === "whatnow" && (
-              <div className="space-y-6">
-                <OverviewStrip
-                  projects={projects}
-                  focusGoals={focusHook.goals}
-                  shipped={shippedHook.shipped}
-                  visit={visitHook.visit}
-                  visitLoading={visitHook.loading}
-                  focusLoading={focusHook.loading}
-                  shippedLoading={shippedHook.loading}
-                  onAddFocusGoal={() => setTab("whatnow")}
-                  onToggleFocusGoal={(id, completed) => focusHook.updateGoal(id, { completed })}
-                  activeFilter={signalFilter}
-                  onFilter={(f) => { setSignalFilter(f); setTab("projects"); }}
-                  onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
-                />
+              <WhatNowTab
+                projects={projects}
+                onDismiss={handleDismissAlert}
+                onSelectProject={(id) => setSelectedId(id)}
+                onSnooze={async (id, days) => {
+                  const until = new Date();
+                  until.setDate(until.getDate() + days);
+                  until.setHours(0, 0, 0, 0);
+                  return updateOverride(id, { snoozedUntil: until.toISOString() });
+                }}
+                onArchive={async (id, note) => updateOverride(id, { statusOverride: "archived", archivedNote: note })}
+                onRevive={async (id) => updateOverride(id, { statusOverride: null, archivedNote: null })}
+              />
+            )}
 
-                <div>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Priority Actions
-                  </h2>
-                  <ActionFeed
-                    projects={projects}
-                    onDismiss={handleDismissAlert}
-                    onSelectProject={(id) => setSelectedId(id)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <FocusSection
-                    goals={focusHook.goals}
-                    loading={focusHook.loading}
-                    onToggle={(id, completed) => focusHook.updateGoal(id, { completed })}
-                    onAdd={focusHook.addGoal}
-                    projects={focusProjectOptions}
-                  />
-                  <ShippedSection shipped={shippedHook.shipped} loading={shippedHook.loading} />
-                </div>
-              </div>
+            {/* ── Analytics Tab ── */}
+            {tab === "analytics" && (
+              <AnalyticsTab
+                projects={projects}
+                shipped={shippedHook.shipped}
+                shippedLoading={shippedHook.loading}
+                visit={visitHook.visit}
+                visitLoading={visitHook.loading}
+                focusGoals={focusHook.goals}
+                focusLoading={focusHook.loading}
+                onToggleFocusGoal={(id, completed) => focusHook.updateGoal(id, { completed })}
+                onAddFocusGoal={() => setTab("whatnow")}
+                onSelectProject={(id) => setSelectedId(id)}
+              />
             )}
 
             {/* ── Projects Tab ── */}
