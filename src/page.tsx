@@ -361,14 +361,6 @@ export function DashboardPage() {
                 projects={projects}
                 onDismiss={handleDismissAlert}
                 onSelectProject={(id) => setSelectedId(id)}
-                onSnooze={async (id, days) => {
-                  const until = new Date();
-                  until.setDate(until.getDate() + days);
-                  until.setHours(0, 0, 0, 0);
-                  return updateOverride(id, { snoozedUntil: until.toISOString() });
-                }}
-                onArchive={async (id, note) => updateOverride(id, { statusOverride: "archived", archivedNote: note })}
-                onRevive={async (id) => updateOverride(id, { statusOverride: null, archivedNote: null })}
               />
             )}
 

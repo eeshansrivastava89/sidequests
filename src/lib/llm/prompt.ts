@@ -1,73 +1,35 @@
 import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
+import projectSystemPrompt from "@/config/prompts/project-system.md?raw";
+import projectUserTemplate from "@/config/prompts/project-user.md?raw";
 
 const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "completed", "idea"]);
 
-export const SYSTEM_PROMPT = `You are a developer project analyst. Given a project's scan data, derived metrics, and optional GitHub data, produce a JSON object with these exact fields:
-
-- "summary": A 1-2 sentence description of what this project does and its current state.
-- "nextAction": The single most important thing the developer should do next. Always provide a concrete, actionable step.
-- "status": One of "building", "shipping", "maintaining", "blocked", "completed", or "idea".
-  - "building": actively being developed, frequent commits, features in progress
-  - "shipping": ready or nearly ready for release/deployment
-  - "maintaining": stable, only bug fixes or minor updates
-  - "blocked": has open issues or PRs blocking progress, CI failures, or unresolved problems
-  - "completed": finished project, works as intended, used occasionally but not actively developed
-  - "idea": early stage, minimal code, exploration phase
-- "statusReason": A short explanation of why you chose this status.
-- "tags": An array of 3-8 descriptive tags (technology, domain, type).
-- "insights": An array of 3-5 objects, each with "text" (the observation) and "severity" ("green" = strength/positive, "amber" = at-risk/could improve, "red" = critical issue needing immediate attention). Each text should state the concern AND the suggested action in a single sentence. Do not repeat the same issue in multiple bullets. Combine risks and recommendations into unified insights.
-- "framework": The primary framework or meta-framework (e.g. "Next.js", "Astro", "FastAPI", "Axum"). null if none detected.
-- "primaryLanguage": The dominant programming language (e.g. "TypeScript", "Python", "Rust", "HTML/CSS"). null if unclear.
-
-Respond ONLY with valid JSON, no markdown fences or commentary.`;
+export const SYSTEM_PROMPT = projectSystemPrompt;
 
 export function buildPrompt(input: LlmInput): string {
-  let prompt = `Analyze this project and respond with ONLY a JSON object (no markdown fences, no commentary):
-
-{
-  "summary": "1-2 sentence description + current state",
-  "nextAction": "single most important next step",
-  "status": "building|shipping|maintaining|blocked|completed|idea",
-  "statusReason": "why this status",
-  "tags": ["3-8 descriptive tags"],
-  "insights": [{"text": "observation + action", "severity": "green|amber|red"}],
-  "framework": "primary framework or null",
-  "primaryLanguage": "dominant language or null"
-}
-
-Project data:
-
-Name: ${input.name}
-Path: ${input.path}
-Status: ${input.derived.statusAuto}
-Health Score: ${input.derived.healthScoreAuto}/100
-Hygiene Score: ${input.derived.hygieneScoreAuto}/100
-Momentum Score: ${input.derived.momentumScoreAuto}/100
-Derived Tags: ${input.derived.tags.join(", ") || "none"}
-
-Raw scan data:
-${JSON.stringify(input.scan, null, 2)}`;
+  let prompt = projectUserTemplate
+    .replace("{{name}}", input.name)
+    .replace("{{path}}", input.path)
+    .replace("{{statusAuto}}", input.derived.statusAuto)
+    .replace("{{healthScore}}", String(input.derived.healthScoreAuto))
+    .replace("{{hygieneScore}}", String(input.derived.hygieneScoreAuto))
+    .replace("{{momentumScore}}", String(input.derived.momentumScoreAuto))
+    .replace("{{tags}}", input.derived.tags.join(", ") || "none")
+    .replace("{{scanData}}", JSON.stringify(input.scan, null, 2));
 
   if (input.github) {
-    prompt += `
-
-GitHub data:
-Open Issues: ${input.github.openIssues}
-Open PRs: ${input.github.openPrs}
-CI Status: ${input.github.ciStatus}
-Repo Visibility: ${input.github.repoVisibility}`;
-    if (input.github.topIssues) {
-      prompt += `\nTop Issues: ${input.github.topIssues}`;
-    }
-    if (input.github.topPrs) {
-      prompt += `\nTop PRs: ${input.github.topPrs}`;
-    }
+    let githubBlock = `GitHub data:\nOpen Issues: ${input.github.openIssues}\nOpen PRs: ${input.github.openPrs}\nCI Status: ${input.github.ciStatus}\nRepo Visibility: ${input.github.repoVisibility}`;
+    if (input.github.topIssues) githubBlock += `\nTop Issues: ${input.github.topIssues}`;
+    if (input.github.topPrs) githubBlock += `\nTop PRs: ${input.github.topPrs}`;
+    prompt = prompt.replace("{{githubBlock}}", githubBlock);
+  } else {
+    prompt = prompt.replace("{{githubBlock}}", "");
   }
 
   if (input.previousSummary) {
-    prompt += `
-
-Previous summary (for continuity): ${input.previousSummary}`;
+    prompt = prompt.replace("{{previousSummaryBlock}}", `\nPrevious summary (for continuity): ${input.previousSummary}`);
+  } else {
+    prompt = prompt.replace("{{previousSummaryBlock}}", "");
   }
 
   return prompt;

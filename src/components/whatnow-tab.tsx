@@ -5,9 +5,9 @@ import { CARD, SECTION_LABEL } from "@/lib/status-colors";
 import {
   Sparkles,
   Terminal,
-  ExternalLink,
-  AlarmClock,
-  Archive,
+
+
+
   X,
   ChevronRight,
   RefreshCw,
@@ -17,7 +17,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { copyToClipboard, parseGitHubOwnerRepo } from "@/lib/project-helpers";
+import { copyToClipboard } from "@/lib/project-helpers";
 import { toast } from "sonner";
 
 /* ── Types ──────────────────────────────────────────────── */
@@ -39,9 +39,6 @@ interface WhatNowTabProps {
   projects: Project[];
   onDismiss: (action: PriorityAction) => void;
   onSelectProject: (id: string) => void;
-  onSnooze: (projectId: string, days: number) => Promise<unknown>;
-  onArchive: (projectId: string, note: string | null) => Promise<unknown>;
-  onRevive: (projectId: string) => Promise<unknown>;
 }
 
 /* ── What Now Tab ───────────────────────────────────────── */
@@ -50,8 +47,6 @@ export function WhatNowTab({
   projects,
   onDismiss,
   onSelectProject,
-  onSnooze,
-  onArchive,
 }: WhatNowTabProps) {
   const [analysis, setAnalysis] = useState<PortfolioAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,13 +89,9 @@ export function WhatNowTab({
         .filter((s) => s.project)
     : [];
 
-  const ownerRepo = recommendedProject?.scan?.remoteUrl
-    ? parseGitHubOwnerRepo(recommendedProject.scan.remoteUrl)
-    : null;
   const cdCommand = recommendedProject?.pathDisplay
     ? `cd "${recommendedProject.pathDisplay}"`
     : null;
-
   return (
     <div className="space-y-6">
       {/* AI Recommendation */}
@@ -131,10 +122,7 @@ export function WhatNowTab({
       {analysis && !loading && (
         <div className="space-y-4">
           {/* Primary recommendation */}
-          <div className={cn(CARD, "overflow-hidden border-amber-500/20 dark:border-amber-500/10")}>
-            {/* Accent bar */}
-            <div className="h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-amber-600" />
-
+          <div className={cn(CARD, "overflow-hidden")}>
             <div className="px-5 py-5">
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex items-center justify-center size-7 rounded-lg bg-amber-500/10">
@@ -178,37 +166,17 @@ export function WhatNowTab({
                     }}
                   >
                     <Terminal className="size-3.5" />
-                    Copy path
-                  </Button>
-                )}
-                {ownerRepo && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-1.5 text-xs"
-                    onClick={() => window.open(`https://github.com/${ownerRepo.owner}/${ownerRepo.repo}/issues`, "_blank")}
-                  >
-                    <ExternalLink className="size-3.5" />
-                    GitHub
+                    Open in terminal
                   </Button>
                 )}
                 <Button
                   size="sm"
                   variant="outline"
                   className="gap-1.5 text-xs"
-                  onClick={() => recommendedProject && onSnooze(recommendedProject.id, 7)}
+                  onClick={fetchAnalysis}
                 >
-                  <AlarmClock className="size-3.5" />
-                  Snooze 7d
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="gap-1.5 text-xs text-muted-foreground"
-                  onClick={() => recommendedProject && onArchive(recommendedProject.id, null)}
-                >
-                  <Archive className="size-3.5" />
-                  Archive
+                  <RefreshCw className="size-3.5" />
+                  Refresh
                 </Button>
               </div>
             </div>

@@ -8,33 +8,7 @@ export const portfolioRoute = Router();
 let analysisCache: { result: Record<string, unknown>; timestamp: number } | null = null;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-const PORTFOLIO_PROMPT = `You are a portfolio analyst for a developer who manages multiple side projects. Given a summary of all their projects, provide strategic advice about where to focus their time.
-
-Respond ONLY with valid JSON (no markdown fences, no commentary):
-{
-  "recommendation": {
-    "projectName": "name of the ONE project they should focus on this week",
-    "reasoning": "2-3 sentences explaining WHY this project deserves focus right now, considering momentum, blocking issues, and shipping potential",
-    "quickAction": "one concrete thing to do first (e.g. 'Fix the failing CI on main branch' or 'Ship the auth feature you were building last week')"
-  },
-  "secondary": [
-    {
-      "projectName": "name",
-      "reason": "1 sentence why it's worth attention"
-    }
-  ],
-  "portfolioInsights": [
-    "2-4 high-signal observations about the portfolio as a whole, e.g. '3 of 8 projects are stalled — consider archiving' or 'You're spread thin across 5 active projects; deep focus on 1-2 would move the needle more'"
-  ]
-}
-
-Prioritization principles:
-- Prefer projects with recent momentum (commits this week) over stalled ones
-- Prefer projects close to shipping over early-stage ones
-- Prefer projects with blocking issues (CI failing, bugs) that need immediate attention
-- Prefer projects that align with stated goals over inactive ones
-- Flag when the portfolio is too spread out and needs pruning
-- Don't recommend working on stalled/abandoned projects unless there's a clear reason to revive them`;
+import portfolioSystemPrompt from "@/config/prompts/portfolio-system.md?raw";
 
 interface ProjectSummary {
   name: string;
@@ -88,7 +62,7 @@ portfolioRoute.get("/analysis", async (_req, res) => {
       goal: p.goal ?? null,
     }));
 
-    const prompt = `${PORTFOLIO_PROMPT}
+    const prompt = `${portfolioSystemPrompt}
 
 Projects (${summaries.length} total):
 
