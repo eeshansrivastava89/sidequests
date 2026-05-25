@@ -1,14 +1,20 @@
 import { Router } from "express";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { mergeAllProjects } from "@/lib/merge";
 import { getLlmProvider } from "@/lib/llm";
 
 export const portfolioRoute = Router();
 
+// Load portfolio prompt from config file
+const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+const PORTFOLIO_SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "portfolio-system.md"), "utf-8").trim();
+
 // Simple in-memory cache: { result, timestamp }
 let analysisCache: { result: Record<string, unknown>; timestamp: number } | null = null;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
-import portfolioSystemPrompt from "@/config/prompts/portfolio-system.md?raw";
+
 
 interface ProjectSummary {
   name: string;
@@ -62,7 +68,7 @@ portfolioRoute.get("/analysis", async (_req, res) => {
       goal: p.goal ?? null,
     }));
 
-    const prompt = `${portfolioSystemPrompt}
+    const prompt = `${PORTFOLIO_SYSTEM_PROMPT}
 
 Projects (${summaries.length} total):
 

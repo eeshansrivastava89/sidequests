@@ -1,13 +1,16 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
-import projectSystemPrompt from "@/config/prompts/project-system.md?raw";
-import projectUserTemplate from "@/config/prompts/project-user.md?raw";
+
+const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+
+export const SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "project-system.md"), "utf-8").trim();
+const USER_TEMPLATE = readFileSync(join(PROMPTS_DIR, "project-user.md"), "utf-8").trim();
 
 const VALID_STATUSES = new Set<LlmStatus>(["building", "shipping", "maintaining", "blocked", "completed", "idea"]);
 
-export const SYSTEM_PROMPT = projectSystemPrompt;
-
 export function buildPrompt(input: LlmInput): string {
-  let prompt = projectUserTemplate
+  let prompt = USER_TEMPLATE
     .replace("{{name}}", input.name)
     .replace("{{path}}", input.path)
     .replace("{{statusAuto}}", input.derived.statusAuto)
