@@ -14,8 +14,19 @@ const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 // 1. Vite build (SPA)
 run("npx vite build");
 
-// 2. Bundle Hono server with tsx/esbuild
-run("npx esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --external:@prisma/adapter-libsql --external:libsql --external:better-sqlite3 --external:cpu-features --external:encoding");
+// 2. Bundle Express server with esbuild (using JS API for banner with curly braces)
+import * as esbuild from "esbuild";
+await esbuild.build({
+  entryPoints: ["src/server.ts"],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  outfile: "dist/server.js",
+  external: ["@prisma/adapter-libsql", "libsql", "better-sqlite3", "cpu-features", "encoding"],
+  banner: {
+    js: 'import{createRequire}from"module";const require=createRequire(import.meta.url);',
+  },
+});
 
 // 3. Copy Vite SPA assets to dist/
 // Vite puts assets in dist/assets already, but we need index.html at dist/index.html
@@ -44,6 +55,9 @@ copyMod("@prisma/adapter-libsql");
 copyMod("@libsql/core");
 copyMod("@libsql/hrana-client");
 copyMod("libsql");
+
+// Express sub-dependencies (bundled by esbuild, but their native/binary parts are external)
+// No need to copy Express itself — it's bundled in server.js;
 
 // Platform-aware native binding for libsql
 const platformMap = {

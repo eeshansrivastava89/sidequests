@@ -1,20 +1,21 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { db } from "@/lib/db";
 
-export const dismissAlertRoute = new Hono();
+export const dismissAlertRoute = Router();
 
 // POST /api/projects/:id/dismiss-alert — dismiss a specific alert type
-dismissAlertRoute.post("/:id/dismiss-alert", async (c) => {
-  const id = c.req.param("id");
+dismissAlertRoute.post("/:id/dismiss-alert", async (req, res) => {
+  const { id } = req.params;
   const project = await db.project.findUnique({ where: { id } });
   if (!project) {
-    return c.json({ ok: false, error: "Project not found" }, 404);
+    res.status(404).json({ ok: false, error: "Project not found" });
+    return;
   }
 
-  const body = await c.req.json();
-  const alertType = body.alertType as string;
+  const { alertType } = req.body;
   if (!alertType) {
-    return c.json({ ok: false, error: "alertType is required" }, 400);
+    res.status(400).json({ ok: false, error: "alertType is required" });
+    return;
   }
 
   const dismissed = await db.dismissedAlert.upsert({
@@ -23,24 +24,25 @@ dismissAlertRoute.post("/:id/dismiss-alert", async (c) => {
     update: { dismissedAt: new Date() },
   });
 
-  return c.json({ ok: true, dismissed });
+  res.json({ ok: true, dismissed });
 });
 
 // DELETE /api/projects/:id/dismiss-alert — re-show a previously dismissed alert
-dismissAlertRoute.delete("/:id/dismiss-alert", async (c) => {
-  const id = c.req.param("id");
-  const alertType = c.req.query("alertType");
+dismissAlertRoute.delete("/:id/dismiss-alert", async (req, res) => {
+  const { id } = req.params;
+  const { alertType } = req.query;
   if (!alertType) {
-    return c.json({ ok: false, error: "alertType query parameter is required" }, 400);
+    res.status(400).json({ ok: false, error: "alertType query parameter is required" });
+    return;
   }
 
   try {
     await db.dismissedAlert.delete({
-      where: { projectId_alertType: { projectId: id, alertType } },
+      where: { projectId_alertType: { projectId: id, alertType: alertType as string } },
     });
-    return c.json({ ok: true });
+    res.json({ ok: true });
   } catch {
     // Already doesn't exist — that's fine
-    return c.json({ ok: true });
+    res.json({ ok: true });
   }
 });

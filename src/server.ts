@@ -1,36 +1,48 @@
 /**
- * Hono production server.
+ * Express production server.
  *
  * Serves:
- *   - /api/* → Hono API routes
+ *   - /api/* → Express API routes
  *   - /*    → Static SPA assets from Vite build output
  *
  * Usage: node dist/server.js
  */
 
-import { serve } from "@hono/node-server";
-import { app } from "./api/index";
-import { serveStatic } from "@hono/node-server/serve-static";
+import express from "express";
+import cors from "cors";
+import morgan from "morgan";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Serve Vite build assets (CSS, JS, fonts, etc.)
-app.use("/assets/*", serveStatic({ root: "./dist" }));
-app.use("/fonts/*", serveStatic({ root: "./dist" }));
+import { apiRouter } from "./api/index";
 
-// SPA fallback: all non-API routes serve index.html
-app.get("*", async (c, next) => {
-  // Skip API routes
-  if (c.req.path.startsWith("/api")) return next();
+const app = express();
+
+// ── Global middleware ────────────────────────────────────
+app.use(morgan("dev"));
+app.use(cors({ origin: "*" }));
+app.use(express.json());
+
+// ── API routes ───────────────────────────────────────────
+app.use("/api", apiRouter);
+
+// ── Static assets ─────────────────────────────────────────
+app.use("/assets", express.static(join(process.cwd(), "dist", "assets")));
+app.use("/fonts", express.static(join(process.cwd(), "dist", "fonts")));
+
+// ── SPA fallback (all non-API, non-static routes serve index.html) ───
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) return next();
   try {
     const html = readFileSync(join(process.cwd(), "dist", "index.html"), "utf-8");
-    return c.html(html);
+    res.type("html").send(html);
   } catch {
-    return c.notFound();
+    res.status(404).json({ ok: false, error: "Not found" });
   }
 });
 
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 
-console.log(`[server] Starting Sidequests on http://127.0.0.1:${PORT}`);
-serve({ fetch: app.fetch, port: PORT });
+app.listen(PORT, () => {
+  console.log(`[server] Starting Sidequests on http://127.0.0.1:${PORT}`);
+});

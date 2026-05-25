@@ -1,6 +1,5 @@
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { Router, Request, Response, NextFunction } from "express";
+
 import { projectsRoute } from "./routes/projects";
 import { projectByIdRoute } from "./routes/projects/[id]";
 import { dismissAlertRoute } from "./routes/dismiss-alert";
@@ -13,49 +12,45 @@ import { focusRoute } from "./routes/focus";
 import { visitRoute } from "./routes/visit";
 import { shippedRoute } from "./routes/shipped";
 
-export const app = new Hono();
-
-// ── Global middleware ────────────────────────────────────
-app.use("*", logger());
-app.use("*", cors({ origin: "*" }));
-// Note: no global timeout — SSE streaming for refresh can take minutes.
-// Individual routes can set their own timeouts if needed.
+// ── API router (mountable on any Express app) ────────────────
+export const apiRouter = Router();
 
 // ── Health check ─────────────────────────────────────────
-app.get("/api/health", (c) => c.json({ ok: true, ts: new Date().toISOString() }));
+apiRouter.get("/health", (_req, res) => {
+  res.json({ ok: true, ts: new Date().toISOString() });
+});
 
 // ── Routes ───────────────────────────────────────────────
-app.route("/api/projects", projectsRoute);
-app.route("/api/projects", projectByIdRoute);   // /:id, /:id/override, etc.
-app.route("/api/projects", dismissAlertRoute);   // /:id/dismiss-alert
-app.route("/api/refresh", refreshRoute);
-app.route("/api/settings", settingsRoute);
-app.route("/api/config", configRoute);
-app.route("/api/preflight", preflightRoute);
-app.route("/api/version", versionRoute);
-app.route("/api/focus", focusRoute);
-app.route("/api/visit", visitRoute);
-app.route("/api/shipped", shippedRoute);
+apiRouter.use("/projects", projectsRoute);
+apiRouter.use("/projects", projectByIdRoute);     // /:id, /:id/override, etc.
+apiRouter.use("/projects", dismissAlertRoute);    // /:id/dismiss-alert
+apiRouter.use("/refresh", refreshRoute);
+apiRouter.use("/settings", settingsRoute);
+apiRouter.use("/config", configRoute);
+apiRouter.use("/preflight", preflightRoute);
+apiRouter.use("/version", versionRoute);
+apiRouter.use("/focus", focusRoute);
+apiRouter.use("/visit", visitRoute);
+apiRouter.use("/shipped", shippedRoute);
 
 // ── 404 fallback ────────────────────────────────────────
-app.notFound((c) => c.json({ ok: false, error: "Not found" }, 404));
+apiRouter.use((_req, res) => {
+  res.status(404).json({ ok: false, error: "Not found" });
+});
 
 // ── Global error handler ─────────────────────────────────
-app.onError((err, c) => {
-  const msg = err instanceof Error ? err.message : String(err);
+apiRouter.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  const msg = err.message ?? String(err);
 
   // SQLite "no such table" → 503
   if (msg.includes("no such table") || msg.includes("SQLITE_ERROR")) {
-    return c.json(
-      {
-        ok: false,
-        error:
-          "Database tables not found. Run `npm run setup` to initialize the database, then restart the dev server.",
-      },
-      503,
-    );
+    res.status(503).json({
+      ok: false,
+      error: "Database tables not found. Run `npm run setup` to initialize the database, then restart the dev server.",
+    });
+    return;
   }
 
-  console.error(`[api] ${c.req.method} ${c.req.path}: ${msg}`);
-  return c.json({ ok: false, error: msg }, 500);
+  console.error(`[api] ${_req.method} ${_req.path}: ${msg}`);
+  res.status(500).json({ ok: false, error: msg });
 });

@@ -121,7 +121,7 @@ function killAll() {
   }, 3000);
 }
 
-// ── Start Hono API server ──────────────────────────────
+// ── Start Express API server ──────────────────────────────
 const serverEnv = {
   ...process.env,
   PORT: String(apiPort),

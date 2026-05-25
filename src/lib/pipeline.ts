@@ -78,7 +78,7 @@ function isAbortError(error: unknown, signal?: AbortSignal): boolean {
  * Each project completes fully before the next starts.
  */
 export async function runRefreshPipeline(
-  emit: (event: PipelineEvent) => void = () => {},
+  emit: (event: PipelineEvent) => Promise<void> | void = () => {},
   signal?: AbortSignal,
   options?: { skipLlm?: boolean; selectedNames?: string[] }
 ): Promise<{ projectCount: number }> {
@@ -112,7 +112,7 @@ export async function runRefreshPipeline(
     return new Date(bDate).getTime() - new Date(aDate).getTime();
   });
 
-  emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name), pathHashes: projectDirs.map((d) => d.pathHash) });
+  await emit({ type: "enumerate_complete", projectCount: projectDirs.length, names: projectDirs.map((d) => d.name), pathHashes: projectDirs.map((d) => d.pathHash) });
 
   // 2. Soft-prune missing projects and restore returning ones
   //    Skip when doing a selective scan — we don't want to prune
@@ -173,7 +173,7 @@ export async function runRefreshPipeline(
     const dir = projectDirs[i];
     const name = dir.name;
 
-    emit({ type: "project_start", name, pathHash: dir.pathHash, index: i, total, step: "store" });
+    await emit({ type: "project_start", name, pathHash: dir.pathHash, index: i, total, step: "store" });
     if (process.env.NODE_ENV !== "test") {
       console.log(`[pipeline] [store] ${name} (${i + 1}/${total})`);
     }
@@ -335,7 +335,7 @@ export async function runRefreshPipeline(
     }
 
     // 3e. Emit project_complete(store) → UI refetches
-    emit({
+    await emit({
       type: "project_complete",
       name,
       pathHash: dir.pathHash,
@@ -410,7 +410,7 @@ export async function runRefreshPipeline(
     const runLlmForProject = async (pd: ProjectData, index: number) => {
       if (!pd.derived || signal?.aborted) return;
 
-      emit({ type: "project_start", name: pd.name, pathHash: pd.dir.pathHash, index, total, step: "llm", provider: providerName ?? undefined });
+      await emit({ type: "project_start", name: pd.name, pathHash: pd.dir.pathHash, index, total, step: "llm", provider: providerName ?? undefined });
       const llmStartTime = Date.now();
       if (process.env.NODE_ENV !== "test") {
         console.log(`[pipeline] [${providerName}] ${pd.name} (${index + 1}/${total}) — enriching...`);
@@ -473,7 +473,7 @@ export async function runRefreshPipeline(
         if (process.env.NODE_ENV !== "test") {
           console.log(`[pipeline] [${providerName}] ${pd.name} — done (${(llmDurationMs / 1000).toFixed(1)}s) status=${enrichment.status}`);
         }
-        emit({
+        await emit({
           type: "project_complete",
           name: pd.name,
           pathHash: pd.dir.pathHash,
@@ -503,7 +503,7 @@ export async function runRefreshPipeline(
           create: { projectId: pd.projectId, llmError: message },
           update: { llmError: message },
         });
-        emit({ type: "project_error", name: pd.name, pathHash: pd.dir.pathHash, step: "llm", error: message, provider: providerName ?? undefined });
+        await emit({ type: "project_error", name: pd.name, pathHash: pd.dir.pathHash, step: "llm", error: message, provider: providerName ?? undefined });
 
         projectLog.push({
           projectId: pd.projectId,
@@ -566,7 +566,7 @@ export async function runRefreshPipeline(
   if (process.env.NODE_ENV !== "test") {
     console.log(`[pipeline] Emitting done event`);
   }
-  emit({
+  await emit({
     type: "done",
     projectCount: projectDirs.length,
     llmSucceeded,

@@ -1,7 +1,7 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { db } from "@/lib/db";
 
-export const focusRoute = new Hono();
+export const focusRoute = Router();
 
 // Helper: get the Monday 00:00 of the current week
 function getWeekStart(date: Date): Date {
@@ -12,7 +12,7 @@ function getWeekStart(date: Date): Date {
 }
 
 // GET /api/focus — weekly focus goals for current week
-focusRoute.get("/", async (c) => {
+focusRoute.get("/", async (_req, res) => {
   const weekStart = getWeekStart(new Date());
 
   const goals = await db.weeklyFocus.findMany({
@@ -21,7 +21,7 @@ focusRoute.get("/", async (c) => {
     include: { project: { select: { id: true, name: true } } },
   });
 
-  return c.json({
+  res.json({
     ok: true,
     weekStart: weekStart.toISOString(),
     goals: goals.map((g) => ({
@@ -37,17 +37,18 @@ focusRoute.get("/", async (c) => {
 });
 
 // POST /api/focus — create a new weekly focus goal
-focusRoute.post("/", async (c) => {
-  const body = await c.req.json();
-  const { projectId, goal } = body;
+focusRoute.post("/", async (req, res) => {
+  const { projectId, goal } = req.body;
 
   if (!projectId || !goal || typeof goal !== "string" || goal.trim().length === 0) {
-    return c.json({ ok: false, error: "projectId and goal are required" }, 400);
+    res.status(400).json({ ok: false, error: "projectId and goal are required" });
+    return;
   }
 
   const project = await db.project.findUnique({ where: { id: projectId } });
   if (!project) {
-    return c.json({ ok: false, error: "Project not found" }, 404);
+    res.status(404).json({ ok: false, error: "Project not found" });
+    return;
   }
 
   const weekStart = getWeekStart(new Date());
@@ -56,26 +57,27 @@ focusRoute.post("/", async (c) => {
     data: { projectId, goal: goal.trim(), weekStart },
   });
 
-  return c.json({ ok: true, focus });
+  res.json({ ok: true, focus });
 });
 
 // PUT /api/focus/:id — update a focus goal (toggle completion or edit text)
-focusRoute.put("/:id", async (c) => {
-  const id = c.req.param("id");
-  const body = await c.req.json();
+focusRoute.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const body = req.body;
 
   const data: { goal?: string; completed?: boolean } = {};
   if (body.goal !== undefined && typeof body.goal === "string") data.goal = body.goal.trim();
   if (body.completed !== undefined && typeof body.completed === "boolean") data.completed = body.completed;
 
   if (Object.keys(data).length === 0) {
-    return c.json({ ok: false, error: "Provide goal or completed to update" }, 400);
+    res.status(400).json({ ok: false, error: "Provide goal or completed to update" });
+    return;
   }
 
   try {
     const focus = await db.weeklyFocus.update({ where: { id }, data });
-    return c.json({ ok: true, focus });
+    res.json({ ok: true, focus });
   } catch {
-    return c.json({ ok: false, error: "Focus goal not found" }, 404);
+    res.status(404).json({ ok: false, error: "Focus goal not found" });
   }
 });

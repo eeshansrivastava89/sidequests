@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { execSync } from "node:child_process";
 import { config } from "@/lib/config";
 
@@ -44,10 +44,10 @@ const PROVIDER_CHECK_NAME: Record<string, string> = {
   "qwen-cli": "qwen",
 };
 
-export const preflightRoute = new Hono();
+export const preflightRoute = Router();
 
 // GET /api/preflight — check dependencies and LLM providers
-preflightRoute.get("/", async (c) => {
+preflightRoute.get("/", async (_req, res) => {
   const checks: PreflightCheck[] = [];
   const activeProvider = config.llmProvider;
 
@@ -94,5 +94,5 @@ preflightRoute.get("/", async (c) => {
     if (match) match.active = true;
   }
 
-  return c.json({ checks });
+  res.json({ checks });
 });

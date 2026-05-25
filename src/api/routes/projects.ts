@@ -1,12 +1,12 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { db } from "@/lib/db";
 import { mergeAllProjects } from "@/lib/merge";
 import { computeActions, filterActions, isSnoozed } from "@/lib/actions";
 
-export const projectsRoute = new Hono();
+export const projectsRoute = Router();
 
 // GET /api/projects — list all projects with merged data, actions, and shipped counts
-projectsRoute.get("/", async (c) => {
+projectsRoute.get("/", async (_req, res) => {
   const [projects, lastScan, dismissedAlerts] = await Promise.all([
     mergeAllProjects(),
     db.scan.findFirst({ orderBy: { scannedAt: "desc" }, select: { scannedAt: true } }),
@@ -27,5 +27,5 @@ projectsRoute.get("/", async (c) => {
   });
 
   const lastRefreshedAt = lastScan?.scannedAt?.toISOString() ?? null;
-  return c.json({ ok: true, projects: enrichedProjects, lastRefreshedAt });
+  res.json({ ok: true, projects: enrichedProjects, lastRefreshedAt });
 });

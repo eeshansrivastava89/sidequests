@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -52,10 +52,10 @@ function isNewer(latest: string, current: string): boolean {
   return false;
 }
 
-export const versionRoute = new Hono();
+export const versionRoute = Router();
 
 // GET /api/version — current + latest version info
-versionRoute.get("/", async (c) => {
+versionRoute.get("/", async (_req, res) => {
   const current = getCurrentVersion();
   const latest = await fetchLatestVersion();
 
@@ -65,5 +65,5 @@ versionRoute.get("/", async (c) => {
     updateAvailable: latest ? isNewer(latest, current) : false,
   };
 
-  return c.json(info);
+  res.json(info);
 });

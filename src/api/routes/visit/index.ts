@@ -1,11 +1,11 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { db } from "@/lib/db";
 import { mergeAllProjects } from "@/lib/merge";
 
-export const visitRoute = new Hono();
+export const visitRoute = Router();
 
 // GET /api/visit — get delta between current project state and last-visit snapshot
-visitRoute.get("/", async (c) => {
+visitRoute.get("/", async (_req, res) => {
   // Load last visit snapshot
   const visitRow = await db.userVisit.findUnique({ where: { key: "lastVisit" } });
 
@@ -14,7 +14,7 @@ visitRoute.get("/", async (c) => {
 
   if (!visitRow) {
     // No previous visit — return current state as baseline, no delta
-    return c.json({
+    res.json({
       ok: true,
       firstVisit: true,
       current: currentProjects.map((p) => ({
@@ -27,6 +27,7 @@ visitRoute.get("/", async (c) => {
       })),
       delta: null,
     });
+    return;
   }
 
   // Parse previous snapshot
@@ -76,7 +77,7 @@ visitRoute.get("/", async (c) => {
     }
   }
 
-  return c.json({
+  res.json({
     ok: true,
     firstVisit: false,
     lastVisitAt: visitRow.updatedAt.toISOString(),
@@ -93,7 +94,7 @@ visitRoute.get("/", async (c) => {
 });
 
 // POST /api/visit — save current project state as last-visit snapshot
-visitRoute.post("/", async (c) => {
+visitRoute.post("/", async (_req, res) => {
   const currentProjects = await mergeAllProjects();
 
   // Save a lightweight snapshot for delta comparison
@@ -112,5 +113,5 @@ visitRoute.post("/", async (c) => {
     update: { snapshotJson: JSON.stringify(snapshot) },
   });
 
-  return c.json({ ok: true, projectCount: snapshot.length });
+  res.json({ ok: true, projectCount: snapshot.length });
 });

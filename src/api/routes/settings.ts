@@ -1,14 +1,14 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import fs from "node:fs";
 import os from "node:os";
 import { config } from "@/lib/config";
 import { type AppSettings, getSettings, writeSettings, clearSettingsCache } from "@/lib/settings";
 
-export const settingsRoute = new Hono();
+export const settingsRoute = Router();
 
 // GET /api/settings — returns all effective config (masks API keys for UI display)
-settingsRoute.get("/", (c) => {
-  return c.json({
+settingsRoute.get("/", (_req, res) => {
+  res.json({
     devRoot: config.devRoot,
     excludeDirs: config.excludeDirs.join(", "),
     llmProvider: config.llmProvider,
@@ -43,9 +43,9 @@ const STR_KEYS: (keyof AppSettings)[] = [
 ];
 const NUM_KEYS: (keyof AppSettings)[] = ["llmTimeout", "llmConcurrency"];
 
-settingsRoute.put("/", async (c) => {
+settingsRoute.put("/", async (req, res) => {
   try {
-    const body = await c.req.json();
+    const body = req.body;
     clearSettingsCache();
     const current = getSettings();
     const updated: AppSettings = { ...current };
@@ -75,8 +75,8 @@ settingsRoute.put("/", async (c) => {
     writeSettings(updated);
     const resolvedRoot = (updated.devRoot ?? "~/dev").replace(/^~(?=$|\/)/, os.homedir());
     const devRootExists = fs.existsSync(resolvedRoot) && fs.statSync(resolvedRoot).isDirectory();
-    return c.json({ ok: true, devRootExists });
+    res.json({ ok: true, devRootExists });
   } catch {
-    return c.json({ ok: false, error: "Invalid request body" }, 400);
+    res.status(400).json({ ok: false, error: "Invalid request body" });
   }
 });

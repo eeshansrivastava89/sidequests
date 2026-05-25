@@ -1,10 +1,10 @@
-import { Hono } from "hono";
+import { Router } from "express";
 import { db } from "@/lib/db";
 
-export const shippedRoute = new Hono();
+export const shippedRoute = Router();
 
 // GET /api/shipped — aggregate commit counts across the portfolio
-shippedRoute.get("/", async (c) => {
+shippedRoute.get("/", async (_req, res) => {
   const derivedRows = await db.derived.findMany({
     select: {
       projectId: true,
@@ -38,7 +38,7 @@ shippedRoute.get("/", async (c) => {
     };
   });
 
-  return c.json({
+  res.json({
     ok: true,
     weekTotal,
     monthTotal,

@@ -1,7 +1,7 @@
 # Sidequests — Architecture & Implementation Plan
 
-**Updated:** 2026-05-24
-**Status:** Revised plan — post architecture review, DRY/KISS-optimized
+**Updated:** 2026-05-25
+**Status:** Phase 5 complete. SSE streaming fixed. Ready for Phase 6 (menu bar) and Phase 7 (polish).
 
 ---
 
@@ -14,369 +14,136 @@ The product is a **control center for side projects**, not a dashboard. Every fe
 - **Don't store what you can compute.** If data already exists in the DB, derive it on-the-fly rather than persisting a redundant copy.
 - **Add columns before adding tables.** A column on an existing model beats a new model + relation + join.
 - **Extend existing endpoints before creating new ones.** Adding a field to `GET /api/projects` beats a new `/api/actions` endpoint.
+- **Prefer battle-tested tools over novel abstractions.** Express has 15 years of production precedent. Use it.
+- **Yield to the event loop.** If you're doing I/O (SSE, file watching, streaming), `setImmediate(resolve)` between writes so Node.js can flush the TCP buffer. Synchronous work (`execFileSync`, CPU loops) blocks the event loop and starves network I/O.
 
 ---
 
-## Phase 0: Hono+Vite Migration (Issue #10)
+## Phases 0–4: Complete ✅
 
-**Why first:** We're about to add significant new backend and frontend code. Building on Next.js when we plan to migrate means building on a foundation we'll demolish. Better to migrate first, then add features on the new stack.
+| Phase | What | Status |
+|---|---|---|
+| 0 | Next.js → Hono+Vite migration | ✅ 5.7MB build |
+| 1 | Data model extensions (snooze, archive, focus, visit, dismissed alerts) | ✅ |
+| 2 | API routes (actions, lifecycle, focus, visit, shipped) | ✅ |
+| 3 | Frontend (What Now tab, action cards, focus, shipped, lifecycle) | ✅ |
+| 4 | Notifications (removed — replaced by in-app signals) | ✅ (deprecated) |
 
-**Current state:** Next.js 16 (App Router) + React 19 + Prisma 7.4 + libSQL/SQLite + Tailwind CSS v4 + shadcn/ui
+---
 
-**Target state:** Hono (API) + Vite (SPA) + React 19 + Prisma 7.4 + libSQL/SQLite + Tailwind CSS v4 + shadcn/ui
+## Phase 5: Express Migration + SSE Fix ✅
 
-### What stays identical
-- All React components, hooks, shadcn/ui, Tailwind
-- Prisma schema, SQLite database, all data models
-- Pipeline logic (scan → derive → GitHub → LLM)
-- LLM provider abstraction (5 adapters)
-- CLI entry point (`bin/cli.mjs`)
+### What changed
 
-### What changes
 | Component | From | To |
 |---|---|---|
-| API server | Next.js route handlers (`app/api/.../route.ts`) | Hono routes (`src/api/...ts`) |
-| Build | `next build` + standalone output | `vite build` (SPA) + Hono server |
-| SSR | Next.js server components | None — pure SPA |
-| `next/font/local` | Next.js font optimization | CSS `@font-face` |
-| Error middleware | `withErrorHandler` wrapper (Next.js) | Hono middleware |
-| Dev server | `next dev` (single process) | `vite dev` + `tsx watch` for Hono (two processes in dev) |
-| SSE streaming | Next.js `ReadableStream` | Hono `streamSSE()` |
-| Theme/Toaster | `layout.tsx` (root layout) | `App.tsx` (Vite root) |
+| HTTP framework | Hono (`hono`, `@hono/node-server`) | Express (`express`, `cors`, `morgan`) |
+| SSE streaming | `streamSSE()` (TransformStream) → events arrived all at once | Raw `res.write()` + `await setImmediate()` → events arrive one at a time |
+| Route handlers | `(c) => c.json(...)` | `(req, res) => res.json(...)` |
+| Route params | `c.req.param("id")` | `req.params.id` |
+| Request body | `await c.req.json()` | `req.body` (with `express.json()` middleware) |
+| Static serving | `@hono/node-server/serve-static` | `express.static()` |
+| Integration tests | Hono `app.request()` | `supertest` |
+| Build | esbuild (no banner) | esbuild with `createRequire` banner for Express CJS requires |
 
-### Migration sub-phases
+### What stayed the same (0 changes)
+- All React components, hooks, UI (4,800 lines)
+- All library code — pipeline, LLM, merge, config, actions (6,313 lines)
+- Prisma schema, SQLite database
+- CLI entry point (`bin/cli.mjs`)
+- Vite build pipeline and dev server
+- `EventSource` client in `use-refresh.ts`
 
-**0a — Hono scaffold + first routes (1-2 days)**
+### SSE root cause and fix
 
-- [x] Create `src/api/index.ts` — Hono app with CORS + logger + timeout middleware
-- [x] Create `src/api/routes/projects.ts` — port `GET /api/projects`
-- [x] Create `src/api/routes/projects/[id].ts` — port `GET /api/projects/:id`, PATCH override/metadata/pin, POST touch, GET activity
-- [x] Create `src/api/routes/refresh.ts` — port `POST /api/refresh` (without SSE)
-- [x] Create `src/api/routes/config.ts`, `src/api/routes/preflight.ts`, `src/api/routes/version.ts` — simple GET routes
-- [x] Create `src/api/routes/settings.ts` — port GET/PUT settings
-- [x] Refactor `src/lib/api-helpers.ts` — extract framework-agnostic `coercePatchBody`, `findProject`, `safeJsonParse`, `isMissingTableError`
-- [x] Create `src/lib/next-api-helpers.ts` — Next.js-specific `withErrorHandler`, `notFound`, `patchErrorToNextResponse`
-- [x] Update existing Next.js route imports to use `next-api-helpers` for NextResponse-based helpers
-- [x] Write 19 Hono integration tests covering all ported routes
-- [x] Verify: all 251 unit tests + 93 integration tests (incl. 19 Hono) pass
+**Symptom:** Fast scan events arrived all at once at the end of the scan, instead of one project at a time as they were processed.
 
-**0b — All routes + SSE** ✅
+**Initial (incorrect) diagnosis:** Hono's `streamSSE` buffered events through an internal `TransformStream`. Migrating to Express with raw `res.write()` would fix it.
 
-- [x] Port SSE endpoint: `GET /api/refresh/stream` → Hono `streamSSE()` with pipeline state management
-- [x] Port `POST /api/refresh/stream` (cancel) → Hono route
-- [x] Remove global route timeout (SSE streams can take minutes)
-- [x] All integration tests passing (19 Hono + existing)
+**Actual root cause:** Node.js event loop starvation. The pipeline's `scanProject()` calls `execFileSync("git", ...)` which blocks the event loop for 5-50ms per project. While the event loop is blocked, Node.js cannot flush the TCP write buffer to the network — even though `res.write()` was called. All buffered writes get sent together when the event loop finally yields during `await` DB operations.
 
-**0c — Vite SPA + production build** ✅
+**Fix:** Changed `emit()` from synchronous `(event) => void` to async `(event) => Promise<void>`. Each emit does `res.write()` then `await new Promise(resolve => setImmediate(resolve))`, yielding one event loop tick so Node.js can flush the write buffer before the next blocking `execFileSync()` call.
 
-- [x] Create `vite.config.ts` with React plugin + `resolve.tsconfigPaths: true`
-- [x] Create `src/App.tsx` — import `DashboardPage` + `Toaster` + `globals.css`
-- [x] Create `src/entry.tsx` — React root mount
-- [x] Create `src/index.html` — Vite HTML entry with anti-FOUC theme script
-- [x] Create `src/styles/font-faces.css` — `@font-face` for Geist Sans/Mono (replaces `next/font/local`)
-- [x] Create `src/server.ts` — Hono server serving Vite build as static + API routes
-- [x] Install: vite, @vitejs/plugin-react, esbuild, tsx, concurrently
-- [x] Remove: next, eslint-config-next, vite-tsconfig-paths
-- [x] Vite build produces: `dist/` = 5.7MB total (vs 252MB `.next/`)
-- [x] Production build: `vite build + esbuild` bundles server.js (5.2MB)
-- [x] Dev scripts: `npm run dev` (concurrently api+spa), `npm run dev:api`, `npm run dev:spa`
+**Verification:** Fast scan now sends events incrementally — each project's `project_start` + `project_complete` arrives ~2 seconds apart, matching the pipeline's processing pace.
 
-**0d — CLI + deployment migration** ✅
+### Key files
 
-- [x] Update `bin/cli.mjs` — start Hono server via `fork()` with env vars
-- [x] Rewrite `scripts/build-npx.mjs` — vite build + esbuild server + copy native bindings
-- [x] Delete `.next/`, `next.config.mjs`, `src/app/api/`, `src/app/layout.tsx`, `src/lib/next-api-helpers.ts`
-- [x] Remove `next` and `eslint-config-next` from package.json dependencies
-- [x] Remove `src/app/api/__tests__/` (old Next.js route integration tests)
-- [x] Update `api-helpers.test.ts` — test only framework-agnostic functions
-- [x] Change `DashboardPage` export from `export default` to named `export`
-- [x] Add `"type": "module"` to package.json
-- [x] Update `package.json` scripts and files array for Vite+Hono
-- [x] Clean `public/` — remove Vite template SVG files
-- [x] All 245 unit tests + 50 integration tests pass
-- [x] Build output: 5.7MB dist/ (was 252MB .next/)
+- `src/api/routes/refresh.ts` — Express SSE route with `res.write()` + `setImmediate()` yield
+- `src/lib/pipeline.ts` — `emit` signature changed to `Promise<void> | void`, all 7 calls now `await emit()`
+- `src/server.ts` — Express with cors, morgan, json, static, SPA fallback
+- `src/api/index.ts` — Express Router with routes and error handler
+- `src/api/routes/*.ts` — All 12 routes converted to Express handlers
+- `src/api/__tests__/api-routes.integration.test.ts` — supertest integration tests
+- `src/api/__tests__/helpers/create-app.ts` — test app factory
+- `scripts/build-server.mjs` — esbuild with `createRequire` banner
+- `AGENTS.md` — project principles for AI agents
 
-### Size impact
-| | Before | After |
-|---|---|---|
-| Framework | 255MB (Next + @next/swc) | ~3MB (Hono) |
-| Build output | 252MB (`.next/`) | 5.7MB (`dist/`)* |
-| Installed via npx | ~620MB | ~170MB (target) |
+### Deprecated
 
-*`dist/` includes: 420KB JS bundle, 66KB CSS, 5.2MB server.js, fonts. Production npx build adds node_modules for native bindings.
+- **Hono framework** — removed from project. Hono is a good framework for simple request/response APIs, but Sidequests needs direct control over the HTTP response stream. Express provides this natively.
 
 ---
 
-## Phase 1: Data Model Extensions
+## Phase 6: SwiftUI Menu Bar Companion (Future)
 
-### Design rationale
+**Architecture:** Thin Swift `MenuBarExtra` app (~500–1000 lines) that talks to the Sidequests localhost API.
 
-The original plan proposed 5 new tables. This revision cuts it to 4, with 3 being trivial (3-4 columns each). The key design decisions:
+**What it does:**
+- Shows project count / attention-needed count as badge on menu bar icon
+- Dropdown: top 3 "What Now" priority actions
+- "Open Dashboard" → opens `http://localhost:PORT` in default browser
+- "Refresh" → `POST /api/refresh/stream` to trigger scan
+- Polls `GET /api/health` to detect if server is running; launches it if not
 
-1. **No PriorityAction table.** Priority actions are computed on-the-fly from existing data (git state, LLM nextAction, GitHub issues, stale thresholds). Persisting them creates a stale-data problem and a DRY violation. Instead, compute `actions[]` in the API response from existing tables. Dismissals are tracked with a lightweight `DismissedAlert` table (2 columns + unique constraint).
+**What it does NOT do:**
+- No database, no git scanning, no LLM calls — all that stays in the Node.js server
+- No bundled WebView — opens the browser for the full dashboard
+- No OAuth, no GitHub API calls — the server handles all data
 
-2. **No LifecycleAction table.** Snooze/archive/revive are project-level state changes. Adding `snoozedUntil` and `archivedNote` columns to Project eliminates an entire table + relation, and lets snooze/archive/revive flow through the existing `PUT /api/projects/:id/override` endpoint.
-
-3. **No ScanDelta table.** "Since last visit" deltas are computed by comparing current project state to a stored snapshot from the user's last visit. A single `UserVisit` row (one row, not many) replaces what would be many ScanDelta rows per scan.
-
-4. **Commit counts belong in Derived, not Project.** `weekCommits`/`monthCommits`/`quarterCommits` are scan-derived metrics — they belong alongside the other derived scores. The scan module needs a small enhancement to count commits by date range.
-
-### Schema changes to existing tables
-
-```
-Project
-  + snoozedUntil    DateTime?    // When snooze expires (null = not snoozed)
-  + archivedNote    String?      // "What did you learn?" retirement note
-
-Derived
-  + weekCommits     Int  @default(0)   // Commits in last 7 days
-  + monthCommits    Int  @default(0)   // Commits in last 30 days
-  + quarterCommits  Int  @default(0)   // Commits in last 90 days
-```
-
-### New tables
-
-```
-WeeklyFocus
-  id           String    @id @default(cuid())
-  projectId    String
-  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  goal         String    // What you want to accomplish this week
-  completed    Boolean   @default(false)
-  weekStart    DateTime  // Monday 00:00 of the week
-  createdAt    DateTime  @default(now())
-
-DismissedAlert
-  id           String    @id @default(cuid())
-  projectId    String
-  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  alertType    String    // "git-urgent" | "git-warning" | "issue" | "stale-decision"
-  dismissedAt  DateTime  @default(now())
-  @@unique([projectId, alertType])  // one dismissal per alert type per project
-
-UserPreference
-  id           String    @id @default(cuid())
-  key          String    @unique // e.g. "notification.quietHours" | "staleness.threshold"
-  value        String    // JSON string
-  updatedAt    DateTime  @updatedAt
-
-UserVisit
-  id           String    @id @default(cuid())
-  key          String    @unique // "lastVisit"
-  snapshotJson String    // Serialized MergedProject[] at last visit
-  updatedAt    DateTime  @updatedAt
-```
+**Distribution:** Homebrew cask or DMG. Separate Xcode project, not bundled with the npm package.
 
 ### Checklist
 
-- [x] Add `snoozedUntil` and `archivedNote` columns to `Project` model in Prisma schema
-- [x] Add `weekCommits`, `monthCommits`, `quarterCommits` columns to `Derived` model
-- [x] Create `WeeklyFocus` model
-- [x] Create `DismissedAlert` model with unique constraint on `[projectId, alertType]`
-- [x] Create `UserPreference` model (gradually replaces `settings.json` file)
-- [x] Create `UserVisit` model (single-row table for last-visit snapshot)
-- [x] Update `bootstrap-db.mjs` with new SCHEMA_SQL and MIGRATIONS array
-- [x] Update `bootstrap-db.test.ts` EXPECTED_COLUMNS fixture
-- [x] Update `scanProject()` in `pipeline-native/scan.ts` to compute commit counts by date range
-- [x] Update `pipeline.ts` to store `weekCommits`/`monthCommits`/`quarterCommits` in Derived
+- [ ] Create Xcode project: SwiftUI `MenuBarExtra` app
+- [ ] ServerMonitor class — polls `localhost:PORT/api/health`, stores project count
+- [ ] Menu bar popover UI — project count, top actions, Open Dashboard, Refresh
+- [ ] Auto-launch on login (via `SMAppService` or `LaunchAtLogin` helper)
+- [ ] If server not running, start it via `Process` (`npx @eeshans/sidequests`)
+- [ ] Icon in menu bar (SF Symbol or custom)
 
 ---
 
-## Phase 2: API Routes
+## Phase 7: Polish & Ship
 
-### Design rationale
+### Before shipping v1
 
-The original plan proposed 8 new route groups. After review, the actual net-new surface area is much smaller:
+- [ ] **Split `page.tsx`** — currently 877 lines, needs modularization
+- [ ] **Lifecycle actions modal** — replace `prompt()` with proper dialog
+- [ ] **`beforeunload` visit save** — use `navigator.sendBeacon()` instead of sync fetch
+- [ ] **End-to-end npx validation** — fresh install, scan, verify all features work
+- [ ] **GitHub Actions** — update from deprecated Node 20
+- [ ] **Prisma hash fragility** — investigate and fix standalone Prisma hash mismatch
+- [ ] **Pre-existing test failures** — `use-refresh-cancel.test.tsx` and `use-refresh-restart.test.tsx` need `EventSource` mock in jsdom
 
-- **Priority actions** are computed on-the-fly and included in the existing `GET /api/projects` response. No new table, no new endpoints.
-- **Snooze/archive/revive** flow through the existing `PUT /api/projects/:id/override` endpoint with new fields. No new `/api/lifecycle/` routes.
-- **"Since last visit" delta** uses `UserVisit` snapshot comparison. Two endpoints: load snapshot and save snapshot.
-- **Shipped history** is an aggregate query on Derived. Single endpoint or just a field in the projects response.
+### Future (v2+)
 
-### Extended existing routes
-
-```
-GET /api/projects
-  → Add computed `actions[]` array per project:
-    - git-urgent: isDirty && daysInactive > 7, or ahead > 0 && daysInactive > 7
-    - git-warning: no remote, dirty tree < 7 days
-    - issue: GitHub issues with bug labels (highest priority), features, chores
-    - llm-suggestion: from Llm.nextAction
-    - stale-decision: statusAuto crossed threshold (30/60/90 days)
-  → Add `weekCommits`, `monthCommits`, `quarterCommits` per project
-  → Filter out actions where DismissedAlert exists for (projectId, alertType)
-  → Filter out projects where Project.snoozedUntil > now
-
-PUT /api/projects/:id/override
-  → Extend to handle snooze/archive/revive:
-    - { statusOverride: "archived", archivedNote: "learned X" } → archive
-    - { snoozedUntil: "2026-06-01T00:00:00Z" } → snooze
-    - { statusOverride: null, snoozedUntil: null } → revive
-```
-
-### New routes
-
-```
-POST /api/projects/:id/dismiss-alert
-  Body: { alertType: string }
-  → Create DismissedAlert row, silencing that alert type for that project
-  DELETE variant: clear dismissal to re-show the alert
-
-GET  /api/focus
-  → Weekly focus goals for current week
-
-POST /api/focus
-  Body: { projectId, goal }
-  → Create new weekly focus goal
-
-PUT  /api/focus/:id
-  Body: { goal?, completed? }
-  → Update goal text or toggle completion
-
-GET  /api/visit
-  → Returns delta between current project state and last-visit snapshot
-  → Frontend calls this on dashboard load
-
-POST /api/visit
-  → Saves current merged project state as snapshot (UserVisit row with key "lastVisit")
-  → Frontend calls this on dashboard close/unload
-
-GET  /api/shipped
-  → Aggregate commit counts across portfolio: { weekTotal, monthTotal, quarterTotal, projects: [...] }
-```
-
-### Checklist
-
-- [x] Extend `mergeAllProjects()` and `buildMergedView()` to include `actions[]`, `weekCommits`/`monthCommits`/`quarterCommits`, and `snoozedUntil`/`archivedNote`
-- [x] Create `src/lib/actions.ts` — pure function that computes priority actions from a MergedProject + GitHub data
-- [x] Extend `PUT /api/projects/:id/override` handler to accept `snoozedUntil` and `archivedNote`
-- [x] Create `POST /api/projects/:id/dismiss-alert` route
-- [x] Create `GET/POST /api/focus` routes
-- [x] Create `GET/POST /api/visit` routes (snapshot save + diff)
-- [x] Create `GET /api/shipped` route (aggregate commit counts)
-- [x] Add tests for action computation, dismissal, snooze/archive/revive, and visit snapshot
-
----
-
-## Phase 3: Frontend Architecture
-
-### Two-view structure
-
-**View: What Now (default)**
-- Delta strip: "Since last visit (2 days ago)" — what changed
-- Priority action cards: full-width, ranked, with copy-paste commands and source badges
-- Weekly Focus section: goals per project with checkboxes
-- Shipped section: 7d / 30d / 90d commit counts with week-over-week delta
-- No "insights" section in v1 — portfolio insights can be computed client-side from project data when needed
-
-**View: Projects**
-- Project list with all current columns (status, momentum, issues, git state)
-- Click a project → side drawer opens with:
-  - Full project detail (LLM summary, next action, insights, GitHub issues)
-  - Shipped history for that project (7d/30d/90d commit counts)
-  - Lifecycle actions (snooze, archive, revive buttons)
-  - All project metadata (override status, tags, notes)
-
-### New components
-
-- [x] `DeltaStrip` — "Since last visit" banner with delta items
-- [x] `ActionCard` — ranked priority action with source badge + copy-paste command
-- [x] `FocusSection` — weekly goals with checkboxes per project
-- [x] `ShippedSection` — portfolio-level commit counts (7d/30d/90d)
-- [x] `LifecycleActions` — snooze/archive/revive buttons in project detail pane
-
-### Modified components
-
-- [x] `ProjectDetailPane` — add LifecycleActions in slide-over panel
-- [ ] `ProjectList` — add ShippedSection or ShippedCard (v2 — per-project shipped in detail pane)
-- [x] `page.tsx` — tab-based layout (What Now / Projects)
-- [x] `use-whatnow-data.ts` — hooks for focus goals, shipped data, visit delta, dismiss alerts
-- [x] `types.ts` — added PriorityAction, FocusGoal, ShippedData, VisitDelta; extended Project with actions[], isSnoozed, weekCommits/monthCommits/quarterCommits, snoozedUntil, archivedNote
-
-### No hidden sections
-Everything visible. No accordions, no "click to expand." If content is secondary, it goes below the fold, but it's always visible.
-
----
-
-## Phase 4: Notifications — Deprecated
-
-System notifications via `node-notifier` have been **removed**. The approach had low signal-to-noise (pop-up per project) and the terminal-notifier proxy message was confusing.
-
-**Replaced by:**
-- In-app attention signals: the What Now tab surfaces priority actions, delta indicators, focus goals, and shipped counts — all visible when you open the dashboard
-- Future menu bar companion (Phase 5) will use badge count changes on the icon, which is subtler and more appropriate than system notifications
-
-**Deprecated and removed:**
-- `node-notifier` dependency (uninstalled)
-- `src/lib/notifications.ts` (deleted)
-- `src/types/node-notifier.d.ts` (deleted)
-- Pipeline notification step (removed — done event now fires immediately after project processing)
-- `Activity` rows with `type: "notification"` are cleaned up on each scan
-
-Notification rule logic (CI failure transitions, stale thresholds, unpushed aging) may be revived as in-app badges or menu bar indicators in a future phase, but system notification pop-ups are not the right UX.
-
-### Checklist
-- [x] Remove `node-notifier` dependency
-- [x] Delete `src/lib/notifications.ts`
-- [x] Delete `src/types/node-notifier.d.ts`
-- [x] Remove notification step from pipeline (done event now fires immediately)
-- [x] Clean up old notification Activity rows on scan
-- [ ] Delete `src/lib/__tests__/notifications.test.ts` (done)
-
----
-
-## Phase 5: Menu Bar Companion (Future)
-
-**Architecture:** Thin Swift + AppKit menu bar app (~800 lines)
-- Polls `localhost:PORT/api/projects` every 5 minutes, extracts top actions
-- Shows badge count on menu bar icon
-- Dropdown shows top 3-5 priority actions
-- Click action → opens browser to `localhost:PORT` with project pre-selected
-- Click "Open Dashboard" → opens full web UI
-- Snooze/Archive/Revive send PUT to existing override API
-
-**Distribution:** Homebrew cask or DMG download
-**Not in scope for initial build** — ships after the web UI and notifications are working.
-
----
-
-## Phase 6: CLI & Shell Integration (Future)
-
-### `sq` CLI commands
-```
-sq status          → One-line summary: "3 active, 2 stalling, 1 needs attention"
-sq next            → Top 3 priority actions with commands
-sq focus           → This week's focus goals
-sq archive <name>   → Archive a stale project with retirement note
-sq snooze <name>   → Snooze a project for 2 weeks
-sq revive <name>    → Revive a stale project
-```
-
-### `cd` hook
-- `sq hook` installs a shell function in `.zshrc`/`.bashrc`
-- After every `cd`, if the directory is a tracked project:
-  - Prints one line: "sidequests: 1 modified, 3 ahead. Next: fix auth bug (#42)"
+- [ ] Per-project shipped history in detail pane
+- [ ] Health timeline / sparklines per project (commit history over 12 weeks)
+- [ ] Shell integration (`sq status`, `sq next`, `cd` hook)
+- [ ] MCP server for AI tool integration
+- [ ] GitHub Issues as work queue (bugs → features → chores, merged into priority actions)
 
 ---
 
 ## Implementation Order
 
 ```
-Phase 0: Hono+Vite migration              ← Foundation — must be first
+Phases 0–4: Complete ✅
+Phase 5: Express migration + SSE fix  ✅
     │
-Phase 1: Data model extensions            ← Add columns + new tables
-    │
-Phase 2: API routes (extend + new)         ← Compute actions in-project, add new endpoints
-    │
-Phase 3: Frontend (What Now + Projects)    ← New views using new data
-    │
-Phase 4: Notifications (node-notifier)     ← Push, don't pull
-    │
-Phase 5: Menu bar companion               ← Future
-Phase 6: CLI + Shell integration          ← Future
+Phase 6: Menu bar companion           ← Next (separate Swift project)
+Phase 7: Polish & ship v1             ← After or in parallel
 ```
-
-Phases 0-4 are the initial build. Phases 5-6 are follow-ups.
 
 ---
 
@@ -385,30 +152,34 @@ Phases 0-4 are the initial build. Phases 5-6 are follow-ups.
 Explicitly out of scope for v1:
 
 - **Per-project detail pages** — the side drawer is enough
-- **Charts/graphs** — sparklines and commit counts tell the story, no chart libraries
+- **Charts/graphs** — sparklines and commit counts tell the story
 - **Lifecycle kanban board** — the lifecycle actions in the project detail pane are enough
-- **PriorityAction table** — computed on-the-fly from existing data, not stored
+- **PriorityAction table** — computed on-the-fly, not stored
 - **ScanDelta table** — replaced by UserVisit snapshot comparison
 - **LifecycleAction table** — replaced by 2 columns on Project + existing override API
 - **`/api/actions` endpoint family** — actions are a field in the projects response
 - **`/api/lifecycle/:id/*` routes** — uses existing override endpoint
-- **`/api/insights` endpoint** — portfolio insights are computed client-side from project data
-- **`/api/notifications` read/dismiss endpoint** — notifications fire from pipeline, Activity log + toasts suffice for v1
-- **Settings panels for notification thresholds** — config file / UserPreference is fine for v1
-- **Onboarding wizard for new features** — existing wizard stays, new features are self-explanatory
+- **`/api/insights` endpoint** — portfolio insights are computed client-side
+- **`/api/notifications` read/dismiss endpoint** — notifications deprecated
+- **Settings panels for notification thresholds** — config file is fine for v1
+- **Onboarding wizard for new features** — existing wizard stays
+- **System notifications via node-notifier** — deprecated, replaced by in-app signals + future menu bar badge
 - **MCP server** — table-stakes for AI workflows, but not blocking for v1
 - **User accounts / cloud sync** — local-first, single user
-- **Time-based notification scheduler** — requires cron/scheduler infrastructure, defer to v2
+- **Time-based notification scheduler** — requires cron infrastructure, defer to v2
+- **Tauri/Electron desktop wrapper** — localhost web server + menu bar client, not a desktop app
+- **Hono web framework** — removed. Not a reflection on Hono's quality; Sidequests needs direct HTTP stream control.
 
 ---
 
 ## Success Criteria for v1
 
-1. Open the app → immediately see ranked actions with copy-paste commands
-2. See what changed since last visit (delta strip)
-3. See GitHub issues merged into the priority queue with issue numbers
-4. See shipped history (commits this week/month/quarter)
-5. Weekly focus goals persist across sessions
-6. Stale project decisions (snooze/archive/revive) persist and re-surface after snooze expires
-7. Native macOS notifications fire on CI failures and stale thresholds
-8. Package size reduced by ~75% after Hono+Vite migration
+1. Open the app → immediately see ranked actions with copy-paste commands ✅
+2. See what changed since last visit (delta strip) ✅
+3. See GitHub issues merged into the priority queue with issue numbers ✅
+4. See shipped history (commits this week/month/quarter) ✅
+5. Weekly focus goals persist across sessions ✅
+6. Stale project decisions (snooze/archive/revive) persist and re-surface ✅
+7. Fast scan progress arrives one project at a time ✅ (fixed: `await setImmediate()` yield after each SSE write)
+8. Menu bar companion shows badge count and top actions — **Phase 6**
+9. Package size ≤ 170MB installed via npx ✅ (was 620MB)
