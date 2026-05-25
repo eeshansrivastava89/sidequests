@@ -7,7 +7,6 @@
  */
 
 import { execFileSync, execFile, type ExecFileException } from "child_process";
-import { parseGitHubOwnerRepo } from "@/lib/project-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,7 +50,7 @@ async function runGhAsync(...args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
     const child = execFile("gh", args, {
       timeout: 10_000,
-    }, (err: ExecFileException | null, stdout: string | Buffer, stderr: string | Buffer) => {
+    }, (err: ExecFileException | null, stdout: string | Buffer) => {
       if (err) {
         if (process.env.NODE_ENV !== "test") {
           const msg = err.message;

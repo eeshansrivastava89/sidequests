@@ -178,7 +178,6 @@ export interface ProjectDetailPaneProps {
   onUpdateOverride: (id: string, fields: Record<string, unknown>) => Promise<unknown>;
   onTogglePin: (id: string) => void;
   onTouch: (id: string, tool: string) => void;
-  delta?: { newlyEnriched?: boolean } | null;
 }
 
 /* ── Main Component ────────────────────────────────────── */
@@ -189,7 +188,6 @@ export function ProjectDetailPane({
   onUpdateOverride,
   onTogglePin,
   onTouch,
-  delta,
 }: ProjectDetailPaneProps) {
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [timelinePage, setTimelinePage] = useState(0);

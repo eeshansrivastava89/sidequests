@@ -18,7 +18,7 @@ projectsRoute.get("/", async (_req, res) => {
   // Filter out snoozed projects (they're still returned but flagged)
   const enrichedProjects = projects.map((p) => {
     const actions = computeActions(p);
-    const filteredActions = filterActions(actions, dismissedAlerts, now);
+    const filteredActions = filterActions(actions, dismissedAlerts);
     return {
       ...p,
       actions: filteredActions,

@@ -166,7 +166,6 @@ export function LifecycleTimeline({ projects, onSelect }: LifecycleTimelineProps
       <div className="divide-y divide-border">
         {rows.map(({ project: p, tier }) => {
           const meta = TIER_META[tier];
-          const llmStatus = p.llmStatus ?? p.status;
 
           return (
             <button

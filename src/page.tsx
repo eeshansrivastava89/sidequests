@@ -598,7 +598,6 @@ export function DashboardPage() {
                 onUpdateOverride={updateOverride}
                 onTogglePin={handleTogglePin}
                 onTouch={handleTouch}
-                delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
               />
               <div className="px-6 pb-6">
                 <LifecycleActions

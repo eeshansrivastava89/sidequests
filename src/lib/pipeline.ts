@@ -7,7 +7,7 @@ import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
 import { tryParseLlmJson } from "./llm/prompt";
 import { listProjectDirs, scanProject, type ScannedProject } from "./pipeline-native/scan";
-import { deriveProject, type ScanProject as DeriveInput } from "./pipeline-native/derive";
+import { deriveProject } from "./pipeline-native/derive";
 import { fetchGitHubDataAsync, isGhAvailable } from "./pipeline-native/github";
 import { parseGitHubOwnerRepo } from "./project-helpers";
 import { mergeAllProjects } from "./merge";

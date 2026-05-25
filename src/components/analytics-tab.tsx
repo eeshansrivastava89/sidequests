@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Project } from "@/lib/types";
-import type { PortfolioStats, VelocityEntry } from "@/lib/merge";
+import type { PortfolioStats } from "@/lib/merge";
 import type { ShippedData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { STATUS_COLORS_HEX } from "@/lib/status-colors";
@@ -79,7 +79,7 @@ function computeHeatmapSummary(dailyCommitCounts: Record<string, number>) {
   const yesterdayStr = yesterday.toISOString().split("T")[0];
 
   let currentStreak = 0;
-  let start = dailyCommitCounts[todayStr] && dailyCommitCounts[todayStr] > 0 ? today : dailyCommitCounts[yesterdayStr] && dailyCommitCounts[yesterdayStr] > 0 ? yesterday : null;
+  const start = dailyCommitCounts[todayStr] && dailyCommitCounts[todayStr] > 0 ? today : dailyCommitCounts[yesterdayStr] && dailyCommitCounts[yesterdayStr] > 0 ? yesterday : null;
   if (start) {
     const d = new Date(start);
     while (true) {
@@ -381,8 +381,6 @@ export function AnalyticsTab({
   const heatmapSummary = computeHeatmapSummary(dailyCommitCounts);
 
   // Stale list for lifecycle section
-  const activeStale = staleProjects.filter((p) => p.daysInactive > 14).slice(5);
-
   return (
     <div className="space-y-4">
       {/* ── Summary cards ── */}

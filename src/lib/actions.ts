@@ -162,7 +162,6 @@ function parseIssues(json: string): Array<{ labels?: string[] }> | null {
 export function filterActions(
   actions: PriorityAction[],
   dismissedAlerts: Array<{ projectId: string; alertType: string }>,
-  now: Date = new Date(),
 ): PriorityAction[] {
   const dismissedSet = new Set(
     dismissedAlerts.map((d) => `${d.projectId}:${d.alertType}`),

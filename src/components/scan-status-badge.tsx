@@ -1,6 +1,5 @@
 import { AlertCircle, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/project-helpers";
 
 type Variant = "badge" | "span";
