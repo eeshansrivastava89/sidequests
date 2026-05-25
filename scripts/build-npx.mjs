@@ -6,8 +6,8 @@
  */
 
 import { execSync } from "node:child_process";
-import { cpSync, rmSync, chmodSync, existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { cpSync, rmSync, chmodSync, existsSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 const run = (cmd) => execSync(cmd, { stdio: "inherit" });
 
