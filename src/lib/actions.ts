@@ -6,17 +6,8 @@
  */
 
 import type { MergedProject } from "./merge";
-
-export type ActionSource = "git" | "issue" | "ai" | "stale";
-
-export interface PriorityAction {
-  type: string;        // e.g. "git-urgent", "git-warning", "issue", "llm-suggestion", "stale-decision"
-  label: string;       // Human-readable description
-  source: ActionSource;
-  severity: "high" | "med" | "low";
-  projectId: string;
-  projectName: string;
-}
+import type { ActionSource, PriorityAction } from "./types";
+export type { ActionSource, PriorityAction };
 
 /** Number of days considered "inactive" at various thresholds. */
 const STALE_WARN = 30;

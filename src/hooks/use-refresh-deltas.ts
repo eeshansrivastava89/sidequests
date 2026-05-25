@@ -88,8 +88,8 @@ export function isNeedsAttention(p: { healthScore: number; isDirty: boolean; day
 export function snapProject(p: Project): ProjectSnapshot {
   return {
     healthScore: p.healthScore,
-    hygieneScore: ((p as unknown as Record<string, unknown>).hygieneScore as number) ?? 0,
-    momentumScore: ((p as unknown as Record<string, unknown>).momentumScore as number) ?? 0,
+    hygieneScore: p.hygieneScore ?? 0,
+    momentumScore: p.momentumScore ?? 0,
     locEstimate: p.locEstimate ?? 0,
     status: p.status,
     isDirty: p.isDirty,
@@ -151,9 +151,6 @@ export function useRefreshDeltas(projects: Project[]) {
     setSnapState(map);
   }, [projects]);
 
-  const clear = useCallback(() => {
-    setSnapState(null);
-  }, []);
 
   const deltas: DashboardDeltas | null = useMemo(() => {
     if (!snapState) return null;
@@ -288,5 +285,5 @@ export function useRefreshDeltas(projects: Project[]) {
     };
   }, [projects, snapState]);
 
-  return { snapshot, deltas, clear };
+  return { snapshot, deltas };
 }

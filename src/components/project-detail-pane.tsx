@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { VsCodeIcon, ClaudeIcon, CodexIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { copyToClipboard, formatRelativeDate, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
+import { PinIcon } from "@/components/project-icons";
+import { ProjectActionButtons } from "@/components/project-action-buttons";
+import { formatRelativeDate, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { X, ExternalLink, Zap, Sparkles, AlertCircle } from "lucide-react";
+import { X, ExternalLink, Zap } from "lucide-react";
+import { ScanStatusBadge } from "@/components/scan-status-badge";
 
 /* ── Constants ─────────────────────────────────────────── */
 
@@ -29,6 +30,7 @@ function StatusSelect({
 }) {
   return (
     <select
+      aria-label="Project status"
       value={value}
       onChange={(e) => onSave(e.target.value)}
       className="h-7 rounded-md border border-input bg-background px-2 text-xs font-medium ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -328,70 +330,14 @@ export function ProjectDetailPane({
                 Scanned {formatRelativeTime(project.lastScanned)}
               </Badge>
             )}
-            {project.llmError ? (
-              <Badge variant="secondary" className="text-[10px] inline-flex items-center gap-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" title={project.llmError}>
-                <AlertCircle className="size-3" />
-                AI scan failed
-              </Badge>
-            ) : project.llmGeneratedAt ? (
-              <Badge variant="secondary" className="text-[10px] inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" title={`AI scanned ${new Date(project.llmGeneratedAt).toLocaleString()}`}>
-                <Sparkles className="size-3" />
-                AI scanned {formatRelativeTime(project.llmGeneratedAt)}
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-                No AI scan
-              </Badge>
-            )}
+            <ScanStatusBadge
+              llmError={project.llmError}
+              llmGeneratedAt={project.llmGeneratedAt}
+              variant="badge"
+            />
           </div>
 
-          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className="text-[#007ACC] hover:bg-[#007ACC]/10"
-              title="Open in VS Code (v)"
-              asChild
-            >
-              <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
-                <VsCodeIcon className="size-4" />
-              </a>
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className="text-[#D97757] hover:bg-[#D97757]/10"
-              title="Copy Claude command (c)"
-              onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
-            >
-              <ClaudeIcon className="size-4" />
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              title="Copy Codex command (x)"
-              onClick={() => { copyToClipboard(`cd "${rawPath}" && codex`, "Codex"); onTouch(project.id, "codex"); }}
-            >
-              <CodexIcon className="size-4" />
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              title="Copy terminal cd command (t)"
-              onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
-            >
-              <TerminalIcon className="size-4" />
-            </Button>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              className="text-muted-foreground"
-              title="Copy path"
-              onClick={() => copyToClipboard(rawPath, "path")}
-            >
-              <span className="text-[10px]">Copy</span>
-            </Button>
-          </div>
+          <ProjectActionButtons projectPath={rawPath} projectId={project.id} onTouch={onTouch} showCopyPath />
         </div>
 
         {/* Last commit message */}

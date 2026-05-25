@@ -6,7 +6,7 @@ await esbuild.build({
   platform: "node",
   format: "esm",
   outfile: "dist/server.js",
-  external: ["@prisma/adapter-libsql", "libsql", "better-sqlite3", "cpu-features", "encoding"],
+  external: ["@prisma/adapter-libsql", "libsql"],
   banner: {
     js: 'import{createRequire}from"module";const require=createRequire(import.meta.url);',
   },

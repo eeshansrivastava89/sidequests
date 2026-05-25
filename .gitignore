@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -13,15 +11,13 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
-
 # production
 /build
+/dist
+/dist-electron
 
 # misc
-.DS_Store
+**/.DS_Store
 *.pem
 
 # debug
@@ -34,12 +30,8 @@ yarn-error.log*
 .env*
 !.env.local.example
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 /src/generated/prisma
 
@@ -53,12 +45,8 @@ __pycache__/
 *.db
 *.db-journal
 
-# internal docs (architecture, implementation plan, pitch, session context)
+# internal docs
 /docs/internal/
-
-# electron
-/dist-electron/
-/dist/
 
 # claude code session files
 .claude/
@@ -72,7 +60,5 @@ __pycache__/
 # local tarballs from npm pack / testing
 *.tgz
 
-# archive of internal review logs
-/docs/internal/archive/
 # Python venv
 pipeline/.venv/

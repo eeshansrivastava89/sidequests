@@ -24,6 +24,8 @@ const SCHEMA_SQL = [
     "prunedAt"      TEXT
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Project_pathHash_key" ON "Project"("pathHash")`,
+  `CREATE INDEX IF NOT EXISTS "Project_prunedAt_idx" ON "Project"("prunedAt")`,
+  `CREATE INDEX IF NOT EXISTS "Project_lastTouchedAt_idx" ON "Project"("lastTouchedAt")`,
 
   // 2. Scan
   `CREATE TABLE IF NOT EXISTS "Scan" (
@@ -64,6 +66,7 @@ const SCHEMA_SQL = [
     CONSTRAINT "Derived_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Derived_projectId_key" ON "Derived"("projectId")`,
+  `CREATE INDEX IF NOT EXISTS "Derived_lastCommitDate_idx" ON "Derived"("lastCommitDate")`,
 
   // 4. Llm
   `CREATE TABLE IF NOT EXISTS "Llm" (
@@ -123,6 +126,7 @@ const SCHEMA_SQL = [
     CONSTRAINT "Activity_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS "Activity_projectId_createdAt_idx" ON "Activity"("projectId", "createdAt")`,
+  `CREATE INDEX IF NOT EXISTS "Activity_projectId_idx" ON "Activity"("projectId")`,
 
   // 8. GitHub
   `CREATE TABLE IF NOT EXISTS "GitHub" (
@@ -161,16 +165,7 @@ const SCHEMA_SQL = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "DismissedAlert_projectId_alertType_key" ON "DismissedAlert"("projectId", "alertType")`,
 
-  // 11. UserPreference
-  `CREATE TABLE IF NOT EXISTS "UserPreference" (
-    "id"        TEXT NOT NULL PRIMARY KEY,
-    "key"       TEXT NOT NULL,
-    "value"    TEXT NOT NULL,
-    "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
-  )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "UserPreference_key_key" ON "UserPreference"("key")`,
-
-  // 12. UserVisit
+  // 11. UserVisit
   `CREATE TABLE IF NOT EXISTS "UserVisit" (
     "id"           TEXT NOT NULL PRIMARY KEY,
     "key"          TEXT NOT NULL,

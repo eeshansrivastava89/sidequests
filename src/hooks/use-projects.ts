@@ -38,20 +38,6 @@ export function useProjects() {
     [fetchProjects]
   );
 
-  const updateMetadata = useCallback(
-    async (id: string, fields: Record<string, unknown>) => {
-      const res = await fetch(`/api/projects/${id}/metadata`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-      });
-      const data = await res.json();
-      if (data.ok) await fetchProjects();
-      return data;
-    },
-    [fetchProjects]
-  );
-
   const touchProject = useCallback((id: string, tool: string) => {
     // Fire-and-forget: no await, no refetch
     fetch(`/api/projects/${id}/touch`, {
@@ -79,5 +65,5 @@ export function useProjects() {
     fetchProjects();
   }, [fetchProjects]);
 
-  return { projects, loading, error, fetchProjects, updateOverride, updateMetadata, togglePin, touchProject };
+  return { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject };
 }

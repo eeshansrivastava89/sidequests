@@ -17,7 +17,6 @@ const EXPECTED_TABLES = [
   "GitHub",
   "WeeklyFocus",
   "DismissedAlert",
-  "UserPreference",
   "UserVisit",
   "PortfolioAnalysis",
   "_DataFix",
@@ -142,12 +141,6 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     alertType: "TEXT",
     dismissedAt: "TEXT",
   },
-  UserPreference: {
-    id: "TEXT",
-    key: "TEXT",
-    value: "TEXT",
-    updatedAt: "TEXT",
-  },
   UserVisit: {
     id: "TEXT",
     key: "TEXT",
@@ -171,7 +164,6 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   Metadata_projectId_key: "Metadata",
   GitHub_projectId_key: "GitHub",
   DismissedAlert_projectId_alertType_key: "DismissedAlert",
-  UserPreference_key_key: "UserPreference",
   UserVisit_key_key: "UserVisit",
 };
 

@@ -6,11 +6,10 @@ vi.mock("child_process", () => ({
 
 import { execFileSync } from "child_process";
 import {
-  parseGitHubOwnerRepo,
   isGhAvailable,
   fetchGitHubData,
-  syncAllGitHub,
 } from "@/lib/pipeline-native/github";
+import { parseGitHubOwnerRepo } from "@/lib/project-helpers";
 
 const mockExecFileSync = vi.mocked(execFileSync);
 
@@ -195,86 +194,3 @@ describe("fetchGitHubData", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// syncAllGitHub
-// ---------------------------------------------------------------------------
-
-describe("syncAllGitHub", () => {
-  it("skips all when gh is unavailable", () => {
-    mockExecFileSync.mockImplementation(() => {
-      throw new Error("not found");
-    });
-
-    const result = syncAllGitHub([
-      { pathHash: "abc", remoteUrl: "git@github.com:o/r.git" },
-      { pathHash: "def", remoteUrl: null },
-    ]);
-
-    expect(result.skipped).toBe(2);
-    expect(result.errors).toBe(0);
-    expect(result.projects).toEqual([]);
-  });
-
-  it('sets repoVisibility "not-on-github" for projects without remotes', () => {
-    // First call: isGhAvailable → auth status succeeds
-    mockExecFileSync.mockReturnValueOnce("Logged in");
-
-    const result = syncAllGitHub([
-      { pathHash: "no-remote", remoteUrl: null },
-    ]);
-
-    expect(result.skipped).toBe(1);
-    expect(result.projects).toHaveLength(1);
-    expect(result.projects[0].data.repoVisibility).toBe("not-on-github");
-  });
-
-  it("continues after single-project error", () => {
-    // isGhAvailable check
-    mockExecFileSync.mockReturnValueOnce("Logged in");
-
-    // First project: GraphQL + CI succeed
-    const graphqlOk = JSON.stringify({
-      data: {
-        repository: {
-          visibility: "PUBLIC",
-          issues: { totalCount: 1, nodes: [{ title: "Bug", number: 1 }] },
-          pullRequests: { totalCount: 0, nodes: [] },
-        },
-      },
-    });
-    mockExecFileSync.mockReturnValueOnce(graphqlOk); // graphql
-    mockExecFileSync.mockReturnValueOnce(JSON.stringify({ workflow_runs: [] })); // CI
-
-    // Second project: both calls fail
-    mockExecFileSync.mockImplementationOnce(() => {
-      throw new Error("graphql fail");
-    });
-    mockExecFileSync.mockImplementationOnce(() => {
-      throw new Error("ci fail");
-    });
-
-    const result = syncAllGitHub([
-      { pathHash: "p1", remoteUrl: "git@github.com:a/b.git" },
-      { pathHash: "p2", remoteUrl: "git@github.com:c/d.git" },
-    ]);
-
-    // Both projects should be in results
-    expect(result.projects).toHaveLength(2);
-    expect(result.errors).toBe(0); // fetchGitHubData handles errors internally
-    expect(result.projects[0].data.openIssues).toBe(1);
-  });
-
-  it("reports correct skipped/errors counts", () => {
-    mockExecFileSync.mockReturnValueOnce("Logged in"); // auth
-
-    const result = syncAllGitHub([
-      { pathHash: "a", remoteUrl: null },
-      { pathHash: "b", remoteUrl: "git@gitlab.com:x/y.git" },
-    ]);
-
-    expect(result.skipped).toBe(2);
-    expect(result.projects).toHaveLength(2);
-    expect(result.projects[0].data.repoVisibility).toBe("not-on-github");
-    expect(result.projects[1].data.repoVisibility).toBe("not-on-github");
-  });
-});

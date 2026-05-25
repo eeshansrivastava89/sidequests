@@ -1,12 +1,14 @@
 
+import React from "react";
 import type { Project } from "@/lib/types";
 import type { ProjectProgress } from "@/hooks/use-refresh";
-import { Button } from "@/components/ui/button";
-import { VsCodeIcon, ClaudeIcon, TerminalIcon, PinIcon } from "@/components/project-icons";
-import { copyToClipboard, formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
+import { PinIcon } from "@/components/project-icons";
+import { ProjectActionButtons } from "@/components/project-action-buttons";
+import { formatRelativeTime, parseGitHubOwnerRepo } from "@/lib/project-helpers";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import { cn } from "@/lib/utils";
-import { Check, X as XIcon, Circle, Lock, Globe, Minus, AlertCircle, Zap, Sparkles } from "lucide-react";
+import { Check, X as XIcon, Circle, Lock, Globe, Minus, Zap } from "lucide-react";
+import { ScanStatusBadge } from "@/components/scan-status-badge";
 
 interface ProjectListProps {
   projects: Project[];
@@ -63,7 +65,7 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   return "";
 }
 
-export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, refreshProgress, selectedNames, onToggleSelect, onSelectAll, allSelected }: ProjectListProps) {
+export const ProjectList = React.memo(function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTouch, refreshProgress, selectedNames, onToggleSelect, onSelectAll, allSelected }: ProjectListProps) {
   const hasSelection = !!(selectedNames && onToggleSelect);
   // Project ~60% (6fr), right columns ~40% total
   const gridCols = hasSelection
@@ -202,27 +204,11 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                     Scanned {formatRelativeTime(project.lastScanned)}
                   </span>
                 )}
-                {project.llmError ? (
-                  <span
-                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 rounded px-1.5 py-0.5 leading-none"
-                    title={project.llmError}
-                  >
-                    <AlertCircle className="size-3" />
-                    AI scan failed
-                  </span>
-                ) : project.llmGeneratedAt ? (
-                  <span
-                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 rounded px-1.5 py-0.5 leading-none"
-                    title={`AI scanned ${new Date(project.llmGeneratedAt).toLocaleString()}`}
-                  >
-                    <Sparkles className="size-3" />
-                    AI scanned {formatRelativeTime(project.llmGeneratedAt)}
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-[10px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5 leading-none">
-                    No AI scan
-                  </span>
-                )}
+                <ScanStatusBadge
+                  llmError={project.llmError}
+                  llmGeneratedAt={project.llmGeneratedAt}
+                  variant="span"
+                />
               </div>
               {/* Line 2: summary */}
               <div className="mt-1 text-sm text-muted-foreground truncate">
@@ -306,36 +292,7 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
 
             {/* Actions */}
             <div className="flex justify-center">
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="text-[#007ACC] hover:bg-[#007ACC]/10"
-                  title="Open in VS Code"
-                  asChild
-                >
-                  <a href={`vscode://file${encodeURI(rawPath)}`} onClick={() => onTouch(project.id, "vscode")}>
-                    <VsCodeIcon className="size-4" />
-                  </a>
-                </Button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="text-[#D97757] hover:bg-[#D97757]/10"
-                  title="Copy Claude command"
-                  onClick={() => { copyToClipboard(`cd "${rawPath}" && claude`, "Claude"); onTouch(project.id, "claude"); }}
-                >
-                  <ClaudeIcon className="size-4" />
-                </Button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  title="Copy terminal cd command"
-                  onClick={() => { copyToClipboard(`cd "${rawPath}"`, "Terminal"); onTouch(project.id, "terminal"); }}
-                >
-                  <TerminalIcon className="size-4" />
-                </Button>
-              </div>
+              <ProjectActionButtons projectPath={rawPath} projectId={project.id} onTouch={onTouch} showCodex={false} />
             </div>
 
           </div>
@@ -343,4 +300,4 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
       })}
     </div>
   );
-}
+});

@@ -3,7 +3,9 @@ import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
 import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
-import { useFocusGoals, useShipped, useVisit, dismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
+import { usePreflight } from "@/hooks/use-preflight";
+import { useVersion } from "@/hooks/use-version";
+import { useFocusGoals, useShipped, useVisit, dismissAlert } from "@/hooks/use-whatnow-data";
 import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
 import {
   SORT_OPTIONS,
@@ -20,7 +22,6 @@ import { cn } from "@/lib/utils";
 import { STATUS_COLORS } from "@/lib/status-colors";
 import type { StatsBarSignalFilter as SignalFilter } from "@/components/overview-strip";
 import { StatsBar } from "@/components/overview-strip";
-import { OverviewStrip } from "@/components/overview-strip";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
 import { WhatNowTab } from "@/components/whatnow-tab";
@@ -34,7 +35,8 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Target, TriangleAlert, Info, BarChart3, X, Settings, Sparkles } from "lucide-react";
+import { Target, TriangleAlert, Info, BarChart3, Settings, Sparkles } from "lucide-react";
+import { FilterChip } from "@/components/filter-chip";
 import { toast } from "sonner";
 
 export function DashboardPage() {
@@ -94,30 +96,8 @@ export function DashboardPage() {
       (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
 
-  const [ghStatus, setGhStatus] = useState<"ok" | "no-auth" | "no-gh" | null>(null);
-  const [versionInfo, setVersionInfo] = useState<{ current: string; latest: string | null; updateAvailable: boolean } | null>(null);
-
-  // Check gh auth status on mount
-  useEffect(() => {
-    fetch("/api/preflight")
-      .then((res) => res.json())
-      .then((data) => {
-        const checks: { name: string; ok: boolean }[] = data.checks ?? [];
-        const gh = checks.find((c) => c.name === "gh");
-        if (!gh || !gh.ok) { setGhStatus("no-gh"); return; }
-        const ghAuth = checks.find((c) => c.name === "gh-auth");
-        setGhStatus(ghAuth?.ok ? "ok" : "no-auth");
-      })
-      .catch(() => {});
-  }, []);
-
-  // Check for version updates on mount
-  useEffect(() => {
-    fetch("/api/version")
-      .then((res) => res.json())
-      .then((data) => setVersionInfo(data))
-      .catch(() => {});
-  }, []);
+  const { ghStatus } = usePreflight();
+  const { versionInfo } = useVersion();
 
   // Apply theme attribute to <html>
   useEffect(() => {
@@ -255,12 +235,6 @@ export function DashboardPage() {
 
   const lastRefreshed = useMemo(() => getLastRefreshed(projects), [projects]);
 
-  // Aggregate actions for What Now tab (excluding snoozed projects)
-  const visibleActions = useMemo(
-    () => aggregateActions(projects.filter((p) => !p.isSnoozed)),
-    [projects]
-  );
-
   // Tab counts for filter labels
   const tabCounts = useMemo(() => ({
     all: projects.length,
@@ -347,11 +321,6 @@ export function DashboardPage() {
                   <TabsTrigger value="whatnow" className="gap-1.5">
                     <Target className="size-3.5" />
                     What Now
-                    {visibleActions.length > 0 && (
-                      <span className="ml-1 inline-flex items-center justify-center size-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
-                        {visibleActions.length}
-                      </span>
-                    )}
                   </TabsTrigger>
                   <TabsTrigger value="projects">
                     Projects ({projects.length})
@@ -383,7 +352,7 @@ export function DashboardPage() {
                 analysis={portfolioHook.analysis}
                 analysisLoading={portfolioHook.loading}
                 analysisError={portfolioHook.error}
-                onSelectProject={(id) => setSelectedId(id)}
+                onSelectProject={setSelectedId}
               />
             )}
 
@@ -395,7 +364,7 @@ export function DashboardPage() {
                 shippedLoading={shippedHook.loading}
                 visit={visitHook.visit}
                 visitLoading={visitHook.loading}
-                onSelectProject={(id) => setSelectedId(id)}
+                onSelectProject={setSelectedId}
               />
             )}
 
@@ -448,6 +417,7 @@ export function DashboardPage() {
 
                   <div className="flex items-center gap-2">
                     <select
+                      aria-label="Sort projects by"
                       value={sortKey}
                       onChange={(e) => handleSortChange(e.target.value as SortKey)}
                       className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -472,43 +442,13 @@ export function DashboardPage() {
                 {(view !== "all" || search || signalFilter) && (
                   <div className="flex items-center gap-2 flex-wrap">
                     {view !== "all" && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                        {view.charAt(0).toUpperCase() + view.slice(1)}
-                        <button
-                          type="button"
-                          className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
-                          onClick={() => setView("all")}
-                          aria-label="Clear tab filter"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
+                      <FilterChip label={view.charAt(0).toUpperCase() + view.slice(1)} onClear={() => setView("all")} ariaLabel="Clear tab filter" />
                     )}
                     {signalFilter && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-900/30 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                        {SIGNAL_LABELS[signalFilter]}
-                        <button
-                          type="button"
-                          className="ml-0.5 rounded-sm hover:bg-amber-200 dark:hover:bg-amber-800/40 p-0.5 transition-colors"
-                          onClick={() => setSignalFilter(null)}
-                          aria-label="Clear signal filter"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
+                      <FilterChip label={SIGNAL_LABELS[signalFilter]} onClear={() => setSignalFilter(null)} ariaLabel="Clear signal filter" />
                     )}
                     {search && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">
-                        &ldquo;{search}&rdquo;
-                        <button
-                          type="button"
-                          className="ml-0.5 rounded-sm hover:bg-accent p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                          onClick={() => setSearch("")}
-                          aria-label="Clear search"
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </span>
+                      <FilterChip label={`“${search}”`} onClear={() => setSearch("")} ariaLabel="Clear search" variant="muted" />
                     )}
                     <button
                       type="button"

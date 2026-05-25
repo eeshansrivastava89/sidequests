@@ -9,6 +9,35 @@ import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import type { ScanProject } from "./derive";
+
+/** Full output of scanProject(), extending the derive input shape with scan-only fields. */
+export interface ScannedProject extends ScanProject {
+  name: string;
+  path: string;
+  isRepo: boolean;
+  lastCommitDate: string | null;
+  lastCommitMessage: string | null;
+  branch: string | null;
+  commitCount: number;
+  weekCommits: number;
+  monthCommits: number;
+  quarterCommits: number;
+  untrackedCount: number;
+  modifiedCount: number;
+  stagedCount: number;
+  behind: number;
+  recentCommits: { hash: string; date: string; message: string }[];
+  stashCount: number;
+  fixmeCount: number;
+  description: string | null;
+  liveUrl: string | null;
+  scripts: string[];
+  locEstimate: number;
+  locBreakdown: { code?: number; docs?: number; generated?: number };
+  packageManager: string | null;
+  license: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Constants (mirroring scan.py)
@@ -117,7 +146,13 @@ function runGit(cwd: string, ...args: string[]): string | null {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim() || null;
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV !== "test") {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("not a git repository") && !msg.includes("exit code 128")) {
+        console.error(`[scan] git ${args.join(" ")} failed:`, msg.slice(0, 200));
+      }
+    }
     return null;
   }
 }
@@ -147,7 +182,29 @@ function countCommitsSince(projectPath: string, days: number): number {
   return result ? parseInt(result, 10) : 0;
 }
 
-function getGitInfo(projectPath: string): Record<string, unknown> {
+interface GitInfo {
+  isRepo: boolean;
+  lastCommitDate: string | null;
+  lastCommitMessage: string | null;
+  branch: string | null;
+  remoteUrl: string | null;
+  commitCount: number;
+  weekCommits: number;
+  monthCommits: number;
+  quarterCommits: number;
+  daysInactive: number | null;
+  isDirty: boolean;
+  untrackedCount: number;
+  modifiedCount: number;
+  stagedCount: number;
+  ahead: number;
+  behind: number;
+  recentCommits: { hash: string; date: string; message: string }[];
+  branchCount: number;
+  stashCount: number;
+}
+
+function getGitInfo(projectPath: string): GitInfo {
   if (!fs.existsSync(path.join(projectPath, ".git"))) {
     return {
       isRepo: false,
@@ -292,7 +349,7 @@ function detectLanguages(projectPath: string): { primary: string | null; detecte
   return { primary, detected };
 }
 
-function checkFiles(projectPath: string): Record<string, boolean> {
+function checkFiles(projectPath: string): ScanProject["files"] & { env?: boolean; envExample?: boolean } {
   const p = projectPath;
   const testDirs = ["tests", "test", "__tests__", "spec", "src/tests", "src/__tests__"];
   const hasTests = testDirs.some((d) => fs.existsSync(path.join(p, d))) ||
@@ -320,7 +377,7 @@ function checkFiles(projectPath: string): Record<string, boolean> {
   };
 }
 
-function checkCicd(projectPath: string): Record<string, boolean> {
+function checkCicd(projectPath: string): ScanProject["cicd"] {
   return {
     githubActions: fs.existsSync(path.join(projectPath, ".github", "workflows")),
     circleci: fs.existsSync(path.join(projectPath, ".circleci")),
@@ -329,7 +386,7 @@ function checkCicd(projectPath: string): Record<string, boolean> {
   };
 }
 
-function checkDeployment(projectPath: string): Record<string, boolean> {
+function checkDeployment(projectPath: string): ScanProject["deployment"] {
   return {
     fly: existsAt(projectPath, "fly.toml"),
     vercel: existsAt(projectPath, "vercel.json"),
@@ -529,13 +586,8 @@ export function listProjectDirs(devRoot: string, excludeDirs: string[], includeN
 // Main scan function
 // ---------------------------------------------------------------------------
 
-export interface ScanOutput {
-  scannedAt: string;
-  projectCount: number;
-  projects: Array<Record<string, unknown>>;
-}
 
-export function scanProject(absPath: string): Record<string, unknown> {
+export function scanProject(absPath: string): ScannedProject {
   const name = path.basename(absPath);
   const gitInfo = getGitInfo(absPath);
   const languages = detectLanguages(absPath);
@@ -583,34 +635,3 @@ export function scanProject(absPath: string): Record<string, unknown> {
   };
 }
 
-export function scanAll(devRoot: string, excludeDirs: string[], includeNonGitDirs = true): ScanOutput {
-  if (!fs.existsSync(devRoot) || !fs.statSync(devRoot).isDirectory()) {
-    throw new Error(`Scan root not found: ${devRoot}`);
-  }
-
-  const excludeSet = new Set(excludeDirs.filter(Boolean));
-  const projects: Array<Record<string, unknown>> = [];
-  const entries = fs.readdirSync(devRoot, { withFileTypes: true });
-
-  // Sort for deterministic order
-  entries.sort((a, b) => a.name.localeCompare(b.name));
-
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith(".")) continue;
-    if (excludeSet.has(entry.name)) continue;
-
-    const absPath = path.join(devRoot, entry.name);
-    if (!includeNonGitDirs && !fs.existsSync(path.join(absPath, ".git")) && !hasLanguageIndicators(absPath)) {
-      continue;
-    }
-
-    projects.push(scanProject(absPath));
-  }
-
-  return {
-    scannedAt: new Date().toISOString(),
-    projectCount: projects.length,
-    projects,
-  };
-}

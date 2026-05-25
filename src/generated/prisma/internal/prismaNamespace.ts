@@ -394,7 +394,6 @@ export const ModelName = {
   Activity: 'Activity',
   WeeklyFocus: 'WeeklyFocus',
   DismissedAlert: 'DismissedAlert',
-  UserPreference: 'UserPreference',
   PortfolioAnalysis: 'PortfolioAnalysis',
   UserVisit: 'UserVisit'
 } as const
@@ -412,7 +411,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "scan" | "derived" | "llm" | "override" | "metadata" | "gitHub" | "activity" | "weeklyFocus" | "dismissedAlert" | "userPreference" | "portfolioAnalysis" | "userVisit"
+    modelProps: "project" | "scan" | "derived" | "llm" | "override" | "metadata" | "gitHub" | "activity" | "weeklyFocus" | "dismissedAlert" | "portfolioAnalysis" | "userVisit"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1156,80 +1155,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    UserPreference: {
-      payload: Prisma.$UserPreferencePayload<ExtArgs>
-      fields: Prisma.UserPreferenceFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.UserPreferenceFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.UserPreferenceFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        findFirst: {
-          args: Prisma.UserPreferenceFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.UserPreferenceFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        findMany: {
-          args: Prisma.UserPreferenceFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>[]
-        }
-        create: {
-          args: Prisma.UserPreferenceCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        createMany: {
-          args: Prisma.UserPreferenceCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.UserPreferenceCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>[]
-        }
-        delete: {
-          args: Prisma.UserPreferenceDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        update: {
-          args: Prisma.UserPreferenceUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        deleteMany: {
-          args: Prisma.UserPreferenceDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.UserPreferenceUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.UserPreferenceUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>[]
-        }
-        upsert: {
-          args: Prisma.UserPreferenceUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$UserPreferencePayload>
-        }
-        aggregate: {
-          args: Prisma.UserPreferenceAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateUserPreference>
-        }
-        groupBy: {
-          args: Prisma.UserPreferenceGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.UserPreferenceGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.UserPreferenceCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.UserPreferenceCountAggregateOutputType> | number
-        }
-      }
-    }
     PortfolioAnalysis: {
       payload: Prisma.$PortfolioAnalysisPayload<ExtArgs>
       fields: Prisma.PortfolioAnalysisFieldRefs
@@ -1567,16 +1492,6 @@ export const DismissedAlertScalarFieldEnum = {
 export type DismissedAlertScalarFieldEnum = (typeof DismissedAlertScalarFieldEnum)[keyof typeof DismissedAlertScalarFieldEnum]
 
 
-export const UserPreferenceScalarFieldEnum = {
-  id: 'id',
-  key: 'key',
-  value: 'value',
-  updatedAt: 'updatedAt'
-} as const
-
-export type UserPreferenceScalarFieldEnum = (typeof UserPreferenceScalarFieldEnum)[keyof typeof UserPreferenceScalarFieldEnum]
-
-
 export const PortfolioAnalysisScalarFieldEnum = {
   id: 'id',
   resultJson: 'resultJson',
@@ -1757,7 +1672,6 @@ export type GlobalOmitConfig = {
   activity?: Prisma.ActivityOmit
   weeklyFocus?: Prisma.WeeklyFocusOmit
   dismissedAlert?: Prisma.DismissedAlertOmit
-  userPreference?: Prisma.UserPreferenceOmit
   portfolioAnalysis?: Prisma.PortfolioAnalysisOmit
   userVisit?: Prisma.UserVisitOmit
 }

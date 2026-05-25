@@ -2,6 +2,7 @@ import type { Project } from "@/lib/types";
 import type { FocusGoal } from "@/lib/types";
 import type { ShippedData, VisitDelta } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { formatLastVisit } from "@/lib/project-helpers";
 import { CARD, SECTION_LABEL, SIGNAL_COLORS } from "@/lib/status-colors";
 import { ArrowUpRight, ArrowDownRight, Plus, Minus, Target, Rocket, RefreshCw } from "lucide-react";
 
@@ -62,18 +63,6 @@ function SignalChip({
 }
 
 /* ── Delta chips ────────────────────────────────────────── */
-
-function formatLastVisit(dateStr: string | null): string {
-  if (!dateStr) return "never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
-  return "a while ago";
-}
 
 function DeltaChips({ visit, loading }: { visit: VisitDelta | null; loading: boolean }) {
   if (loading) return <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>;

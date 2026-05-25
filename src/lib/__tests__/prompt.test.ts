@@ -161,7 +161,7 @@ describe("buildPrompt", () => {
   const baseInput: LlmInput = {
     name: "test-project",
     path: "/Users/dev/test-project",
-    scan: { isRepo: true, branch: "main" },
+    scan: { isRepo: true, branch: "main" } as unknown as LlmInput["scan"],
     derived: {
       statusAuto: "active",
       healthScoreAuto: 80,

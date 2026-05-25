@@ -189,9 +189,6 @@ export function WhatNowTab({
           </p>
         </div>
       )}
-
-      {/* Priority actions (from signal computation) — kept for now, hidden when analysis exists */}
-      {/* This can be removed or merged later */}
     </div>
   );
 }

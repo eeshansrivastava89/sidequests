@@ -72,7 +72,7 @@ export function useShipped() {
 
   useEffect(() => { fetchShipped(); }, [fetchShipped]);
 
-  return { shipped, loading, refetch: fetchShipped };
+  return { shipped, loading };
 }
 
 /* ── Visit Delta ────────────────────────────────────────── */
@@ -93,17 +93,9 @@ export function useVisit() {
     }
   }, []);
 
-  const saveSnapshot = useCallback(async () => {
-    try {
-      await fetch("/api/visit", { method: "POST" });
-    } catch {
-      // Fire and forget on close
-    }
-  }, []);
-
   useEffect(() => { fetchDelta(); }, [fetchDelta]);
 
-  return { visit, loading, fetchDelta, saveSnapshot };
+  return { visit, loading, fetchDelta };
 }
 
 /* ── Dismiss Alert ──────────────────────────────────────── */

@@ -86,6 +86,7 @@ function ModelSelect({
   return (
     <Field label="Model" description={description}>
       <select
+        aria-label="Model"
         value={showCustomInput ? CUSTOM_SENTINEL : value}
         onChange={(e) => {
           if (e.target.value === CUSTOM_SENTINEL) {
@@ -129,6 +130,7 @@ export function ProviderFields({
     <>
       <Field label="Provider">
         <select
+          aria-label="Provider"
           value={provider}
           onChange={(e) => set("llmProvider", e.target.value)}
           className={selectClass}

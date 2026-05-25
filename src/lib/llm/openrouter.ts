@@ -1,6 +1,7 @@
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { SYSTEM_PROMPT, buildPrompt, parseEnrichment } from "./prompt";
 import { config } from "../config";
+import { withRetry } from "./retry";
 
 /**
  * OpenRouter provider — calls the OpenRouter chat completions API.
@@ -16,7 +17,7 @@ export const openrouterProvider: LlmProvider = {
     }
     const model = config.openrouterModel;
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await withRetry(() => fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -31,7 +32,7 @@ export const openrouterProvider: LlmProvider = {
         temperature: 0.3,
       }),
       signal: signal ?? AbortSignal.timeout(config.llmTimeout),
-    });
+    }));
 
     if (!res.ok) {
       throw new Error(`OpenRouter API error: ${res.status} ${await res.text()}`);
@@ -47,7 +48,7 @@ export const openrouterProvider: LlmProvider = {
   async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
     const apiKey = config.openrouterApiKey;
     if (!apiKey) throw new Error("openrouterApiKey is required");
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const res = await withRetry(() => fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -56,7 +57,7 @@ export const openrouterProvider: LlmProvider = {
         temperature: 0.3,
       }),
       signal: signal ?? AbortSignal.timeout(config.llmTimeout * 2),
-    });
+    }));
     if (!res.ok) throw new Error(`OpenRouter API error: ${res.status}`);
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;

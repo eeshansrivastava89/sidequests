@@ -6,9 +6,8 @@
  * Graceful fallback: if `gh` is missing or unauthed, returns empty results.
  */
 
-import { execFileSync } from "child_process";
+import { execFileSync, execFile, type ExecFileException } from "child_process";
 import { parseGitHubOwnerRepo } from "@/lib/project-helpers";
-export { parseGitHubOwnerRepo };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,18 +25,6 @@ export interface GitHubProjectData {
   repoVisibility: "public" | "private" | "not-on-github";
 }
 
-export interface GitHubSyncResult {
-  fetchedAt: string;
-  projects: Array<{ pathHash: string; data: GitHubProjectData }>;
-  skipped: number;
-  errors: number;
-}
-
-interface GitHubSyncInput {
-  pathHash: string;
-  remoteUrl: string | null;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -49,9 +36,38 @@ function runGh(...args: string[]): string | null {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-  } catch {
+  } catch (err) {
+    if (process.env.NODE_ENV !== "test") {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("not found") && !msg.includes("no such file")) {
+        console.error(`[github] gh ${args[0]} failed:`, msg.slice(0, 200));
+      }
+    }
     return null;
   }
+}
+
+async function runGhAsync(...args: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = execFile("gh", args, {
+      timeout: 10_000,
+    }, (err: ExecFileException | null, stdout: string | Buffer, stderr: string | Buffer) => {
+      if (err) {
+        if (process.env.NODE_ENV !== "test") {
+          const msg = err.message;
+          if (!msg.includes("not found") && !msg.includes("no such file")) {
+            console.error(`[github] gh ${args[0]} failed:`, msg.slice(0, 200));
+          }
+        }
+        resolve(null);
+        return;
+      }
+      const out = typeof stdout === "string" ? stdout : stdout.toString("utf-8");
+      resolve(out.trim() || null);
+    });
+    // Prevent unhandled error if spawn itself fails before callback
+    child.on("error", () => resolve(null));
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -149,56 +165,86 @@ export function fetchGitHubData(ownerRepo: { owner: string; repo: string }): Git
 }
 
 /**
- * Sync GitHub data for all projects. Skips non-GitHub projects.
- * Returns empty result (no crash) if `gh` is unavailable.
+ * Async version of fetchGitHubData — does not block the Node.js event loop.
+ * Uses execFile (async) instead of execFileSync.
  */
-export function syncAllGitHub(projects: GitHubSyncInput[]): GitHubSyncResult {
-  const fetchedAt = new Date().toISOString();
-  const result: GitHubSyncResult = { fetchedAt, projects: [], skipped: 0, errors: 0 };
+export async function fetchGitHubDataAsync(ownerRepo: { owner: string; repo: string }): Promise<GitHubProjectData> {
+  const { owner, repo } = ownerRepo;
 
-  if (!isGhAvailable()) {
-    result.skipped = projects.length;
-    return result;
-  }
-
-  for (const project of projects) {
-    const ownerRepo = project.remoteUrl ? parseGitHubOwnerRepo(project.remoteUrl) : null;
-
-    if (!ownerRepo) {
-      result.skipped++;
-      result.projects.push({
-        pathHash: project.pathHash,
-        data: {
-          openIssues: 0,
-          openPrs: 0,
-          ciStatus: "none",
-          issuesJson: null,
-          prsJson: null,
-          repoVisibility: "not-on-github",
-        },
-      });
-      continue;
+  // GraphQL: issues, PRs, visibility in one call
+  const query = `query {
+    repository(owner: "${owner}", name: "${repo}") {
+      visibility
+      issues(states: OPEN, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) {
+        totalCount
+        nodes { title number }
+      }
+      pullRequests(states: OPEN, first: 5, orderBy: {field: CREATED_AT, direction: DESC}) {
+        totalCount
+        nodes { title number }
+      }
     }
+  }`;
 
+  const graphqlResult = await runGhAsync("api", "graphql", "-f", `query=${query}`);
+
+  let openIssues = 0;
+  let openPrs = 0;
+  let issuesJson: string | null = null;
+  let prsJson: string | null = null;
+  let repoVisibility: "public" | "private" = "public";
+
+  if (graphqlResult) {
     try {
-      const data = fetchGitHubData(ownerRepo);
-      result.projects.push({ pathHash: project.pathHash, data });
-    } catch (err) {
-      result.errors++;
-      result.projects.push({
-        pathHash: project.pathHash,
-        data: {
-          openIssues: 0,
-          openPrs: 0,
-          ciStatus: "none",
-          issuesJson: null,
-          prsJson: null,
-          repoVisibility: "not-on-github",
-        },
-      });
-      console.error(`GitHub fetch failed for ${project.pathHash}:`, err);
+      const parsed = JSON.parse(graphqlResult);
+      const repoData = parsed?.data?.repository;
+      if (repoData) {
+        openIssues = repoData.issues?.totalCount ?? 0;
+        openPrs = repoData.pullRequests?.totalCount ?? 0;
+
+        const issueNodes = repoData.issues?.nodes;
+        if (Array.isArray(issueNodes) && issueNodes.length > 0) {
+          issuesJson = JSON.stringify(issueNodes.map((n: { title: string; number: number }) => ({
+            title: n.title,
+            number: n.number,
+          })));
+        }
+
+        const prNodes = repoData.pullRequests?.nodes;
+        if (Array.isArray(prNodes) && prNodes.length > 0) {
+          prsJson = JSON.stringify(prNodes.map((n: { title: string; number: number }) => ({
+            title: n.title,
+            number: n.number,
+          })));
+        }
+
+        const vis = repoData.visibility;
+        repoVisibility = vis === "PRIVATE" ? "private" : "public";
+      }
+    } catch {
+      // Parse error — fall through with defaults
     }
   }
 
-  return result;
+  // REST: CI status from latest Actions run
+  let ciStatus: CiStatus = "none";
+  const ciResult = await runGhAsync("api", `repos/${owner}/${repo}/actions/runs?per_page=1`);
+  if (ciResult) {
+    try {
+      const parsed = JSON.parse(ciResult);
+      const runs = parsed?.workflow_runs;
+      if (Array.isArray(runs) && runs.length > 0) {
+        const conclusion = runs[0].conclusion;
+        const status = runs[0].status;
+        if (conclusion === "success") ciStatus = "success";
+        else if (conclusion === "failure") ciStatus = "failure";
+        else if (status === "in_progress" || status === "queued") ciStatus = "pending";
+      }
+    } catch {
+      // Parse error — leave as "none"
+    }
+  }
+
+  return { openIssues, openPrs, ciStatus, issuesJson, prsJson, repoVisibility };
 }
+

@@ -38,6 +38,5 @@ export async function cleanDb(db: Awaited<ReturnType<typeof getTestDb>>) {
   await db.derived.deleteMany();
   await db.scan.deleteMany();
   await db.project.deleteMany();
-  await db.userPreference.deleteMany();
   await db.userVisit.deleteMany();
 }

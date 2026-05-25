@@ -33,7 +33,7 @@ export const config = {
     return getSettings().qwenCliModel;
   },
   get llmDebug(): boolean {
-    return getSettings().llmDebug ?? true;
+    return getSettings().llmDebug ?? false;
   },
   get llmOverwriteMetadata(): boolean {
     return getSettings().llmOverwriteMetadata ?? true;

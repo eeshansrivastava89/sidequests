@@ -3,14 +3,11 @@
  * All providers must return this shape.
  */
 
+import type { Insight, InsightSeverity } from "@/lib/types";
+import type { ScannedProject } from "@/lib/pipeline-native/scan";
+export type { Insight, InsightSeverity };
+
 export type LlmStatus = "building" | "shipping" | "maintaining" | "blocked" | "completed" | "idea";
-
-export type InsightSeverity = "green" | "amber" | "red";
-
-export interface Insight {
-  text: string;
-  severity: InsightSeverity;
-}
 
 export interface LlmEnrichment {
   summary: string;           // replaces purpose + pitch
@@ -26,7 +23,7 @@ export interface LlmEnrichment {
 export interface LlmInput {
   name: string;
   path: string;
-  scan: Record<string, unknown>;
+  scan: ScannedProject;
   derived: {
     statusAuto: string;
     healthScoreAuto: number;

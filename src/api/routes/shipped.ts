@@ -6,20 +6,15 @@ export const shippedRoute = Router();
 // GET /api/shipped — aggregate commit counts across the portfolio
 shippedRoute.get("/", async (_req, res) => {
   const derivedRows = await db.derived.findMany({
+    where: { project: { prunedAt: null } },
     select: {
       projectId: true,
       weekCommits: true,
       monthCommits: true,
       quarterCommits: true,
+      project: { select: { name: true } },
     },
   });
-
-  const project = await db.project.findMany({
-    where: { prunedAt: null },
-    select: { id: true, name: true },
-  });
-
-  const projectMap = new Map(project.map((p) => [p.id, p.name]));
 
   let weekTotal = 0;
   let monthTotal = 0;
@@ -31,7 +26,7 @@ shippedRoute.get("/", async (_req, res) => {
     quarterTotal += d.quarterCommits;
     return {
       id: d.projectId,
-      name: projectMap.get(d.projectId) ?? "Unknown",
+      name: d.project.name,
       weekCommits: d.weekCommits,
       monthCommits: d.monthCommits,
       quarterCommits: d.quarterCommits,

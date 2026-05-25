@@ -90,11 +90,6 @@ export type WeeklyFocus = Prisma.WeeklyFocusModel
  */
 export type DismissedAlert = Prisma.DismissedAlertModel
 /**
- * Model UserPreference
- * 
- */
-export type UserPreference = Prisma.UserPreferenceModel
-/**
  * Model PortfolioAnalysis
  * 
  */

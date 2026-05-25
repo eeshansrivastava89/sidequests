@@ -29,6 +29,9 @@ model Project {
   activity       Activity[]
   weeklyFocuses  WeeklyFocus[]
   dismissedAlerts DismissedAlert[]
+
+  @@index([prunedAt])
+  @@index([lastTouchedAt])
 }
 
 model Scan {
@@ -65,6 +68,8 @@ model Derived {
   weekCommits        Int       @default(0)   // Commits in last 7 days
   monthCommits       Int       @default(0)   // Commits in last 30 days
   quarterCommits    Int       @default(0)   // Commits in last 90 days
+
+  @@index([lastCommitDate])
 }
 
 model Llm {
@@ -133,6 +138,7 @@ model Activity {
   createdAt   DateTime @default(now())
 
   @@index([projectId, createdAt])
+  @@index([projectId])
 }
 
 model WeeklyFocus {
@@ -157,12 +163,6 @@ model DismissedAlert {
   @@unique([projectId, alertType])
 }
 
-model UserPreference {
-  id        String   @id @default(cuid())
-  key       String   @unique // e.g. "notification.quietHours", "staleness.threshold"
-  value     String   // JSON string
-  updatedAt DateTime @updatedAt
-}
 
 model PortfolioAnalysis {
   id          String   @id @default(cuid())

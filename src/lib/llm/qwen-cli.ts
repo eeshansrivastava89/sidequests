@@ -73,7 +73,7 @@ export const qwenCliProvider: LlmProvider = {
 
   async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
     const { stdout } = await runCli({
-      command: "qwen-cli",
+      command: "qwen",
       args: [],
       stdinData: prompt,
       timeoutMs: config.llmTimeout * 2,

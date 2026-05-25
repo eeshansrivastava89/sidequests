@@ -22,7 +22,7 @@ await esbuild.build({
   platform: "node",
   format: "esm",
   outfile: "dist/server.js",
-  external: ["@prisma/adapter-libsql", "libsql", "better-sqlite3", "cpu-features", "encoding"],
+  external: ["@prisma/adapter-libsql", "libsql"],
   banner: {
     js: 'import{createRequire}from"module";const require=createRequire(import.meta.url);',
   },
@@ -77,7 +77,10 @@ if (nativePackage && existsSync(`node_modules/${nativePackage}`)) {
   console.warn(`⚠ No native @libsql binding found for ${key}, skipping`);
 }
 
-// 5. Copy Prisma generated client
+// 5. Copy prompt templates
+cpSync("src/config/prompts", join(distDir, "config", "prompts"), { recursive: true });
+
+// 6. Copy Prisma generated client
 cpSync("src/generated/prisma", join(nodeModulesDir, "src", "generated", "prisma"), { recursive: true });
 
 // 6. Clean up dev-only files from dist

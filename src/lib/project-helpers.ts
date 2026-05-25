@@ -43,6 +43,22 @@ export function formatRelativeTime(iso: string): string {
 }
 
 /**
+ * Format a "last visit" date as a human-friendly relative string.
+ * Returns "never" for null, then "just now" / "2h ago" / "yesterday" / "5d ago" / "a while ago".
+ */
+export function formatLastVisit(dateStr: string | null): string {
+  if (!dateStr) return "never";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) return "just now";
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days}d ago`;
+  return "a while ago";
+}
+
+/**
  * Parse a GitHub remote URL (SSH or HTTPS) into owner/repo.
  */
 export function parseGitHubOwnerRepo(remoteUrl: string | null | undefined): { owner: string; repo: string } | null {

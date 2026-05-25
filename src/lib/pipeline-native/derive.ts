@@ -29,7 +29,6 @@ export interface ScanProject {
   cicd: Record<string, boolean>;
   deployment: Record<string, boolean>;
   services: string[];
-  [key: string]: unknown;
 }
 
 export interface DeriveProject {
@@ -45,10 +44,6 @@ export interface DeriveProject {
   tags: string[];
 }
 
-export interface DeriveOutput {
-  derivedAt: string;
-  projects: DeriveProject[];
-}
 
 export function deriveStatus(daysInactive: number | null): DeriveProject["statusAuto"] {
   if (daysInactive === null) return "archived";
@@ -147,9 +142,3 @@ export function deriveProject(project: ScanProject): DeriveProject {
   };
 }
 
-export function deriveAll(scanOutput: { scannedAt: string; projects: ScanProject[] }): DeriveOutput {
-  return {
-    derivedAt: scanOutput.scannedAt,
-    projects: scanOutput.projects.map(deriveProject),
-  };
-}

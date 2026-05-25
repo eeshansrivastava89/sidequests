@@ -103,6 +103,213 @@ export interface MergedProject {
 }
 
 
+// ── Portfolio stats ──────────────────────────────────────────────────────
+
+export interface VelocityEntry {
+  id: string;
+  name: string;
+  week: number;
+  month: number;
+  quarter: number;
+  healthScore: number;
+  status: string;
+}
+
+export interface PortfolioStats {
+  statusCounts: Record<string, number>;
+  velocity: VelocityEntry[];
+  totals: {
+    projects: number;
+    weekCommits: number;
+    monthCommits: number;
+    quarterCommits: number;
+  };
+  momentum: {
+    accelerating: number;
+    steady: number;
+    decelerating: number;
+    stalled: number;
+  };
+  momentumProjects: Record<string, string[]>;
+  signals: {
+    dirty: number;
+    ciFailing: number;
+    openIssues: number;
+    notOnGitHub: number;
+  };
+  topActive: VelocityEntry[];
+  stalled: VelocityEntry[];
+}
+
+/**
+ * Pure function: compute portfolio statistics from a merged project list.
+ * No DB access — call mergeAllProjects() first, then pass the result here.
+ */
+export function computePortfolioStats(projects: MergedProject[]): PortfolioStats {
+  // Status distribution
+  const statusCounts: Record<string, number> = {};
+  for (const p of projects) {
+    const s = p.llmStatus ?? p.status;
+    statusCounts[s] = (statusCounts[s] ?? 0) + 1;
+  }
+
+  // Commit velocity per project
+  const velocity: VelocityEntry[] = projects
+    .filter((p) => p.status !== "archived")
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      week: p.weekCommits,
+      month: p.monthCommits,
+      quarter: p.quarterCommits,
+      healthScore: p.healthScore,
+      status: p.llmStatus ?? p.status,
+    }))
+    .sort((a, b) => b.quarter - a.quarter);
+
+  // Momentum classification
+  const momentum = { accelerating: 0, steady: 0, decelerating: 0, stalled: 0 };
+  const momentumProjects: Record<string, string[]> = {
+    accelerating: [],
+    steady: [],
+    decelerating: [],
+    stalled: [],
+  };
+
+  for (const p of velocity) {
+    let m: string;
+    if (p.quarter === 0) {
+      m = "stalled";
+    } else if (p.week >= (p.month / 4) * 1.3) {
+      m = "accelerating";
+    } else if (p.week <= (p.month / 4) * 0.5) {
+      m = "decelerating";
+    } else {
+      m = "steady";
+    }
+    momentum[m as keyof typeof momentum]++;
+    momentumProjects[m as keyof typeof momentumProjects].push(p.name);
+  }
+
+  // Totals
+  const totals = {
+    projects: projects.length,
+    weekCommits: velocity.reduce((s, p) => s + p.week, 0),
+    monthCommits: velocity.reduce((s, p) => s + p.month, 0),
+    quarterCommits: velocity.reduce((s, p) => s + p.quarter, 0),
+  };
+
+  // Signals
+  const dirty = projects.filter((p) => p.isDirty).length;
+  const ciFailing = projects.filter((p) => p.ciStatus === "failure").length;
+  const openIssues = projects.reduce((s, p) => s + p.openIssues, 0);
+  const notOnGitHub = projects.filter((p) => p.repoVisibility === "not-on-github").length;
+
+  // Top projects by commits
+  const topActive = velocity.filter((p) => p.quarter > 0).slice(0, 8);
+  const stalled = velocity.filter((p) => p.quarter === 0);
+
+  return {
+    statusCounts,
+    velocity,
+    totals,
+    momentum,
+    momentumProjects,
+    signals: { dirty, ciFailing, openIssues, notOnGitHub },
+    topActive,
+    stalled,
+  };
+}
+
+// ── Visit delta ────────────────────────────────────────────────────────────
+
+/**
+ * Lightweight snapshot shape used for visit-delta comparison.
+ * Only the fields that matter for "what changed since last visit".
+ */
+export interface VisitSnapshot {
+  id: string;
+  name: string;
+  status: string;
+  healthScore: number;
+  weekCommits: number;
+  monthCommits: number;
+}
+
+/**
+ * Delta between two visit snapshots.
+ * - added:   project IDs present in current but not previous
+ * - removed: project IDs present in previous but not current
+ * - changed: per-field changes for projects present in both
+ */
+export interface VisitDelta {
+  added: string[];
+  removed: string[];
+  changed: Array<{ id: string; name: string; field: string; from: unknown; to: unknown }>;
+}
+
+/**
+ * Map a full MergedProject[] down to the lightweight snapshot shape
+ * used for visit-delta comparison and persistence.
+ */
+export function snapshotFromProjects(projects: MergedProject[]): VisitSnapshot[] {
+  return projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    status: p.status,
+    healthScore: p.healthScore,
+    weekCommits: p.weekCommits,
+    monthCommits: p.monthCommits,
+  }));
+}
+
+/**
+ * Pure-function delta computation between a current and previous visit snapshot.
+ * Returns added/removed project IDs plus per-field changes for surviving projects.
+ */
+export function computeVisitDelta(
+  current: VisitSnapshot[],
+  previous: VisitSnapshot[],
+): VisitDelta {
+  const previousMap = new Map(previous.map((p) => [p.id, p]));
+  const currentIds = new Set(current.map((p) => p.id));
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  const changed: Array<{ id: string; name: string; field: string; from: unknown; to: unknown }> = [];
+
+  // New projects
+  for (const p of current) {
+    if (!previousMap.has(p.id)) added.push(p.id);
+  }
+
+  // Removed projects
+  for (const p of previous) {
+    if (!currentIds.has(p.id)) removed.push(p.id);
+  }
+
+  // Changed fields
+  for (const p of current) {
+    const prev = previousMap.get(p.id);
+    if (!prev) continue;
+
+    if (p.status !== prev.status) {
+      changed.push({ id: p.id, name: p.name, field: "status", from: prev.status, to: p.status });
+    }
+    if (p.healthScore !== prev.healthScore) {
+      changed.push({ id: p.id, name: p.name, field: "healthScore", from: prev.healthScore, to: p.healthScore });
+    }
+    if (p.weekCommits !== prev.weekCommits) {
+      changed.push({ id: p.id, name: p.name, field: "weekCommits", from: prev.weekCommits, to: p.weekCommits });
+    }
+    if (p.monthCommits !== prev.monthCommits) {
+      changed.push({ id: p.id, name: p.name, field: "monthCommits", from: prev.monthCommits, to: p.monthCommits });
+    }
+  }
+
+  return { added, removed, changed };
+}
+
 export function parseJson<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback;
   try {
@@ -132,8 +339,29 @@ export async function mergeAllProjects(): Promise<MergedProject[]> {
   return projects.map(buildMergedView);
 }
 
+/**
+ * Lean variant: skips scan.rawJson and scan.metaJson — use for endpoints
+ * that don't need the full raw scan blob (portfolio stats, visit delta).
+ */
+export async function mergeAllProjectsLean(): Promise<MergedProject[]> {
+  const projects = await db.project.findMany({
+    where: { prunedAt: null },
+    include: {
+      scan: { select: { scannedAt: true } },
+      derived: true,
+      llm: true,
+      override: true,
+      metadata: true,
+      github: true,
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return projects.map(buildMergedView);
+}
+
 export type ProjectWithRelations = Project & {
-  scan: { rawJson: string; metaJson: string | null; scannedAt: Date } | null;
+  scan: { rawJson?: string; metaJson?: string | null; scannedAt: Date } | null;
   derived: {
     statusAuto: string;
     healthScoreAuto: number;

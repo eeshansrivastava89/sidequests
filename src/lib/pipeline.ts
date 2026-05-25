@@ -1,17 +1,19 @@
 import { createHash } from "crypto";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { config } from "./config";
 import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
 import { tryParseLlmJson } from "./llm/prompt";
-import { listProjectDirs, scanProject } from "./pipeline-native/scan";
+import { listProjectDirs, scanProject, type ScannedProject } from "./pipeline-native/scan";
 import { deriveProject, type ScanProject as DeriveInput } from "./pipeline-native/derive";
-import { fetchGitHubData, isGhAvailable, parseGitHubOwnerRepo } from "./pipeline-native/github";
+import { fetchGitHubDataAsync, isGhAvailable } from "./pipeline-native/github";
+import { parseGitHubOwnerRepo } from "./project-helpers";
 import { mergeAllProjects } from "./merge";
 
-// Load portfolio prompt from config file
-const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROMPTS_DIR = join(__dirname, "..", "config", "prompts");
 const PORTFOLIO_SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "portfolio-system.md"), "utf-8").trim();
 
 
@@ -99,55 +101,6 @@ export async function runPortfolioAnalysis(signal?: AbortSignal): Promise<void> 
     const durationMs = Date.now() - startTime;
     console.error(`[pipeline] [portfolio] Failed after ${(durationMs / 1000).toFixed(1)}s:`, err instanceof Error ? err.message : String(err));
   }
-}
-
-/** Validate scan output shape. */
-export function validateScanOutput(data: unknown): { scannedAt: string; projectCount: number; projects: Array<Record<string, unknown>> } {
-  if (!data || typeof data !== "object") {
-    throw new Error("scan: output is not an object");
-  }
-  const obj = data as Record<string, unknown>;
-  if (typeof obj.scannedAt !== "string") {
-    throw new Error("scan: missing or invalid 'scannedAt' (expected string)");
-  }
-  if (typeof obj.projectCount !== "number") {
-    throw new Error("scan: missing or invalid 'projectCount' (expected number)");
-  }
-  if (!Array.isArray(obj.projects)) {
-    throw new Error("scan: missing or invalid 'projects' (expected array)");
-  }
-  for (let i = 0; i < obj.projects.length; i++) {
-    const p = obj.projects[i] as Record<string, unknown>;
-    if (typeof p.name !== "string") throw new Error(`scan: projects[${i}] missing 'name'`);
-    if (typeof p.path !== "string") throw new Error(`scan: projects[${i}] missing 'path'`);
-    if (typeof p.pathHash !== "string") throw new Error(`scan: projects[${i}] missing 'pathHash'`);
-  }
-  return data as { scannedAt: string; projectCount: number; projects: Array<Record<string, unknown>> };
-}
-
-/** Validate derive output shape. */
-export function validateDeriveOutput(data: unknown): { derivedAt: string; projects: Array<Record<string, unknown>> } {
-  if (!data || typeof data !== "object") {
-    throw new Error("derive: output is not an object");
-  }
-  const obj = data as Record<string, unknown>;
-  if (typeof obj.derivedAt !== "string") {
-    throw new Error("derive: missing or invalid 'derivedAt' (expected string)");
-  }
-  if (!Array.isArray(obj.projects)) {
-    throw new Error("derive: missing or invalid 'projects' (expected array)");
-  }
-  for (let i = 0; i < obj.projects.length; i++) {
-    const p = obj.projects[i] as Record<string, unknown>;
-    if (typeof p.pathHash !== "string") throw new Error(`derive: projects[${i}] missing 'pathHash'`);
-    if (typeof p.statusAuto !== "string") throw new Error(`derive: projects[${i}] missing 'statusAuto'`);
-    if (typeof p.healthScoreAuto !== "number") throw new Error(`derive: projects[${i}] missing 'healthScoreAuto'`);
-    if (typeof p.hygieneScoreAuto !== "number") throw new Error(`derive: projects[${i}] missing 'hygieneScoreAuto'`);
-    if (typeof p.momentumScoreAuto !== "number") throw new Error(`derive: projects[${i}] missing 'momentumScoreAuto'`);
-    if (typeof p.scoreBreakdownJson !== "object" || p.scoreBreakdownJson === null) throw new Error(`derive: projects[${i}] missing 'scoreBreakdownJson'`);
-    if (!Array.isArray(p.tags)) throw new Error(`derive: projects[${i}] missing 'tags'`);
-  }
-  return data as { derivedAt: string; projects: Array<Record<string, unknown>> };
 }
 
 /** Events emitted during the refresh pipeline. */
@@ -240,7 +193,7 @@ export async function runRefreshPipeline(
     dir: typeof projectDirs[number];
     projectId: string;
     name: string;
-    scanned: Record<string, unknown>;
+    scanned: ScannedProject;
     derived?: { statusAuto: string; healthScoreAuto: number; hygieneScoreAuto: number; momentumScoreAuto: number; tags: string[] };
     github?: {
       openIssues: number;
@@ -277,10 +230,10 @@ export async function runRefreshPipeline(
     const scanned = scanProject(dir.absPath);
 
     // 3b. Derive
-    const derived = deriveProject(scanned as unknown as DeriveInput);
+    const derived = deriveProject(scanned);
 
     // 3c. DB upsert (Project, Scan, Derived)
-    const lastCommitDateStr = scanned.lastCommitDate as string | null;
+    const lastCommitDateStr = scanned.lastCommitDate;
     const lastTouchedAt = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
 
     const project = await db.project.upsert({
@@ -335,21 +288,21 @@ export async function runRefreshPipeline(
       const derivedJsonStr = JSON.stringify({ tags: derived.tags });
       const scoreBreakdownStr = JSON.stringify(derived.scoreBreakdownJson);
 
-      const isDirty = (scanned.isDirty as boolean) ?? false;
-      const dirtyFileCount = ((scanned.untrackedCount as number) ?? 0) + ((scanned.modifiedCount as number) ?? 0) + ((scanned.stagedCount as number) ?? 0);
-      const ahead = (scanned.ahead as number) ?? 0;
-      const behind = (scanned.behind as number) ?? 0;
+      const isDirty = scanned.isDirty;
+      const dirtyFileCount = (scanned.untrackedCount ?? 0) + (scanned.modifiedCount ?? 0) + (scanned.stagedCount ?? 0);
+      const ahead = scanned.ahead ?? 0;
+      const behind = scanned.behind ?? 0;
       const framework = null;
-      const branchName = (scanned.branch as string) ?? null;
+      const branchName = scanned.branch ?? null;
       const lastCommitDate = lastCommitDateStr ? new Date(lastCommitDateStr) : null;
-      const locEstimate = (scanned.locEstimate as number) ?? 0;
-      const locBk = (scanned.locBreakdown as { code?: number; docs?: number; generated?: number }) ?? {};
+      const locEstimate = scanned.locEstimate ?? 0;
+      const locBk = scanned.locBreakdown ?? {};
       const locCode = locBk.code ?? 0;
       const locDocs = locBk.docs ?? 0;
       const locGenerated = locBk.generated ?? 0;
-      const weekCommits = (scanned.weekCommits as number) ?? 0;
-      const monthCommits = (scanned.monthCommits as number) ?? 0;
-      const quarterCommits = (scanned.quarterCommits as number) ?? 0;
+      const weekCommits = scanned.weekCommits ?? 0;
+      const monthCommits = scanned.monthCommits ?? 0;
+      const quarterCommits = scanned.quarterCommits ?? 0;
 
       await db.derived.upsert({
         where: { projectId: project.id },
@@ -408,7 +361,7 @@ export async function runRefreshPipeline(
       const remoteUrl = scanned.remoteUrl as string | null;
       const ownerRepo = remoteUrl ? parseGitHubOwnerRepo(remoteUrl) : null;
       if (ownerRepo) {
-        const ghData = fetchGitHubData(ownerRepo);
+        const ghData = await fetchGitHubDataAsync(ownerRepo);
         await db.gitHub.upsert({
           where: { projectId: project.id },
           create: {
@@ -459,7 +412,7 @@ export async function runRefreshPipeline(
       dir,
       projectId: project.id,
       name,
-      scanned: scanned as Record<string, unknown>,
+      scanned,
       derived: derived ? {
         statusAuto: derived.statusAuto,
         healthScoreAuto: derived.healthScoreAuto,

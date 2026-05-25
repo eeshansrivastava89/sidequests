@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
+import { gt as semverGt } from "semver";
 
 import { bootstrapDb } from "./bootstrap-db.mjs";
 import { openBrowser } from "./open-browser.mjs";
@@ -150,10 +151,7 @@ console.log(`\n${bold("Sidequests")} is running at ${green(serverUrl)}\n`);
     const data = await res.json();
     const latest = data.version;
     if (latest && latest !== pkg.version) {
-      const l = latest.split(".").map(Number);
-      const c = pkg.version.split(".").map(Number);
-      const newer = l[0] > c[0] || (l[0] === c[0] && l[1] > c[1]) || (l[0] === c[0] && l[1] === c[1] && l[2] > c[2]);
-      if (newer) {
+      if (semverGt(latest, pkg.version)) {
         console.log(`  ${yellow("Update available:")} ${pkg.version} → ${green(latest)}`);
         console.log(`  Run: ${bold("npx @eeshans/sidequests@latest")}\n`);
       }

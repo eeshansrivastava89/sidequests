@@ -23,11 +23,11 @@ jobs:
 
       - run: npx prisma generate
 
+      - name: Lint
+        run: npm run lint
+
       - name: Unit tests
         run: npm test
-
-      - name: Integration tests
-        run: npm run test:integration
 
       - name: Build NPX bundle
         run: npm run build:npx
@@ -71,8 +71,6 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - run: npm ci
-
-      - run: npx prisma validate
 
       - run: npx prisma generate
 

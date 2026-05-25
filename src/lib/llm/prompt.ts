@@ -1,22 +1,42 @@
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
 import { config } from "../config";
 
-const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROMPTS_DIR = join(__dirname, "..", "..", "config", "prompts");
 
 /** Try to parse a JSON object from an LLM response.
  * Handles string responses, markdown fences, and partial JSON wrapping.
+ * Uses balanced-brace matching to avoid greedy overcapture.
  * Returns null if parsing fails entirely. */
 export function tryParseLlmJson(raw: unknown): Record<string, unknown> | null {
   if (typeof raw === "object" && raw !== null) return raw as Record<string, unknown>;
   if (typeof raw !== "string") return null;
+  // Strip markdown code fences
+  const stripped = raw.replace(/```(?:json)?\s*/g, "").replace(/\s*```/g, "").trim();
   try {
-    return JSON.parse(raw);
+    return JSON.parse(stripped);
   } catch {
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) {
-      try { return JSON.parse(match[0]); } catch { return null; }
+    // Find the first balanced brace group
+    const firstBrace = stripped.indexOf("{");
+    if (firstBrace === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = firstBrace; i < stripped.length; i++) {
+      const ch = stripped[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\") { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+      if (depth === 0) {
+        const candidate = stripped.slice(firstBrace, i + 1);
+        try { return JSON.parse(candidate); } catch { return null; }
+      }
     }
     return null;
   }

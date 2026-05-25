@@ -75,24 +75,45 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
   const totalCount = all.length;
   const doneCount = completed.length;
 
-  // Build name→LLM status lookup for AI scan states
-  const llmByName = new Map<string, string>();
+  // Build name→status lookups from refreshState.projects (tracks both phases)
+  const storeStatusByName = new Map<string, string>();
+  const llmStatusByName = new Map<string, string>();
   for (const prog of refreshState.projects.values()) {
-    if (prog.name) llmByName.set(prog.name, prog.llmStatus);
+    if (prog.name) {
+      storeStatusByName.set(prog.name, prog.storeStatus);
+      llmStatusByName.set(prog.name, prog.llmStatus);
+    }
   }
 
-  // Currently scanning: first project not yet completed
-  const scanningName = refreshState.active
-    ? all.find((n) => !completedSet.has(n)) ?? null
-    : null;
-
-  // AI scanning count
+  // Derive per-phase progress from refreshState.projects
+  const hasLlmPhase = !refreshState.skipLlm && refreshState.active;
+  let storeDoneCount = 0;
+  let llmDoneCount = 0;
+  let llmErrorCount = 0;
   let aiScanningCount = 0;
-  let errorCount = 0;
-  for (const [, prog] of refreshState.projects) {
+  for (const prog of refreshState.projects.values()) {
+    if (prog.storeStatus === "done") storeDoneCount++;
+    if (prog.llmStatus === "done" || prog.llmStatus === "skipped") llmDoneCount++;
+    if (prog.llmStatus === "error") llmErrorCount++;
     if (prog.llmStatus === "running") aiScanningCount++;
-    else if (prog.llmStatus === "error") errorCount++;
   }
+  const errorCount = llmErrorCount;
+
+  // During AI scan, show LLM progress; during fast scan, show store progress
+  const showLlmProgress = hasLlmPhase && storeDoneCount === totalCount;
+  const progressDone = showLlmProgress ? llmDoneCount + llmErrorCount : storeDoneCount;
+  const progressTotal = totalCount;
+
+  // Currently scanning: first project not yet completed in the current phase
+  const scanningName = refreshState.active
+    ? all.find((n) => {
+        if (showLlmProgress) {
+          const ls = llmStatusByName.get(n);
+          return ls === "pending" || ls === "running";
+        }
+        return !completedSet.has(n);
+      }) ?? null
+    : null;
 
   const refreshDone = !refreshState.active && refreshState.summary !== null;
   const isFastScanOnly = refreshDone && (refreshState.summary?.llmSkipped ?? 0) === totalCount && totalCount > 0;
@@ -103,6 +124,8 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
       <button
         type="button"
         onClick={() => setExpanded(true)}
+        aria-label="Show activity log"
+        aria-expanded="false"
         className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-card border border-border px-4 py-2.5 shadow-lg hover:bg-accent transition-colors"
       >
         <Activity className="size-4 text-muted-foreground" />
@@ -112,7 +135,7 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
         )}
         {totalCount > 0 && (
           <span className="text-xs text-muted-foreground tabular-nums">
-            {doneCount}/{totalCount}
+            {progressDone}/{progressTotal}
           </span>
         )}
       </button>
@@ -135,6 +158,7 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
           onClick={() => setExpanded(false)}
           className="inline-flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           aria-label="Minimize activity log"
+          aria-expanded="true"
         >
           <ChevronDown className="size-4" />
         </button>
@@ -151,8 +175,9 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
             <div className="flex items-center justify-between text-xs mt-1">
               <span className="text-muted-foreground">Progress</span>
               <span className="tabular-nums text-foreground">
-                {doneCount + errorCount} / {totalCount}
-                {aiScanningCount > 0 && <span className="text-purple-400 ml-1">({aiScanningCount} AI scanning)</span>}
+                {progressDone} / {progressTotal}
+                {showLlmProgress && <span className="text-purple-400 ml-1">AI scan</span>}
+                {!showLlmProgress && aiScanningCount > 0 && <span className="text-purple-400 ml-1">({aiScanningCount} AI scanning)</span>}
               </span>
             </div>
           )}
@@ -197,8 +222,15 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
           <div className="py-1">
             {all.map((name) => {
               let status: string;
-              if (completedSet.has(name)) {
-                const llmStatus = llmByName.get(name);
+              const llmStatus = llmStatusByName.get(name);
+              if (showLlmProgress) {
+                if (llmStatus === "running") status = "ai-scanning";
+                else if (llmStatus === "error") status = "error";
+                else if (llmStatus === "skipped") status = "skipped";
+                else if (llmStatus === "done") status = "done";
+                else if (name === scanningName) status = "ai-scanning";
+                else status = "pending";
+              } else if (completedSet.has(name)) {
                 if (llmStatus === "running") status = "ai-scanning";
                 else if (llmStatus === "error") status = "error";
                 else if (llmStatus === "skipped") status = "skipped";

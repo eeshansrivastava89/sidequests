@@ -223,23 +223,31 @@ export function useRefresh(onComplete: () => void, callbacks?: Omit<UseRefreshCa
   const firstStoreCompleteRef = useRef(false);
   const projectCountRef = useRef(0);
   const skipLlmRef = useRef(false);
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [scanProgress, setScanProgress] = useState<ScanProgress>({ all: [], completed: [] });
 
   const callbacksRef = useRef(callbacks);
   callbacksRef.current = callbacks;
 
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   const handleEvent = useCallback((type: string, raw: string) => {
     setState((s) => reduceRefreshEvent(s, type, raw));
-    // Refetch on every project_complete — natural stagger, no debounce needed
+    // Debounce refetches: batch rapid project_complete events into one call
     if (type === "project_complete") {
-      onComplete();
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+      refetchTimerRef.current = setTimeout(() => {
+        refetchTimerRef.current = null;
+        onCompleteRef.current();
+      }, 150);
     }
     // Also refetch on first enumerate_complete for initial data
     if (type === "enumerate_complete" && !hydratedCoreRef.current) {
       hydratedCoreRef.current = true;
     }
-  }, [onComplete]);
+  }, []);
 
   const start = useCallback((options?: { skipLlm?: boolean; selectedNames?: string[] }) => {
     if (state.active) return;
@@ -314,7 +322,7 @@ export function useRefresh(onComplete: () => void, callbacks?: Omit<UseRefreshCa
         const data = JSON.parse(e.data);
         callbacksRef.current?.onScanDone?.(data);
       } catch {}
-      onComplete();
+      onCompleteRef.current();
       es.close();
     });
 
@@ -349,7 +357,7 @@ export function useRefresh(onComplete: () => void, callbacks?: Omit<UseRefreshCa
         phase: "Cancelled",
       });
     });
-  }, [state.active, onComplete, handleEvent]);
+  }, [state.active, handleEvent]);
 
   // Cleanup on unmount
   useEffect(() => {

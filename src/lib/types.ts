@@ -1,6 +1,8 @@
+export type InsightSeverity = "green" | "amber" | "red";
+
 export interface Insight {
   text: string;
-  severity: "green" | "amber" | "red";
+  severity: InsightSeverity;
 }
 
 /** Priority action from the API (computed per project). */

@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { gt as semverGt } from "semver";
 
 interface VersionInfo {
   current: string;
@@ -12,7 +14,8 @@ let cache: { latest: string; fetchedAt: number } | null = null;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 function getCurrentVersion(): string {
-  const pkgPath = join(process.cwd(), "package.json");
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const pkgPath = join(__dirname, "..", "..", "..", "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
   return pkg.version;
 }
@@ -43,13 +46,7 @@ async function fetchLatestVersion(): Promise<string | null> {
 }
 
 function isNewer(latest: string, current: string): boolean {
-  const l = latest.split(".").map(Number);
-  const c = current.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((l[i] ?? 0) > (c[i] ?? 0)) return true;
-    if ((l[i] ?? 0) < (c[i] ?? 0)) return false;
-  }
-  return false;
+  return semverGt(latest, current);
 }
 
 export const versionRoute = Router();

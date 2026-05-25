@@ -200,8 +200,11 @@ describe("pipeline parity — TypeScript derive vs Python golden baseline", () =
   it("TS derive produces identical output to Python golden fixture", async () => {
     const scanInput = JSON.parse(fs.readFileSync(SCAN_INPUT, "utf-8"));
     const expected = JSON.parse(fs.readFileSync(DERIVE_EXPECTED, "utf-8"));
-    const { deriveAll } = await import("@/lib/pipeline-native/derive");
-    const actual = deriveAll(scanInput);
+    const { deriveProject } = await import("@/lib/pipeline-native/derive");
+    const actual = {
+      derivedAt: scanInput.scannedAt,
+      projects: scanInput.projects.map(deriveProject),
+    };
     expect(actual).toEqual(expected);
   });
 
@@ -229,18 +232,22 @@ describe("pipeline parity — TypeScript derive vs Python golden baseline", () =
 });
 
 describe("pipeline parity — TS scan error semantics", () => {
-  it("scanAll throws on invalid root (matching Python error behavior)", async () => {
-    const { scanAll } = await import("@/lib/pipeline-native/scan");
-    expect(() => scanAll("/nonexistent/path/that/does/not/exist", [])).toThrow("Scan root not found");
+  it("scanProject handles nonexistent path gracefully", async () => {
+    const { scanProject } = await import("@/lib/pipeline-native/scan");
+    // scanProject doesn't throw — it returns data even for non-git dirs
+    const result = scanProject("/nonexistent/path/that/does/not/exist");
+    expect(result).toBeDefined();
+    expect(result.pathHash).toBeTypeOf("string");
   });
 });
 
 describe("pipeline parity — LOC counting", () => {
   it("TS locEstimate matches Python locEstimate for fixture projects", async () => {
-    const { scanAll } = await import("@/lib/pipeline-native/scan");
+    const { listProjectDirs, scanProject } = await import("@/lib/pipeline-native/scan");
     const fixturesDir = path.resolve(process.cwd(), "pipeline/fixtures");
 
-    const tsOutput = scanAll(fixturesDir, []);
+    const dirs = listProjectDirs(fixturesDir, [], true);
+    const tsProjects = dirs.map((d) => scanProject(d.absPath));
     const pyOutput = JSON.parse(
       execFileSync("python3", [
         path.resolve(process.cwd(), "pipeline/scan.py"),
@@ -251,7 +258,7 @@ describe("pipeline parity — LOC counting", () => {
 
     for (const pyProject of pyOutput.projects) {
       const py = pyProject as Record<string, unknown>;
-      const ts = tsOutput.projects.find((p) => p.name === py.name)!;
+      const ts = tsProjects.find((p) => p.name === py.name)!;
       expect(ts.locEstimate).toBe(py.locEstimate);
     }
   });
@@ -259,10 +266,11 @@ describe("pipeline parity — LOC counting", () => {
 
 describe("pipeline parity — TypeScript scan vs Python structural baseline", () => {
   it("TS scan produces same key structure as Python scan", async () => {
-    const { scanAll } = await import("@/lib/pipeline-native/scan");
+    const { listProjectDirs, scanProject } = await import("@/lib/pipeline-native/scan");
     const fixturesDir = path.resolve(process.cwd(), "pipeline/fixtures");
 
-    const tsOutput = scanAll(fixturesDir, []);
+    const dirs = listProjectDirs(fixturesDir, [], true);
+    const tsProjects = dirs.map((d) => scanProject(d.absPath));
     const pyOutput = JSON.parse(
       execFileSync("python3", [
         path.resolve(process.cwd(), "pipeline/scan.py"),
@@ -272,16 +280,16 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
     );
 
     // Same number of projects
-    expect(tsOutput.projectCount).toBe(pyOutput.projectCount);
+    expect(tsProjects.length).toBe(pyOutput.projectCount);
 
     // Same project names (sorted)
-    const tsNames = tsOutput.projects.map((p) => p.name).sort();
+    const tsNames = tsProjects.map((p) => p.name).sort();
     const pyNames = pyOutput.projects.map((p: Record<string, unknown>) => p.name).sort();
     expect(tsNames).toEqual(pyNames);
 
     // Same keys per project (normalized — same structure)
-    for (let i = 0; i < tsOutput.projects.length; i++) {
-      const tsProject = tsOutput.projects.find((p) => p.name === pyOutput.projects[i].name)!;
+    for (let i = 0; i < tsProjects.length; i++) {
+      const tsProject = tsProjects.find((p) => p.name === pyOutput.projects[i].name)!;
       const pyProject = pyOutput.projects[i];
       // TS scanner has additional keys not in Python scanner (e.g. locBreakdown)
       const tsKeys = Object.keys(tsProject).sort();
@@ -292,10 +300,11 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
   });
 
   it("TS scan produces same pathHash as Python scan", async () => {
-    const { scanAll } = await import("@/lib/pipeline-native/scan");
+    const { listProjectDirs, scanProject } = await import("@/lib/pipeline-native/scan");
     const fixturesDir = path.resolve(process.cwd(), "pipeline/fixtures");
 
-    const tsOutput = scanAll(fixturesDir, []);
+    const dirs = listProjectDirs(fixturesDir, [], true);
+    const tsProjects = dirs.map((d) => scanProject(d.absPath));
     const pyOutput = JSON.parse(
       execFileSync("python3", [
         path.resolve(process.cwd(), "pipeline/scan.py"),
@@ -305,7 +314,7 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
     );
 
     for (const pyProject of pyOutput.projects) {
-      const tsProject = tsOutput.projects.find(
+      const tsProject = tsProjects.find(
         (p) => p.name === (pyProject as Record<string, unknown>).name
       );
       expect(tsProject).toBeDefined();
@@ -314,10 +323,11 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
   });
 
   it("TS scan produces matching non-host-dependent values", async () => {
-    const { scanAll } = await import("@/lib/pipeline-native/scan");
+    const { listProjectDirs, scanProject } = await import("@/lib/pipeline-native/scan");
     const fixturesDir = path.resolve(process.cwd(), "pipeline/fixtures");
 
-    const tsOutput = scanAll(fixturesDir, []);
+    const dirs = listProjectDirs(fixturesDir, [], true);
+    const tsProjects = dirs.map((d) => scanProject(d.absPath));
     const pyOutput = JSON.parse(
       execFileSync("python3", [
         path.resolve(process.cwd(), "pipeline/scan.py"),
@@ -328,7 +338,7 @@ describe("pipeline parity — TypeScript scan vs Python structural baseline", ()
 
     for (const pyProject of pyOutput.projects) {
       const py = pyProject as Record<string, unknown>;
-      const ts = tsOutput.projects.find((p) => p.name === py.name)!;
+      const ts = tsProjects.find((p) => p.name === py.name)!;
 
       // Deterministic fields that must match exactly
       expect(ts.path).toBe(py.path);

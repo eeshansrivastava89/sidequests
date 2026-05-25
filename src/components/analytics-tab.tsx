@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { formatLastVisit } from "@/lib/project-helpers";
 import {
   BarChart3,
   Activity,
@@ -166,18 +167,6 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 
 /* ── Visit Delta ─────────────────────────────────────────── */
 
-function formatLastVisit(dateStr: string | null): string {
-  if (!dateStr) return "never";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return "just now";
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
-  return "a while ago";
-}
-
 function VisitDeltaDetail({ visit, projects, loading }: { visit: VisitDelta | null; projects: Project[]; loading: boolean }) {
   if (loading) return <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>;
   if (!visit || visit.firstVisit) return <span className="text-xs text-muted-foreground">Your first visit — next time you'll see what changed.</span>;
@@ -265,7 +254,7 @@ export function AnalyticsTab({
       })
       .catch(() => {})
       .finally(() => setStatsLoading(false));
-  }, [projects]);
+  }, []);
 
   if (statsLoading) {
     return (

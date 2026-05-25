@@ -1,6 +1,7 @@
 import type { LlmProvider, LlmInput, LlmEnrichment } from "./provider";
 import { SYSTEM_PROMPT, buildPrompt, parseEnrichment } from "./prompt";
 import { config } from "../config";
+import { withRetry } from "./retry";
 
 /**
  * Ollama provider — calls a local Ollama instance.
@@ -13,7 +14,7 @@ export const ollamaProvider: LlmProvider = {
     const baseUrl = config.ollamaUrl;
     const model = config.ollamaModel;
 
-    const res = await fetch(`${baseUrl}/api/chat`, {
+    const res = await withRetry(() => fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -25,7 +26,7 @@ export const ollamaProvider: LlmProvider = {
         ],
       }),
       signal: signal ?? AbortSignal.timeout(config.llmTimeout),
-    });
+    }));
 
     if (!res.ok) {
       throw new Error(`Ollama API error: ${res.status} ${await res.text()}`);
@@ -40,7 +41,7 @@ export const ollamaProvider: LlmProvider = {
 
   async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
     const baseUrl = config.ollamaUrl;
-    const res = await fetch(`${baseUrl}/api/chat`, {
+    const res = await withRetry(() => fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -49,7 +50,7 @@ export const ollamaProvider: LlmProvider = {
         messages: [{ role: "user", content: prompt }],
       }),
       signal: signal ?? AbortSignal.timeout(config.llmTimeout * 2),
-    });
+    }));
     if (!res.ok) throw new Error(`Ollama API error: ${res.status}`);
     const data = await res.json();
     const content = data.message?.content;

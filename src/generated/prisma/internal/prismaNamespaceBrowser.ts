@@ -61,7 +61,6 @@ export const ModelName = {
   Activity: 'Activity',
   WeeklyFocus: 'WeeklyFocus',
   DismissedAlert: 'DismissedAlert',
-  UserPreference: 'UserPreference',
   PortfolioAnalysis: 'PortfolioAnalysis',
   UserVisit: 'UserVisit'
 } as const
@@ -230,16 +229,6 @@ export const DismissedAlertScalarFieldEnum = {
 } as const
 
 export type DismissedAlertScalarFieldEnum = (typeof DismissedAlertScalarFieldEnum)[keyof typeof DismissedAlertScalarFieldEnum]
-
-
-export const UserPreferenceScalarFieldEnum = {
-  id: 'id',
-  key: 'key',
-  value: 'value',
-  updatedAt: 'updatedAt'
-} as const
-
-export type UserPreferenceScalarFieldEnum = (typeof UserPreferenceScalarFieldEnum)[keyof typeof UserPreferenceScalarFieldEnum]
 
 
 export const PortfolioAnalysisScalarFieldEnum = {

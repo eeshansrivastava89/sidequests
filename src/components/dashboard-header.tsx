@@ -113,6 +113,7 @@ export function DashboardHeader({
               className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               onClick={onToggleDark}
               aria-label="Toggle dark mode"
+              aria-pressed={dark}
             >
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>

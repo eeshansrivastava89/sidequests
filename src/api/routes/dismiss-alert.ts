@@ -41,8 +41,13 @@ dismissAlertRoute.delete("/:id/dismiss-alert", async (req, res) => {
       where: { projectId_alertType: { projectId: id, alertType: alertType as string } },
     });
     res.json({ ok: true });
-  } catch {
-    // Already doesn't exist — that's fine
-    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("not found") || msg.includes("No")) {
+      res.json({ ok: true });
+    } else {
+      console.error("[dismiss-alert DELETE]", err);
+      res.status(500).json({ ok: false, error: msg });
+    }
   }
 });

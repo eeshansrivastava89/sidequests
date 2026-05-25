@@ -5,6 +5,43 @@ import { getLlmProvider } from "@/lib/llm";
 
 export const refreshRoute = Router();
 
+const STALE_MS = 10 * 60 * 1000; // 10 minutes
+
+/** Encapsulates pipeline lifecycle state — avoids module-level mutable vars. */
+class PipelineSession {
+  private running = false;
+  private startedAt = 0;
+  private abort: AbortController | null = null;
+
+  get isActive(): boolean {
+    return this.running && (Date.now() - this.startedAt) < STALE_MS;
+  }
+
+  start(): AbortController {
+    this.running = true;
+    this.startedAt = Date.now();
+    const abort = new AbortController();
+    this.abort = abort;
+    return abort;
+  }
+
+  cancel(): boolean {
+    if (this.abort && this.running) {
+      this.abort.abort();
+      this.reset();
+      return true;
+    }
+    return false;
+  }
+
+  reset(): void {
+    this.running = false;
+    this.abort = null;
+  }
+}
+
+const session = new PipelineSession();
+
 // POST /api/refresh — trigger pipeline synchronously (no SSE)
 refreshRoute.post("/", async (_req, res) => {
   const result = await runRefreshPipeline();
@@ -13,35 +50,20 @@ refreshRoute.post("/", async (_req, res) => {
 
 // POST /api/refresh/stream — cancel running pipeline
 refreshRoute.post("/stream", async (_req, res) => {
-  if (pipelineAbort && pipelineRunning) {
-    pipelineAbort.abort();
-    res.json({ ok: true, cancelled: true });
-    return;
-  }
-  res.json({ ok: true, cancelled: false });
+  res.json({ ok: true, cancelled: session.cancel() });
 });
-
-// Pipeline state (module-level singleton)
-let pipelineRunning = false;
-let pipelineStartedAt = 0;
-let pipelineAbort: AbortController | null = null;
-const STALE_MS = 10 * 60 * 1000; // 10 minutes
 
 // GET /api/refresh/stream — SSE streaming pipeline progress
 refreshRoute.get("/stream", async (req, res) => {
-  if (pipelineRunning && (Date.now() - pipelineStartedAt) < STALE_MS) {
+  if (session.isActive) {
     res.status(409).json({ error: "Refresh already in progress" });
     return;
   }
 
-  pipelineRunning = true;
-  pipelineStartedAt = Date.now();
-
   // Ensure pipeline reads fresh settings
   clearSettingsCache();
 
-  const abort = new AbortController();
-  pipelineAbort = abort;
+  const abort = session.start();
 
   const forceSkipLlm = req.query.skipLlm === "true";
   const skipLlm = forceSkipLlm || getLlmProvider() === null;
@@ -59,22 +81,15 @@ refreshRoute.get("/stream", async (req, res) => {
   // Disable Nagle's algorithm — send each write immediately
   if (res.socket) res.socket.setNoDelay(true);
 
-  // Emit an SSE event to the client.
-  // Yields to the event loop after each write so Node.js can flush
-  // the TCP send buffer before the next blocking operation (e.g. execFileSync).
-  // Without this yield, synchronous CPU work (git commands, DB writes)
-  // starves the event loop and batches all SSE events into one packet.
   async function emit(event: PipelineEvent) {
     res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-    // Yield to the event loop — lets Node.js flush the write buffer to the network
     await new Promise((resolve) => setImmediate(resolve));
   }
 
   // Wire client disconnect to pipeline abort
   req.on("close", () => {
     abort.abort();
-    pipelineRunning = false;
-    pipelineAbort = null;
+    session.reset();
   });
 
   try {
@@ -84,8 +99,7 @@ refreshRoute.get("/stream", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     res.write(`event: pipeline_error\ndata: ${JSON.stringify({ error: message })}\n\n`);
   } finally {
-    pipelineRunning = false;
-    pipelineAbort = null;
+    session.reset();
     res.end();
   }
 });
