@@ -3,8 +3,8 @@ import type { FocusGoal } from "@/lib/types";
 import type { ShippedData, VisitDelta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { formatLastVisit } from "@/lib/project-helpers";
-import { CARD, SECTION_LABEL, SIGNAL_COLORS } from "@/lib/status-colors";
-import { ArrowUpRight, ArrowDownRight, Plus, Minus, Target, Rocket, RefreshCw } from "lucide-react";
+import { SIGNAL_COLORS } from "@/lib/status-colors";
+import { ArrowUpRight, ArrowDownRight, Plus, Minus, Target, Rocket } from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -22,8 +22,6 @@ interface OverviewStripProps {
   onFilter: (filter: "uncommitted" | "open-issues" | "ci-failing" | "not-on-github" | null) => void;
   onClearAll: () => void;
 }
-
-type SignalFilter = "uncommitted" | "open-issues" | "ci-failing" | "not-on-github" | null;
 
 /* ── Signal chip ────────────────────────────────────────── */
 
@@ -106,7 +104,7 @@ function DeltaChips({ visit, loading }: { visit: VisitDelta | null; loading: boo
 
 /* ── Focus mini ─────────────────────────────────────────── */
 
-function FocusMini({ goals, loading, onToggle, onAdd }: {
+function FocusMini({ goals, loading, onAdd }: {
   goals: FocusGoal[];
   loading: boolean;
   onToggle: (id: string, completed: boolean) => void;
@@ -166,13 +164,6 @@ function ShippedMini({ shipped, loading }: { shipped: ShippedData | null; loadin
 
 /* ── Overview Strip ─────────────────────────────────────── */
 
-const SIGNAL_LABELS: Record<string, string> = {
-  uncommitted: "Dirty",
-  "open-issues": "Issues",
-  "ci-failing": "CI ✗",
-  "not-on-github": "Local",
-};
-
 export function OverviewStrip({
   projects,
   focusGoals,
@@ -190,8 +181,6 @@ export function OverviewStrip({
   const openIssues = projects.reduce((sum, p) => sum + p.openIssues, 0);
   const ciFailing = projects.filter((p) => p.ciStatus === "failure").length;
   const notOnGitHub = projects.filter((p) => p.repoVisibility === "not-on-github").length;
-
-  const focusIdMap = new Map(focusGoals.map((g) => [g.id, g]));
 
   return (
     <div className="space-y-3">
@@ -234,8 +223,6 @@ export { SignalChip };
 export type { OverviewStripProps };
 
 /* ── StatsBar kept for Projects tab ─────────────────────── */
-
-import { useState } from "react";
 
 export type StatsBarSignalFilter = "uncommitted" | "open-issues" | "ci-failing" | "not-on-github" | null;
 

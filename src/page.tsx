@@ -5,8 +5,8 @@ import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import { usePreflight } from "@/hooks/use-preflight";
 import { useVersion } from "@/hooks/use-version";
-import { useFocusGoals, useShipped, useVisit, dismissAlert } from "@/hooks/use-whatnow-data";
-import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
+import { useShipped } from "@/hooks/use-whatnow-data";
+import type { Project, WorkflowView, SortKey } from "@/lib/types";
 import {
   SORT_OPTIONS,
   sortProjects,
@@ -42,7 +42,7 @@ import { toast } from "sonner";
 export function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
-  const { config, configReady, refetch } = useConfig();
+  const { config, refetch } = useConfig();
   const refreshHook = useRefresh(fetchProjects, {
     onFirstStoreComplete: (count, skipLlm) => {
       if (skipLlm) {
@@ -74,9 +74,7 @@ export function DashboardPage() {
     },
   });
   const deltaHook = useRefreshDeltas(projects);
-  const focusHook = useFocusGoals();
   const shippedHook = useShipped();
-  const visitHook = useVisit();
 
   const [search, setSearch] = useState("");
   const [view, setView] = useState<WorkflowView>("all");
@@ -175,15 +173,6 @@ export function DashboardPage() {
     [touchProject]
   );
 
-  const handleDismissAlert = useCallback(
-    (action: PriorityAction) => {
-      dismissAlert(action.projectId, action.type, () => {
-        fetchProjects();
-      });
-    },
-    [fetchProjects]
-  );
-
   const handleSnoozeProject = useCallback(
     (id: string, days: number) => {
       const until = new Date();
@@ -276,14 +265,6 @@ export function DashboardPage() {
   const selectedProject = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
     [projects, selectedId]
-  );
-
-  // Focus goal project options (active projects only)
-  const focusProjectOptions = useMemo(
-    () => projects
-      .filter((p) => p.status !== "archived")
-      .map((p) => ({ id: p.id, name: p.name })),
-    [projects]
   );
 
   if (loading) {
@@ -384,6 +365,7 @@ export function DashboardPage() {
                 onSelectProject={setSelectedId}
                 onSnoozeProject={handleSnoozeProject}
                 onMarkDone={handleMarkDone}
+                onRunScan={handleAiScan}
               />
             )}
 
@@ -393,8 +375,6 @@ export function DashboardPage() {
                 projects={projects}
                 shipped={shippedHook.shipped}
                 shippedLoading={shippedHook.loading}
-                visit={visitHook.visit}
-                visitLoading={visitHook.loading}
                 onSelectProject={setSelectedId}
               />
             )}
@@ -639,7 +619,7 @@ export function DashboardPage() {
         onSaved={refetch}
       />
 
-      <ActivityLogPanel refreshState={refreshHook.state} projects={projects} config={config} scanProgress={refreshHook.scanProgress} />
+      <ActivityLogPanel refreshState={refreshHook.state} config={config} scanProgress={refreshHook.scanProgress} />
 
     </div>
   );

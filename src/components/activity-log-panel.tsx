@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RefreshState, ScanProgress } from "@/hooks/use-refresh";
 import type { AppConfig } from "@/hooks/use-config";
-import type { Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Activity, ChevronDown, Check, XCircle, Clock, Sparkles, Loader2 } from "lucide-react";
 
@@ -50,12 +49,11 @@ function getProviderLabel(config: AppConfig): string {
 
 interface ActivityLogPanelProps {
   refreshState: RefreshState;
-  projects: Project[];
   config: AppConfig;
   scanProgress: ScanProgress;
 }
 
-export function ActivityLogPanel({ refreshState, projects, config, scanProgress }: ActivityLogPanelProps) {
+export function ActivityLogPanel({ refreshState, config, scanProgress }: ActivityLogPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -73,7 +71,6 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
   const { all, completed } = scanProgress;
   const completedSet = new Set(completed);
   const totalCount = all.length;
-  const doneCount = completed.length;
 
   // Build name→status lookups from refreshState.projects (tracks both phases)
   const storeStatusByName = new Map<string, string>();
@@ -97,9 +94,6 @@ export function ActivityLogPanel({ refreshState, projects, config, scanProgress 
     if (prog.llmStatus === "error") llmErrorCount++;
     if (prog.llmStatus === "running") aiScanningCount++;
   }
-  const errorCount = llmErrorCount;
-
-  // During AI scan, show LLM progress; during fast scan, show store progress
   const showLlmProgress = hasLlmPhase && storeDoneCount === totalCount;
   const progressDone = showLlmProgress ? llmDoneCount + llmErrorCount : storeDoneCount;
   const progressTotal = totalCount;

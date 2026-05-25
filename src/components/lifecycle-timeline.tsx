@@ -1,169 +1,206 @@
 import { useMemo } from "react";
 import type { Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import {
+  AlertTriangle,
+  GitBranch,
+  CircleDot,
+} from "lucide-react";
 
 interface LifecycleTimelineProps {
   projects: Project[];
   onSelect: (id: string) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  building: "#22c55e",
-  shipping: "#3b82f6",
-  maintaining: "#8b5cf6",
-  blocked: "#ef4444",
-  completed: "#06b6d4",
-  idea: "#f59e0b",
-  active: "#22c55e",
-  paused: "#f59e0b",
-  stale: "#f97316",
-  archived: "#9ca3af",
-};
+// ── Status chip ──────────────────────────────────────────────
+// The primary visual: a colored pill that says the status in a word.
+// Derived from AI status or git signals.
 
-const STATUS_LABELS: Record<string, string> = {
-  building: "Building",
-  shipping: "Shipping",
-  maintaining: "Maintaining",
-  blocked: "Blocked",
-  completed: "Completed",
-  idea: "Idea",
-  active: "Active",
-  paused: "Paused",
-  stale: "Stale",
-  archived: "Archived",
-};
+type StatusTier = "blocked" | "stale" | "idle" | "active" | "done";
 
-function ageLabel(days: number): string {
-  if (days < 30) return `${days}d`;
-  if (days < 365) return `${Math.round(days / 30)}mo`;
-  const years = days / 365;
-  if (years < 1.5) return `${Math.round(days / 30)}mo`;
-  return `${years.toFixed(1)}y`;
+function getStatusTier(p: Project): StatusTier {
+  if (p.ciStatus === "failure") return "blocked";
+  if (p.isDirty && p.dirtyFileCount > 5) return "blocked";
+  const d = p.lastCommitDate ? Math.floor((Date.now() - new Date(p.lastCommitDate).getTime()) / 86400000) : 999;
+  if (d > 60) return "stale";
+  if (d > 30) return "stale";
+  if (d > 14) return "idle";
+  if (p.status === "completed") return "done";
+  return "active";
 }
+
+const TIER_META: Record<StatusTier, { label: string; pill: string; dot: string }> = {
+  blocked: { label: "Blocked", pill: "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20", dot: "bg-red-500" },
+  stale:   { label: "Stale",   pill: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20", dot: "bg-amber-500" },
+  idle:    { label: "Idle",    pill: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20", dot: "bg-zinc-400" },
+  active:  { label: "Active",  pill: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20", dot: "bg-emerald-500" },
+  done:    { label: "Done",    pill: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20", dot: "bg-blue-500" },
+};
+
+// ── Health arc ──────────────────────────────────────────────
+// A tiny SVG ring (24px) showing health 0-100. Color shifts green→amber→red.
+
+function healthColor(score: number): string {
+  if (score >= 70) return "#22c55e";
+  if (score >= 40) return "#f59e0b";
+  return "#ef4444";
+}
+
+function HealthArc({ score }: { score: number }) {
+  const s = 24;
+  const sw = 2.5;
+  const r = (s - sw) / 2;
+  const cx = s / 2;
+  const cy = s / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - score / 100);
+  const color = healthColor(score);
+
+  return (
+    <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} className="shrink-0">
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={sw} />
+      <circle
+        cx={cx} cy={cy} r={r} fill="none"
+        stroke={color}
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={offset}
+        transform={`rotate(-90 ${cx} ${cy})`}
+      />
+    </svg>
+  );
+}
+
+// ── Recency text ─────────────────────────────────────────────
+
+function lastActivityText(p: Project): string {
+  if (!p.lastCommitDate) return "No commits";
+  const d = Math.floor((Date.now() - new Date(p.lastCommitDate).getTime()) / 86400000);
+  if (d === 0) return "Today";
+  if (d === 1) return "Yesterday";
+  if (d < 7) return `${d}d ago`;
+  if (d < 30) return `${Math.round(d / 7)}w ago`;
+  if (d < 365) return `${Math.round(d / 30)}mo ago`;
+  return `${(d / 365).toFixed(1)}y ago`;
+}
+
+function lastActivityColor(p: Project): string {
+  if (!p.lastCommitDate) return "text-muted-foreground";
+  const d = Math.floor((Date.now() - new Date(p.lastCommitDate).getTime()) / 86400000);
+  if (d <= 1) return "text-emerald-600 dark:text-emerald-400";
+  if (d <= 7) return "text-foreground";
+  if (d <= 30) return "text-amber-600 dark:text-amber-400";
+  return "text-red-500";
+}
+
+// ── Signal chips ─────────────────────────────────────────────
+
+function Signals({ p }: { p: Project }) {
+  const chips: Array<{ label: string; icon: typeof AlertTriangle; color: string }> = [];
+  if (p.ciStatus === "failure") chips.push({ label: "CI failing", icon: AlertTriangle, color: "text-red-500" });
+  if (p.isDirty) chips.push({ label: `${p.dirtyFileCount} uncommitted`, icon: GitBranch, color: "text-amber-500" });
+  if (p.openIssues > 0) chips.push({ label: `${p.openIssues} issue${p.openIssues !== 1 ? "s" : ""}`, icon: CircleDot, color: "text-amber-500" });
+
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex items-center gap-2">
+      {chips.map((c) => {
+        const Icon = c.icon;
+        return (
+          <span key={c.label} className={cn("inline-flex items-center gap-1 text-[11px] font-medium", c.color)}>
+            <Icon className="size-3" />
+            {c.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Component ────────────────────────────────────────────────
 
 export function LifecycleTimeline({ projects, onSelect }: LifecycleTimelineProps) {
   const rows = useMemo(() => {
     const now = Date.now();
     return projects
       .filter((p) => p.status !== "archived")
-      .map((p) => {
-        const created = p.createdAt ? new Date(p.createdAt).getTime() : now;
-        const ageDays = Math.max(1, Math.floor((now - created) / 86400000));
-        const lastCommit = p.lastCommitDate ? new Date(p.lastCommitDate).getTime() : null;
-        const daysSinceCommit = lastCommit ? Math.floor((now - lastCommit) / 86400000) : 999;
-        const status = p.llmStatus ?? p.status;
-
-        // Activity segments: divide age into 4 activity bands
-        // week (0-7d ago), month (7-30d), quarter (30-90d), older
-        const weekPct = Math.min(1, p.weekCommits > 0 ? 7 / ageDays : 0);
-        const monthPct = Math.min(1, p.monthCommits > 0 ? 30 / ageDays : 0) - weekPct;
-        const quarterPct = Math.min(1, p.quarterCommits > 0 ? 90 / ageDays : 0) - weekPct - monthPct;
-
-        return {
-          id: p.id,
-          name: p.name,
-          status,
-          healthScore: p.healthScore,
-          ageDays,
-          daysSinceCommit,
-          weekCommits: p.weekCommits,
-          monthCommits: p.monthCommits,
-          quarterCommits: p.quarterCommits,
-          weekPct,
-          monthPct,
-          quarterPct,
-          lastCommitDays: daysSinceCommit,
-        };
-      })
-      .sort((a, b) => a.daysSinceCommit - b.daysSinceCommit);
+      .map((p) => ({
+        project: p,
+        tier: getStatusTier(p),
+        dayAgo: p.lastCommitDate ? Math.floor((now - new Date(p.lastCommitDate).getTime()) / 86400000) : 999,
+      }))
+      .sort((a, b) => {
+        // Blocked first, then active, then idle, then stale, then done
+        const order: Record<StatusTier, number> = { blocked: 0, active: 1, idle: 2, stale: 3, done: 4 };
+        if (a.tier !== b.tier) return order[a.tier] - order[b.tier];
+        // Within tier: most recent first (ascending days = most recent)
+        return a.dayAgo - b.dayAgo;
+      });
   }, [projects]);
 
   if (rows.length === 0) {
-    return <p className="text-xs text-muted-foreground py-4">No active projects to display.</p>;
+    return <p className="text-xs text-muted-foreground py-4">No active projects.</p>;
   }
 
+  // CTA: derived from the data
+  const blocked = rows.filter((r) => r.tier === "blocked");
+  const stale = rows.filter((r) => r.tier === "stale");
+
   return (
-    <div className="space-y-1">
-      {/* Legend */}
-      <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2">
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm bg-emerald-500/80" /> This week
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm bg-blue-400/60" /> This month
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm bg-blue-400/30" /> This quarter
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-3 rounded-sm bg-muted" /> Older
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block size-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.active }} /> Status
-        </span>
+    <div>
+      {/* CTA line */}
+      {(blocked.length > 0 || stale.length > 0) && (
+        <p className="text-xs text-muted-foreground mb-4">
+          {blocked.length > 0 && (
+            <span className="text-red-500 font-medium">{blocked.length} blocked</span>
+          )}
+          {blocked.length > 0 && stale.length > 0 && " · "}
+          {stale.length > 0 && (
+            <span className="text-amber-500 font-medium">{stale.length} stale</span>
+          )}
+          {" — click to investigate."}
+        </p>
+      )}
+
+      <div className="divide-y divide-border">
+        {rows.map(({ project: p, tier }) => {
+          const meta = TIER_META[tier];
+          const llmStatus = p.llmStatus ?? p.status;
+
+          return (
+            <button
+              key={p.id}
+              type="button"
+              className="w-full text-left flex items-center gap-3 py-3 px-2 hover:bg-muted/30 rounded-md transition-colors"
+              onClick={() => onSelect(p.id)}
+            >
+              {/* Status chip */}
+              <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0", meta.pill)}>
+                <span className={cn("size-1.5 rounded-full", meta.dot)} />
+                {meta.label}
+              </span>
+
+              {/* Project name */}
+              <span className="text-sm font-medium min-w-0 max-w-[200px] truncate">{p.name}</span>
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Signals */}
+              <Signals p={p} />
+
+              {/* Last activity */}
+              <span className={cn("text-xs tabular-nums shrink-0 min-w-[60px] text-right", lastActivityColor(p))}>
+                {lastActivityText(p)}
+              </span>
+
+              {/* Health arc */}
+              <HealthArc score={p.healthScore} />
+            </button>
+          );
+        })}
       </div>
-
-      {rows.map((row) => {
-        const statusColor = STATUS_COLORS[row.status] ?? "#9ca3af";
-        const statusLabel = STATUS_LABELS[row.status] ?? row.status;
-        const activityPct = row.quarterPct + row.monthPct + row.weekPct;
-
-        return (
-          <button
-            key={row.id}
-            type="button"
-            className="w-full text-left flex items-center gap-2 py-1 px-1 hover:bg-muted/30 rounded transition-colors group"
-            onClick={() => onSelect(row.id)}
-          >
-            {/* Status dot */}
-            <span
-              className="inline-block size-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: statusColor }}
-              title={statusLabel}
-            />
-
-            {/* Project name */}
-            <span className="text-xs font-medium min-w-[100px] max-w-[140px] truncate">{row.name}</span>
-
-            {/* Timeline bar */}
-            <div className="flex-1 h-4 rounded-sm bg-muted/50 overflow-hidden relative">
-              {/* Older (background) */}
-              <div className="absolute inset-0 bg-muted" />
-              {/* Quarter (30-90d) */}
-              {row.quarterPct > 0 && (
-                <div
-                  className="absolute top-0 bottom-0 bg-blue-400/30"
-                  style={{ left: `${(1 - row.quarterPct - row.monthPct - row.weekPct) * 100}%`, width: `${row.quarterPct * 100}%` }}
-                />
-              )}
-              {/* Month (7-30d) */}
-              {row.monthPct > 0 && (
-                <div
-                  className="absolute top-0 bottom-0 bg-blue-400/60"
-                  style={{ left: `${(1 - row.monthPct - row.weekPct) * 100}%`, width: `${row.monthPct * 100}%` }}
-                />
-              )}
-              {/* Week (0-7d) */}
-              {row.weekPct > 0 && (
-                <div
-                  className="absolute top-0 bottom-0 bg-emerald-500/80"
-                  style={{ left: `${(1 - row.weekPct) * 100}%`, width: `${row.weekPct * 100}%` }}
-                />
-              )}
-            </div>
-
-            {/* Metrics */}
-            <div className="flex items-center gap-2 min-w-[100px] justify-end">
-              <span className="text-[11px] font-mono tabular-nums text-muted-foreground" title={`${row.weekCommits}/${row.monthCommits}/${row.quarterCommits} commits`}>
-                {row.weekCommits}/{row.monthCommits}/{row.quarterCommits}
-              </span>
-              <span className="text-[10px] text-muted-foreground min-w-[36px] text-right" title={`${row.ageDays} days old`}>
-                {ageLabel(row.ageDays)}
-              </span>
-            </div>
-          </button>
-        );
-      })}
     </div>
   );
 }

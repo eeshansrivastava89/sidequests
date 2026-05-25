@@ -1,5 +1,5 @@
 import type { ShippedData } from "@/lib/types";
-import { SECTION_LABEL } from "@/lib/status-colors";
+import { SectionCard } from "@/components/ui/section-card";
 import { Rocket, TrendingUp } from "lucide-react";
 
 interface ShippedSectionProps {
@@ -16,12 +16,12 @@ const PERIODS = [
 export function ShippedSection({ shipped, loading }: ShippedSectionProps) {
   if (loading) {
     return (
-      <div className="rounded-xl border border-border bg-card px-4 py-3">
+      <SectionCard icon={<Rocket className="size-3.5 text-emerald-500" />} title="Shipped">
         <div className="animate-pulse space-y-2">
           <div className="h-3.5 w-16 bg-muted rounded" />
           <div className="h-6 w-full bg-muted rounded" />
         </div>
-      </div>
+      </SectionCard>
     );
   }
 
@@ -33,13 +33,8 @@ export function ShippedSection({ shipped, loading }: ShippedSectionProps) {
     .slice(5);
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <div className="px-5 py-2.5 border-b border-border flex items-center gap-2">
-        <Rocket className="size-3.5 text-emerald-500" />
-        <h3 className={SECTION_LABEL}>Shipped</h3>
-      </div>
-
-      <div className="px-5 py-3 space-y-3">
+    <SectionCard icon={<Rocket className="size-3.5 text-emerald-500" />} title="Shipped">
+      <div className="space-y-3">
         <div className="flex items-center gap-4">
           {PERIODS.map((period) => (
             <div key={period.key} className="flex items-baseline gap-1">
@@ -77,6 +72,6 @@ export function ShippedSection({ shipped, loading }: ShippedSectionProps) {
           </div>
         )}
       </div>
-    </div>
+    </SectionCard>
   );
 }
