@@ -1,7 +1,7 @@
 # Sidequests — Architecture & Implementation Plan
 
 **Updated:** 2026-05-25
-**Status:** Phase 9 (What Now v2 + Analytics v2) complete. Phase 10 (Ship) next.
+**Status:** Phase 9 complete. Phase 10 (Ship) in progress.
 
 ---
 
@@ -133,6 +133,16 @@ Packaging, CI, distribution.
 - [ ] GitHub Actions — update from deprecated Node 20
 - [ ] Prisma hash fragility — investigate and fix standalone Prisma hash mismatch
 
+### Completed in this phase
+- [x] v0.3.25 published to npm
+- [x] Redesigned What Now + Analytics with Linear+Tufte patterns
+- [x] Full-width contribution heatmap (CSS grid)
+- [x] Lifecycle status chips + health arcs + signal flags
+- [x] All lint errors fixed (0 remaining)
+- [x] Dead code removed (3 components deleted)
+- [x] README updated for Express stack + new features
+- [x] Issue #10 closed (Next.js → Hono + Vite migration)
+
 ---
 
 ## Implementation Order
@@ -142,7 +152,7 @@ Phases 0–5: Complete ✅
 Phase 7: Polish ✅
 Phase 8: What Now + Analytics ✅
 Phase 9: What Now v2 + Analytics v2 ✅
-Phase 10: Ship                       ← Current
+Phase 10: Ship                     ← Current (v0.3.25 shipped, 3 items remaining)
 ```
 
 ---

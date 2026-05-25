@@ -36,7 +36,8 @@ npx @eeshans/sidequests
 
 Sidequests scans your dev directory, discovers every git repo, and builds a dashboard with:
 
-- **Actionable next steps** — LLM-powered summaries, next actions, and insights for every project
+- **What should I work on?** — AI-powered top recommendation, ranked next steps, portfolio insights
+- **Am I making progress?** — Commit heatmap, velocity trends, lifecycle tracking, shipped counts
 - **GitHub at a glance** — open issues, PRs, and CI status pulled from `gh` CLI
 - **Status tracking** — active, paused, stale, or archived based on commit history
 - **Git state** — dirty files, unpushed commits, current branch
@@ -49,6 +50,8 @@ Everything runs locally. Your code never leaves your machine.
 |---|---|
 | **Fast Scan** | Folders, LOC, git history, GitHub issues/PRs/CI — completes in seconds |
 | **AI Scan** | Fast scan + LLM-powered summaries, next actions, insights, tags |
+| **What Now** | AI top recommendation + ranked next steps + portfolio insights |
+| **Analytics** | Contribution heatmap, commit velocity, lifecycle tracking, health arcs |
 | **GitHub Integration** | Open issues, PRs, CI status, repo visibility via `gh` CLI |
 | **Smart Status** | Classifies projects as active, paused, stale, or archived |
 | **Git Aware** | Dirty state, ahead/behind, branch tracking |
@@ -111,7 +114,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
               pass 1: all projects (fast)             pass 2: sequential
 ```
 
-Built with Next.js 16, Prisma 7 + SQLite, React 19, shadcn/ui, and Tailwind CSS.
+Built with Express, Prisma 7 + SQLite, React 19, shadcn/ui, Recharts, and Tailwind CSS.
 
 ## License
 
