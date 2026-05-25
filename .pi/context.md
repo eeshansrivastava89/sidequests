@@ -5,70 +5,62 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phases 0–4 complete, Phase 4 (notifications) DEPRECATED. What Now redesign + bugfix in progress.
+- Current phase: Phases 0–4 complete. Activity log + shimmer simplification done.
 
 ## Git Snapshot
 - Branch: main
-- Last commit: 7786ace — "feat: What Now redesign, SSE done-event fix, deprecate notifications, DRY constants"
-- 24 files changed
+- Last commit: 32c2c79 — "refactor: simplify activity log, use EventSource, clean up dead code"
 - Nothing pushed to origin
 
-## What We Were Doing
-- Redesigned What Now tab: flat action feed, overview strip, compact cards
-- Fixed SSE done-event not reaching client (root cause: writeSSE not awaited)
-- Deprecated system notifications (node-notifier removed)
-- Fixed duplicate React keys, added ErrorBoundary
-- DRY consolidation of shared constants
-- **STILL BROKEN: Fast scan progress shimmer not showing on project rows**
+## What We Did This Session
+- **Simplified ActivityLogPanel**: Replaced complex `deriveStatus` state machine (7 branches, `refreshDone` gate, `isFastScan` branch) with simple `ScanProgress` arrays (`all: string[]`, `completed: string[]`)
+- **Switched SSE client to EventSource**: Replaced `fetch` + `ReadableStream.read()` with native `EventSource` API — purpose-built for SSE
+- **Direct API connection**: Added `VITE_API_URL` to bypass Vite proxy (Vite's http-proxy buffers SSE streams)
+- **Toast cleanup**: Replaced 2 `useEffect` + `useRef` toast blocks with declarative callbacks (`onFirstStoreComplete`, `onScanDone`, `onError`) passed to `useRefresh`
+- **Dead code removal**: Removed `row-scan-complete` CSS + `scan-sweep` animation, `scanDelay` inline style, `storeOrder` field, `sleep()` function, `toast` import from hook, `!important` from shimmer CSS
+- **Fast scan terminal state**: Changed from `row-scan-complete` (CSS animation that replays on remount) to `row-done` (static transition-based green border, same as AI scan final state)
+- **RefreshProgress gating**: Changed condition from `projects.size > 0` to `active` — shimmer classes only apply during active scan, auto-clear on `done`
 
-## Open Problem: Fast Scan Progress Shimmer
-The user reports that during a fast scan, the project rows in the Projects tab do NOT show the scanning/complete shimmer animation. All projects appear to complete "at the same time" with no visible progress.
+## Open Problem: Fast Scan One-at-a-Time Progress
+The fast scan pipeline processes projects serially on the server (verified with curl), but the browser receives all SSE events at once at the end. The AI scan works because LLM takes 5-30s per project (natural gaps exceed buffering window). The fast scan completes all ~24 projects in ~48s.
 
-**What we tried that didn't work:**
-1. `requestAnimationFrame` yields between SSE events — React batches state updates anyway; individual "running" states last ~1-2 seconds but appear instant to the user
-2. Changing `refreshProgress` from `active ? projects : undefined` to `projects.size > 0 ? projects : undefined` — this keeps progress data alive after scan, but the fundamental issue is that during a fast scan, each project's store phase is ~1-2 seconds. The "running" → "done" transition happens too fast for users to see.
+**What we tried:**
+- `socket.setNoDelay(true)` — didn't help
+- 16KB padding per SSE chunk — didn't help
+- `await` each `writeSSE` — didn't help  
+- Raw `res.write()` bypassing Hono — didn't work (response access failed)
+- `await setTimeout(0)` yields between emits in pipeline — tried but reverted
 
-**Root cause analysis:**
-During a fast scan, the pipeline processes each project in ~1-2 seconds. The SSE events `project_start(store)` and `project_complete(store)` arrive within that window. The shimmer classes change too quickly. The `row-scan-complete` cascade animation (staggered 150ms per project) should be visible AFTER the scan, but it's subtle (just a bottom-line sweep).
+**Most likely culprit**: Hono's `streamSSE` uses an internal `TransformStream` that buffers. Node.js HTTP also buffers small writes below highWaterMark. Combined, events accumulate until response ends.
 
-**What needs to happen next session:**
-- The fast scan progress needs a fundamentally different UX approach than the AI scan
-- AI scan: per-project shimmer works because LLM takes 5-30 seconds each
-- Fast scan: aggregate progress indicator (counter, progress bar in header) would be more appropriate
-- Alternatively: make the `row-scan-complete` animation much more visible (thicker, longer, more contrasting)
-- Or: add a dedicated "Scanning..." state to the Projects tab that shows a progress counter (3/24 scanned...)
+**Next session approach**: Either (a) add a tiny delay between pipeline emits to let the buffer flush, or (b) rewrite SSE endpoint without Hono's streamSSE, using raw Node.js response with explicit flushing after each write.
 
 ## Decisions
-- **What Now redesign**: No accordions (all severity groups visible), stats/delta/focus at top, dense action rows, no red borders
-- **SSE fix**: `done` event must fire before notifications/cleanup; `stream.writeSSE()` must be awaited
-- **Notifications deprecated**: node-notifier removed. In-app + future menu bar badge are the replacement
-- **DRY**: Shared constants in `src/lib/status-colors.ts` (SEVERITY_COLORS, SOURCE_COLORS, SIGNAL_COLORS, CARD, SECTION_LABEL, BADGE_VARIANTS)
-- **Error boundary**: App.tsx wraps DashboardPage; prevents blank-page crashes
-- **parseSSE fix**: Returns `{ events, remainder }` instead of bare array; incomplete frames stay in buffer
+- What Now redesign: No accordions, flat action feed, overview strip, compact cards
+- SSE done-event must fire before cleanup; `stream.writeSSE()` must be awaited
+- Notifications deprecated (node-notifier removed)
+- DRY shared constants in `src/lib/status-colors.ts`
+- ErrorBoundary wraps DashboardPage in App.tsx
+- `parseSSE` returns `{ events, remainder }` for incomplete frame handling
 
 ## Open Items
-- **FAST SCAN PROGRESS SHIMMER NOT WORKING** — see detailed analysis above
+- **FAST SCAN ONE-AT-A-TIME PROGRESS** — see detailed analysis above
 - End-to-end npx validation needed before shipping
-- page.tsx still 876+ lines — should be split (useDashboardState + WhatNowView + ProjectsView)
-- LifecycleActions prompt() should use a modal instead
+- page.tsx still 876+ lines — should be split
+- LifecycleActions prompt() should use modal
 - beforeunload visit save should use navigator.sendBeacon()
 - GitHub Actions Node 20 deprecation
 - Standalone Prisma hash fragility root cause unresolved
 - Pre-existing TS strict errors in [id].ts
 - Per-project shipped history in detail pane (deferred to v2)
-- Old delta-strip.tsx and stats-bar.tsx deleted (done)
 
 ## Key Files
 - `src/page.tsx` — DashboardPage (What Now + Projects tabs)
-- `src/components/overview-strip.tsx` — consolidated delta/shipped/focus/signals overview
-- `src/components/action-card.tsx` — flat ActionFeed rows (no accordions)
-- `src/components/focus-section.tsx` — compact focus goals
-- `src/components/shipped-section.tsx` — compact shipped history
-- `src/components/project-list.tsx` — project rows with shimmer states
-- `src/components/error-boundary.tsx` — React error boundary
-- `src/hooks/use-refresh.ts` — SSE client with fixed parseSSE, JSON parse safety
-- `src/api/routes/refresh.ts` — SSE handler with flush() before stream close
-- `src/lib/pipeline.ts` — per-project logging, done event before notifications
-- `src/lib/status-colors.ts` — shared UI constants (SEVERITY_COLORS, etc.)
-- `src/styles/globals.css` — row-scan-complete animation style
-- `src/App.tsx` — wraps DashboardPage in ErrorBoundary
+- `src/components/activity-log-panel.tsx` — simplified: uses ScanProgress arrays, no deriveStatus
+- `src/components/project-list.tsx` — project rows, row-done terminal state
+- `src/hooks/use-refresh.ts` — EventSource client, callback-based toasts, ScanProgress state
+- `src/api/routes/refresh.ts` — original streamSSE, no buffering fixes applied yet
+- `src/lib/pipeline.ts` — original, no changes
+- `src/styles/globals.css` — no !important, no row-scan-complete
+- `src/vite-env.d.ts` — VITE_API_URL type declaration
+- `vite.config.ts` — VITE_API_URL define for direct API connections
