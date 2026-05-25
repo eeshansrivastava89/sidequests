@@ -153,7 +153,32 @@ export function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
     useProjects();
   const { config, configReady, refetch } = useConfig();
-  const refreshHook = useRefresh(fetchProjects);
+  const refreshHook = useRefresh(fetchProjects, {
+    onFirstStoreComplete: (count, skipLlm) => {
+      if (skipLlm) {
+        toast.info(`Scanned ${count} projects.`);
+      } else {
+        toast.info(`Scanned ${count} projects. Running AI scan...`);
+      }
+    },
+    onScanDone: (summary) => {
+      const count = summary.projectCount ?? 0;
+      const llmOk = summary.llmSucceeded ?? 0;
+      const llmFail = summary.llmFailed ?? 0;
+      if (llmFail > 0 && llmOk === 0) {
+        toast.error(`Scanned ${count} projects. AI scan failed for ${llmFail}`);
+      } else if (llmFail > 0) {
+        toast.warning(`Scanned ${count} projects, AI scanned ${llmOk}, ${llmFail} failed`);
+      } else if (llmOk > 0) {
+        toast.success(`Scanned ${count} projects, AI scanned ${llmOk}`);
+      } else {
+        toast.success(`Scanned ${count} projects`);
+      }
+    },
+    onError: (message) => {
+      toast.error(message);
+    },
+  });
   const deltaHook = useRefreshDeltas(projects);
   const focusHook = useFocusGoals();
   const shippedHook = useShipped();
@@ -205,48 +230,6 @@ export function DashboardPage() {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
-
-  // Toast: fast scan complete
-  const prevDeterministicReady = useRef(false);
-  useEffect(() => {
-    const dr = refreshHook.state.deterministicReady;
-    if (dr && !prevDeterministicReady.current && refreshHook.state.active) {
-      const count = refreshHook.state.projects.size;
-      if (refreshHook.state.skipLlm) {
-        toast.info(`Scanned ${count} projects.`);
-      } else {
-        toast.info(`Scanned ${count} projects. Running AI scan...`);
-      }
-    }
-    prevDeterministicReady.current = dr;
-  }, [refreshHook.state.deterministicReady, refreshHook.state.active, refreshHook.state.projects.size]);
-
-  // Toast: final completion or error
-  const wasActive = useRef(false);
-  useEffect(() => {
-    if (refreshHook.state.active) {
-      wasActive.current = true;
-    } else if (wasActive.current) {
-      wasActive.current = false;
-      const s = refreshHook.state;
-      if (s.error) {
-        toast.error(s.error);
-      } else if (s.summary) {
-        const count = s.summary.projectCount ?? 0;
-        const llmOk = s.summary.llmSucceeded ?? 0;
-        const llmFail = s.summary.llmFailed ?? 0;
-        if (llmFail > 0 && llmOk === 0) {
-          toast.error(`Scanned ${count} projects. AI scan failed for ${llmFail}`);
-        } else if (llmFail > 0) {
-          toast.warning(`Scanned ${count} projects, AI scanned ${llmOk}, ${llmFail} failed`);
-        } else if (llmOk > 0) {
-          toast.success(`Scanned ${count} projects, AI scanned ${llmOk}`);
-        } else {
-          toast.success(`Scanned ${count} projects`);
-        }
-      }
-    }
-  }, [refreshHook.state]);
 
   // Save visit snapshot on page visibility change (beforeunload)
   useEffect(() => {
@@ -795,7 +778,7 @@ export function DashboardPage() {
                           onSelect={(p) => setSelectedId(p.id)}
                           onTogglePin={handleTogglePin}
                           onTouch={handleTouch}
-                          refreshProgress={refreshHook.state.projects.size > 0 ? refreshHook.state.projects : undefined}
+                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                           selectedNames={selectedNames}
                           onToggleSelect={handleToggleSelect}
                           onSelectAll={handleSelectAll}
@@ -816,7 +799,7 @@ export function DashboardPage() {
                           onSelect={(p) => setSelectedId(p.id)}
                           onTogglePin={handleTogglePin}
                           onTouch={handleTouch}
-                          refreshProgress={refreshHook.state.projects.size > 0 ? refreshHook.state.projects : undefined}
+                          refreshProgress={refreshHook.state.active ? refreshHook.state.projects : undefined}
                           selectedNames={selectedNames}
                           onToggleSelect={handleToggleSelect}
                           onSelectAll={handleSelectAll}
@@ -888,7 +871,7 @@ export function DashboardPage() {
         onSaved={refetch}
       />
 
-      <ActivityLogPanel refreshState={refreshHook.state} projects={projects} config={config} />
+      <ActivityLogPanel refreshState={refreshHook.state} projects={projects} config={config} scanProgress={refreshHook.scanProgress} />
 
     </div>
   );

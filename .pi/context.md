@@ -5,64 +5,70 @@
 ## Project Anchor
 - Project: sidequests (local dev project tracker, published as `@eeshans/sidequests` on npm)
 - Goal: Transform Sidequests from a dashboard into a control center for side projects
-- Current phase: Phases 0–4 complete, Phase 4 (notifications) DEPRECATED. UI redesign + bugfix in progress.
+- Current phase: Phases 0–4 complete, Phase 4 (notifications) DEPRECATED. What Now redesign + bugfix in progress.
 
 ## Git Snapshot
 - Branch: main
-- Recent commits:
-  - 17d0652 chore: code review cleanup — dead code, DRY violations, stale artifacts
-- Working tree: modified (multiple files: pipeline, refresh, UI components, notifications removed)
+- Last commit: 7786ace — "feat: What Now redesign, SSE done-event fix, deprecate notifications, DRY constants"
+- 24 files changed
 - Nothing pushed to origin
 
 ## What We Were Doing
-- Task 1 (DONE): Redesigned the What Now tab — replaced accordions with flat feed, moved stats to top, densified action rows, removed red borders
-- Task 2 (DONE): Fixed fast scan `done` event not reaching client — root cause was `stream.writeSSE()` not being awaited, and notifications step blocking the `done` emit
-- Task 3 (DONE): Added per-project logging during store phase in pipeline
-- Task 4 (DONE): Deprecated system notifications (node-notifier) — removed package, module, type declaration, pipeline step; in-app + menu bar badges are the right UX
+- Redesigned What Now tab: flat action feed, overview strip, compact cards
+- Fixed SSE done-event not reaching client (root cause: writeSSE not awaited)
+- Deprecated system notifications (node-notifier removed)
+- Fixed duplicate React keys, added ErrorBoundary
+- DRY consolidation of shared constants
+- **STILL BROKEN: Fast scan progress shimmer not showing on project rows**
+
+## Open Problem: Fast Scan Progress Shimmer
+The user reports that during a fast scan, the project rows in the Projects tab do NOT show the scanning/complete shimmer animation. All projects appear to complete "at the same time" with no visible progress.
+
+**What we tried that didn't work:**
+1. `requestAnimationFrame` yields between SSE events — React batches state updates anyway; individual "running" states last ~1-2 seconds but appear instant to the user
+2. Changing `refreshProgress` from `active ? projects : undefined` to `projects.size > 0 ? projects : undefined` — this keeps progress data alive after scan, but the fundamental issue is that during a fast scan, each project's store phase is ~1-2 seconds. The "running" → "done" transition happens too fast for users to see.
+
+**Root cause analysis:**
+During a fast scan, the pipeline processes each project in ~1-2 seconds. The SSE events `project_start(store)` and `project_complete(store)` arrive within that window. The shimmer classes change too quickly. The `row-scan-complete` cascade animation (staggered 150ms per project) should be visible AFTER the scan, but it's subtle (just a bottom-line sweep).
+
+**What needs to happen next session:**
+- The fast scan progress needs a fundamentally different UX approach than the AI scan
+- AI scan: per-project shimmer works because LLM takes 5-30 seconds each
+- Fast scan: aggregate progress indicator (counter, progress bar in header) would be more appropriate
+- Alternatively: make the `row-scan-complete` animation much more visible (thicker, longer, more contrasting)
+- Or: add a dedicated "Scanning..." state to the Projects tab that shows a progress counter (3/24 scanned...)
 
 ## Decisions
-- **What Now redesign**: No accordions (all severity groups visible), stats/delta/focus/shipped at top in compact overview strip, action rows instead of cards, no red borders, severity as small dots
-- **SSE done event bug**: `stream.writeSSE()` must be awaited; done event must fire BEFORE notifications/cleanup
-- **Notifications deprecated**: node-notifier removed. In-app attention signals (What Now tab) and future menu bar badge are the replacement. `Activity` rows with `type: "notification"` are cleaned up on each scan.
-- Priority actions: computed, not stored. Dismissals via DismissedAlert table.
-- Snooze/archive/revive: on Project model. Flow through PATCH /override.
-- Since-last-visit: UserVisit snapshot. Snapshot on visibility change / beforeunload.
-- Shipped history: Derived columns. Computed during scan via git rev-list.
-- Focus goals: WeeklyFocus table. Scoped to current week (Monday start).
-- Dev server: bin/dev.mjs. Dynamic port discovery, no orphans, direct binary spawns.
-- attention.ts deleted: fully replaced by actions.ts (Phase 2).
-- dismissAlert/reshowAlert: plain functions, not hooks.
+- **What Now redesign**: No accordions (all severity groups visible), stats/delta/focus at top, dense action rows, no red borders
+- **SSE fix**: `done` event must fire before notifications/cleanup; `stream.writeSSE()` must be awaited
+- **Notifications deprecated**: node-notifier removed. In-app + future menu bar badge are the replacement
+- **DRY**: Shared constants in `src/lib/status-colors.ts` (SEVERITY_COLORS, SOURCE_COLORS, SIGNAL_COLORS, CARD, SECTION_LABEL, BADGE_VARIANTS)
+- **Error boundary**: App.tsx wraps DashboardPage; prevents blank-page crashes
+- **parseSSE fix**: Returns `{ events, remainder }` instead of bare array; incomplete frames stay in buffer
 
 ## Open Items
+- **FAST SCAN PROGRESS SHIMMER NOT WORKING** — see detailed analysis above
 - End-to-end npx validation needed before shipping
-- page.tsx still 876 lines — should be split into useDashboardState hook + WhatNowView + ProjectsView components
+- page.tsx still 876+ lines — should be split (useDashboardState + WhatNowView + ProjectsView)
 - LifecycleActions prompt() should use a modal instead
-- beforeunload visit save should use navigator.sendBeacon() for reliability
-- GitHub Actions Node 20 deprecation (upgrade actions/checkout + actions/setup-node to v5)
+- beforeunload visit save should use navigator.sendBeacon()
+- GitHub Actions Node 20 deprecation
 - Standalone Prisma hash fragility root cause unresolved
-- Pre-existing TS strict errors in [id].ts (Hono status code types) — not blocking
-- Packaging integration test fails at server startup (esbuild "Dynamic require of node:path") — pre-existing
-- Per-project shipped history in detail pane (deferred to v2 polish)
-- Old stats-bar.tsx and delta-strip.tsx files are dead code — can be deleted
-
-## Resume Plan
-1. Visual QA of the What Now redesign on dev server
-2. Refactor page.tsx into smaller pieces (useDashboardState + WhatNowView + ProjectsView)
-3. End-to-end npx validation
-4. Push to origin
-5. Phase 5 (menu bar companion) / Phase 6 (CLI shell integration) when ready
+- Pre-existing TS strict errors in [id].ts
+- Per-project shipped history in detail pane (deferred to v2)
+- Old delta-strip.tsx and stats-bar.tsx deleted (done)
 
 ## Key Files
-- `src/page.tsx` — tab-based layout (What Now + Projects) with new OverviewStrip
-- `src/components/overview-strip.tsx` — NEW: consolidated delta/shipped/focus/stats at top of What Now
-- `src/components/action-card.tsx` — redesigned: flat ActionFeed rows (no accordions, no red borders)
-- `src/components/focus-section.tsx` — made more compact
-- `src/components/shipped-section.tsx` — made more compact
-- `src/api/routes/refresh.ts` — FIXED: SSE done event now awaited before stream closes
-- `src/lib/pipeline.ts` — FIXED: done event emits before notifications; per-project store logging; notifications step REMOVED
-- `src/lib/notifications.ts` — DELETED
-- `src/types/node-notifier.d.ts` — DELETED
-- `src/lib/__tests__/notifications.test.ts` — DELETED
-- `src/components/stats-bar.tsx` — dead code (superseded by overview-strip.tsx), can delete
-- `src/components/delta-strip.tsx` — dead code (superseded by overview-strip.tsx), can delete
-- `docs/internal/IMPLEMENTATION_PLAN.md` — Phase 4 updated to deprecation status
+- `src/page.tsx` — DashboardPage (What Now + Projects tabs)
+- `src/components/overview-strip.tsx` — consolidated delta/shipped/focus/signals overview
+- `src/components/action-card.tsx` — flat ActionFeed rows (no accordions)
+- `src/components/focus-section.tsx` — compact focus goals
+- `src/components/shipped-section.tsx` — compact shipped history
+- `src/components/project-list.tsx` — project rows with shimmer states
+- `src/components/error-boundary.tsx` — React error boundary
+- `src/hooks/use-refresh.ts` — SSE client with fixed parseSSE, JSON parse safety
+- `src/api/routes/refresh.ts` — SSE handler with flush() before stream close
+- `src/lib/pipeline.ts` — per-project logging, done event before notifications
+- `src/lib/status-colors.ts` — shared UI constants (SEVERITY_COLORS, etc.)
+- `src/styles/globals.css` — row-scan-complete animation style
+- `src/App.tsx` — wraps DashboardPage in ErrorBoundary

@@ -58,8 +58,8 @@ function getRowShimmerClass(project: Project, refreshProgress?: Map<string, Proj
   if (prog.llmStatus === "error") return "row-error";
   // LLM completed — green sweep
   if (prog.llmStatus === "done") return "row-done";
-  // Fast scan completed (store done, no LLM) — green sweep
-  if (prog.storeStatus === "done" && prog.llmStatus === "pending") return "row-scan-complete";
+  // Fast scan completed (store done, no LLM) — same as LLM done
+  if (prog.storeStatus === "done" && prog.llmStatus === "pending") return "row-done";
   return "";
 }
 
@@ -107,12 +107,8 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
         const rawPath = project.pathDisplay;
         const hasGitHub = project.repoVisibility !== "not-on-github";
         const ownerRepo = hasGitHub ? parseGitHubOwnerRepo(project.scan?.remoteUrl) : null;
-        const prog = refreshProgress?.get(project.pathHash);
         const shimmerClass = getRowShimmerClass(project, refreshProgress);
         const lastActive = project.lastTouchedAt ?? project.scan?.lastCommitDate ?? "";
-        const scanDelay = (shimmerClass === "row-scan-complete" || shimmerClass === "row-done") && prog?.storeOrder != null
-          ? { animationDelay: `${prog.storeOrder * 150}ms`, animationFillMode: "backwards" as const }
-          : undefined;
 
         return (
           <div
@@ -133,7 +129,6 @@ export function ProjectList({ projects, selectedId, onSelect, onTogglePin, onTou
                 (e.currentTarget.previousElementSibling as HTMLElement)?.focus();
               }
             }}
-            style={scanDelay}
             className={cn(
               "grid items-center gap-x-4 px-5 py-3 border-b border-border border-l-4 border-l-transparent last:border-b-0 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 outline-none",
               gridCols,

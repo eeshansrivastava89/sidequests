@@ -1,32 +1,12 @@
 
 import { useEffect, useRef, useState } from "react";
-import type { RefreshState, ProjectProgress } from "@/hooks/use-refresh";
+import type { RefreshState, ScanProgress } from "@/hooks/use-refresh";
 import type { AppConfig } from "@/hooks/use-config";
 import type { Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Activity, ChevronDown, Check, XCircle, Clock, Sparkles, Loader2 } from "lucide-react";
 
-type ProjectStatus = "pending" | "scanning" | "ai-scanning" | "done" | "error" | "skipped";
-
-/**
- * Derive display status for a project in the activity log.
- * `refreshDone` indicates the entire refresh has completed — if store finished
- * but LLM never ran, that means it was a fast-scan-only run.
- */
-function deriveStatus(prog: ProjectProgress | undefined, refreshDone: boolean): ProjectStatus {
-  if (!prog) return "pending";
-  if (prog.llmStatus === "done") return "done";
-  if (prog.llmStatus === "error") return "error";
-  if (prog.llmStatus === "skipped") return "skipped";
-  if (prog.llmStatus === "running") return "ai-scanning";
-  if (prog.storeStatus === "running") return "scanning";
-  // Store finished, LLM still pending — either waiting for AI or fast-scan-only
-  if (prog.storeStatus === "done" && refreshDone) return "done";
-  if (prog.storeStatus === "done") return "pending";
-  return "pending";
-}
-
-function StatusIcon({ status }: { status: ProjectStatus }) {
+function StatusIcon({ status }: { status: string }) {
   switch (status) {
     case "pending":
       return <Clock className="size-3.5 text-muted-foreground" />;
@@ -43,7 +23,7 @@ function StatusIcon({ status }: { status: ProjectStatus }) {
   }
 }
 
-function statusLabel(status: ProjectStatus): string {
+function statusLabel(status: string): string {
   switch (status) {
     case "pending": return "Waiting";
     case "scanning": return "Scanning";
@@ -51,6 +31,7 @@ function statusLabel(status: ProjectStatus): string {
     case "done": return "Done";
     case "error": return "Failed";
     case "skipped": return "Skipped";
+    default: return status;
   }
 }
 
@@ -71,9 +52,10 @@ interface ActivityLogPanelProps {
   refreshState: RefreshState;
   projects: Project[];
   config: AppConfig;
+  scanProgress: ScanProgress;
 }
 
-export function ActivityLogPanel({ refreshState, projects, config }: ActivityLogPanelProps) {
+export function ActivityLogPanel({ refreshState, projects, config, scanProgress }: ActivityLogPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -81,7 +63,6 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
   const wasActiveRef = useRef(false);
   useEffect(() => {
     if (refreshState.active && !wasActiveRef.current) {
-      // Defer state update to avoid setState-in-effect warning
       requestAnimationFrame(() => {
         setExpanded(true);
       });
@@ -89,37 +70,32 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
     wasActiveRef.current = refreshState.active;
   }, [refreshState.active]);
 
-  // Build the project status list from refreshState.projects map
-  const progressMap = refreshState.projects;
-  const refreshDone = !refreshState.active && refreshState.summary !== null;
+  const { all, completed } = scanProgress;
+  const completedSet = new Set(completed);
+  const totalCount = all.length;
+  const doneCount = completed.length;
 
-  // Sort projects by lastCommitDate (most recent first), then by name
-  const projectNames = Array.from(progressMap.entries())
-    .sort(([, a], [, b]) => {
-      const aDate = a?.lastCommitDate;
-      const bDate = b?.lastCommitDate;
-      if (!aDate && !bDate) return 0;
-      if (!aDate) return 1;
-      if (!bDate) return -1;
-      return new Date(bDate).getTime() - new Date(aDate).getTime();
-    })
-    .map(([name]) => name);
+  // Build name→LLM status lookup for AI scan states
+  const llmByName = new Map<string, string>();
+  for (const prog of refreshState.projects.values()) {
+    if (prog.name) llmByName.set(prog.name, prog.llmStatus);
+  }
 
-  // Count stats
-  let doneCount = 0;
+  // Currently scanning: first project not yet completed
+  const scanningName = refreshState.active
+    ? all.find((n) => !completedSet.has(n)) ?? null
+    : null;
+
+  // AI scanning count
   let aiScanningCount = 0;
   let errorCount = 0;
-  for (const prog of progressMap.values()) {
-    const s = deriveStatus(prog, refreshDone);
-    if (s === "done" || s === "skipped") doneCount++;
-    else if (s === "ai-scanning") aiScanningCount++;
-    else if (s === "error") errorCount++;
+  for (const [, prog] of refreshState.projects) {
+    if (prog.llmStatus === "running") aiScanningCount++;
+    else if (prog.llmStatus === "error") errorCount++;
   }
-  const totalCount = projectNames.length;
 
-  // Determine scan type from summary
+  const refreshDone = !refreshState.active && refreshState.summary !== null;
   const isFastScanOnly = refreshDone && (refreshState.summary?.llmSkipped ?? 0) === totalCount && totalCount > 0;
-
   const isIdle = !refreshState.active && totalCount === 0;
 
   if (!expanded) {
@@ -211,7 +187,7 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
               Your scan activity will appear here when you run a Fast Scan or AI Scan.
             </p>
           </div>
-        ) : projectNames.length === 0 ? (
+        ) : all.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground">
               Scanning projects...
@@ -219,15 +195,24 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
           </div>
         ) : (
           <div className="py-1">
-            {projectNames.map((key) => {
-              const prog = progressMap.get(key);
-              const displayName = prog?.name ?? key;
-              const status = deriveStatus(prog, refreshDone);
-              const isActive = status === "ai-scanning" || status === "scanning";
+            {all.map((name) => {
+              let status: string;
+              if (completedSet.has(name)) {
+                const llmStatus = llmByName.get(name);
+                if (llmStatus === "running") status = "ai-scanning";
+                else if (llmStatus === "error") status = "error";
+                else if (llmStatus === "skipped") status = "skipped";
+                else status = "done";
+              } else if (name === scanningName) {
+                status = "scanning";
+              } else {
+                status = "pending";
+              }
+              const isActive = status === "scanning" || status === "ai-scanning";
 
               return (
                 <div
-                  key={key}
+                  key={name}
                   className={cn(
                     "flex items-center gap-2.5 px-4 py-1.5 text-xs transition-colors",
                     isActive && "bg-muted/40"
@@ -239,9 +224,9 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
                       "flex-1 truncate",
                       status === "pending" ? "text-muted-foreground" : "text-foreground font-medium"
                     )}
-                    title={displayName}
+                    title={name}
                   >
-                    {displayName}
+                    {name}
                   </span>
                   <span
                     className={cn(
@@ -253,11 +238,6 @@ export function ActivityLogPanel({ refreshState, projects, config }: ActivityLog
                     )}
                   >
                     {statusLabel(status)}
-                    {status === "done" && prog?.llmDurationMs != null && (
-                      <span className="text-muted-foreground ml-1">
-                        {(prog.llmDurationMs / 1000).toFixed(1)}s
-                      </span>
-                    )}
                   </span>
                 </div>
               );

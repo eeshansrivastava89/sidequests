@@ -1,6 +1,5 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 
 export interface RefreshEvent {
   type: string;
@@ -33,6 +32,13 @@ export interface ProjectProgress {
   provider?: string; // which LLM provider processed this project
 }
 
+interface UseRefreshCallbacks {
+  onComplete: () => void;
+  onFirstStoreComplete?: (count: number, skipLlm: boolean) => void;
+  onScanDone?: (summary: RefreshEvent) => void;
+  onError?: (message: string) => void;
+}
+
 export interface RefreshState {
   active: boolean;
   phase: string;
@@ -52,10 +58,6 @@ const INITIAL_STATE: RefreshState = {
   summary: null,
   error: null,
 };
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /** Parse complete SSE frames from a buffer.
  * Only processes blocks terminated by \n\n — the incomplete tail
@@ -170,8 +172,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
           existing.detail = d.detail;
           existing.lastCommitDate = (d.lastCommitDate as string | null | undefined) ?? undefined;
           // Track completion order for staggered animation
-          const doneCount = [...projects.values()].filter(p => p.storeStatus === "done").length;
-          existing.storeOrder = doneCount;
+
         } else if (d.step === "llm") {
           existing.llmStatus = "done";
           if (d.detail) existing.detail = { ...existing.detail, ...d.detail };
@@ -214,11 +215,19 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
   }
 }
 
-export function useRefresh(onComplete: () => void) {
+export function useRefresh(onComplete: () => void, callbacks?: Omit<UseRefreshCallbacks, "onComplete">) {
   const [state, setState] = useState<RefreshState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
   const hydratedCoreRef = useRef(false);
   const cancelRequestedAtRef = useRef(0);
+  const firstStoreCompleteRef = useRef(false);
+  const projectCountRef = useRef(0);
+  const skipLlmRef = useRef(false);
+
+  const [scanProgress, setScanProgress] = useState<ScanProgress>({ all: [], completed: [] });
+
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
 
   const handleEvent = useCallback((type: string, raw: string) => {
     setState((s) => reduceRefreshEvent(s, type, raw));
@@ -238,6 +247,11 @@ export function useRefresh(onComplete: () => void) {
     const abort = new AbortController();
     abortRef.current = abort;
     hydratedCoreRef.current = false;
+    firstStoreCompleteRef.current = false;
+    projectCountRef.current = 0;
+    const skipLlm = !!options?.skipLlm;
+    skipLlmRef.current = skipLlm;
+    setScanProgress({ all: [], completed: [] });
 
     setState({
       active: true,
@@ -249,90 +263,84 @@ export function useRefresh(onComplete: () => void) {
       error: null,
     });
 
-    (async () => {
-      let response: Response;
-      const params = new URLSearchParams();
-      if (options?.skipLlm) params.set("skipLlm", "true");
-      if (options?.selectedNames && options.selectedNames.length > 0) {
-        params.set("names", options.selectedNames.join(","));
-      }
-      const qs = params.toString() ? `?${params.toString()}` : "";
-      const connect = async () => fetch(`/api/refresh/stream${qs}`, { signal: abort.signal });
+    const params = new URLSearchParams();
+    if (options?.skipLlm) params.set("skipLlm", "true");
+    if (options?.selectedNames && options.selectedNames.length > 0) {
+      params.set("names", options.selectedNames.join(","));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const apiBase = import.meta.env.VITE_API_URL || "";
+    const url = `${apiBase}/api/refresh/stream${qs}`;
+
+    const es = new EventSource(url);
+
+    es.addEventListener("enumerate_complete", (e) => {
+      handleEvent("enumerate_complete", e.data);
       try {
-        response = await connect();
-      } catch {
-        if (abort.signal.aborted) return;
-        setState((s) => ({ ...s, active: false, phase: "Error", error: "Connection failed" }));
-        return;
-      }
+        const data = JSON.parse(e.data);
+        projectCountRef.current = data.projectCount ?? 0;
+        setScanProgress({ all: data.names ?? [], completed: [] });
+      } catch {}
+    });
 
-      if (response.status === 409) {
-        const recentlyCancelled = Date.now() - cancelRequestedAtRef.current < 20_000;
-        if (recentlyCancelled) {
-          setState((s) => ({ ...s, phase: "Waiting for previous refresh to stop..." }));
-          for (let i = 0; i < 40; i++) {
-            await sleep(500);
-            if (abort.signal.aborted) return;
-            try {
-              response = await connect();
-            } catch {
-              if (abort.signal.aborted) return;
-              setState((s) => ({ ...s, active: false, phase: "Error", error: "Connection failed" }));
-              return;
-            }
-            if (response.status !== 409) break;
-          }
-        }
-        if (response.status === 409) {
-          setState(INITIAL_STATE);
-          toast.info("Refresh already in progress");
-          return;
-        }
-      }
+    es.addEventListener("project_start", (e) => {
+      handleEvent("project_start", e.data);
+    });
 
-      if (!response.ok || !response.body) {
-        setState((s) => ({ ...s, active: false, phase: "Error", error: `Server error (${response.status})` }));
-        return;
-      }
-      cancelRequestedAtRef.current = 0;
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let completed = false;
-
+    es.addEventListener("project_complete", (e) => {
+      handleEvent("project_complete", e.data);
       try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          // Process only complete SSE frames; incomplete frames stay in the buffer
-          const { events, remainder } = parseSSE(buffer);
-          buffer = remainder;
-
-          for (const frame of events) {
-            try {
-              handleEvent(frame.type, frame.data);
-            } catch {
-              // Ignore malformed SSE frames
-            }
-            if (frame.type === "done") completed = true;
+        const data = JSON.parse(e.data);
+        if (data.step === "store") {
+          if (!firstStoreCompleteRef.current) {
+            firstStoreCompleteRef.current = true;
+            callbacksRef.current?.onFirstStoreComplete?.(projectCountRef.current, skipLlmRef.current);
           }
+          setScanProgress(prev => ({
+            ...prev,
+            completed: [...prev.completed, data.name],
+          }));
         }
-      } catch {
-        if (abort.signal.aborted) return;
-        setState((s) => {
-          if (s.summary) return s;
-          return { ...s, active: false, phase: "Error", error: "Connection lost" };
-        });
-        return;
-      }
+      } catch {}
+    });
 
-      if (completed) {
-        onComplete();
-      }
-    })();
+    es.addEventListener("project_error", (e) => {
+      handleEvent("project_error", e.data);
+    });
+
+    es.addEventListener("done", (e) => {
+      handleEvent("done", e.data);
+      try {
+        const data = JSON.parse(e.data);
+        callbacksRef.current?.onScanDone?.(data);
+      } catch {}
+      onComplete();
+      es.close();
+    });
+
+    es.addEventListener("pipeline_error", (e) => {
+      handleEvent("pipeline_error", e.data);
+      try {
+        const data = JSON.parse(e.data);
+        callbacksRef.current?.onError?.(data.error);
+      } catch {}
+      es.close();
+    });
+
+    es.onerror = () => {
+      if (abort.signal.aborted) return;
+      es.close();
+      // EventSource auto-reconnects by default — prevent that
+      setState((s) => {
+        if (s.summary) return s;
+        return { ...s, active: false, phase: "Error", error: "Connection lost" };
+      });
+    };
+
+    // Wire abort to close EventSource
+    abort.signal.addEventListener("abort", () => {
+      es.close();
+    });
 
     // Cleanup on abort
     abort.signal.addEventListener("abort", () => {
@@ -359,5 +367,11 @@ export function useRefresh(onComplete: () => void) {
     abortRef.current?.abort();
   }, []);
 
-  return { state, start, cancel };
+  return { state, start, cancel, scanProgress };
+}
+
+/** Lightweight parallel state for the activity log — just arrays, no reducer. */
+export interface ScanProgress {
+  all: string[];
+  completed: string[];
 }

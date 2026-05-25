@@ -24,4 +24,8 @@ export default defineConfig({
       },
     },
   },
+  define: {
+    // Expose API URL so SSE connections can bypass Vite's buffering proxy
+    'import.meta.env.VITE_API_URL': JSON.stringify(apiTarget),
+  },
 });

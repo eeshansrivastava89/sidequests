@@ -149,14 +149,14 @@
 }
 
 .row-scanning {
-  border-left: 4px solid var(--blue) !important;
+  border-left: 4px solid var(--blue);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--blue) 6%, transparent) 0%,
     color-mix(in srgb, var(--blue) 10%, transparent) 40%,
     transparent 70%
-  ) !important;
-  background-size: 200% 100% !important;
+  );
+  background-size: 200% 100%;
   animation: scan-shimmer 1.8s linear infinite;
 }
 
@@ -167,44 +167,24 @@
 }
 
 .row-enriching {
-  border-left: 4px solid var(--primary) !important;
+  border-left: 4px solid var(--primary);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--primary) 12%, transparent) 0%,
     color-mix(in srgb, var(--primary) 22%, transparent) 35%,
     color-mix(in srgb, var(--primary) 8%, transparent) 60%,
     transparent 80%
-  ) !important;
-  background-size: 200% 100% !important;
+  );
+  background-size: 200% 100%;
   animation: enriching-glow 2.2s ease-in-out infinite;
 }
 
 .row-done {
-  border-left: 4px solid var(--green) !important;
+  border-left: 4px solid var(--green);
   transition: border-color 0.3s;
 }
 
 .row-error {
-  border-left: 4px solid var(--red) !important;
+  border-left: 4px solid var(--red);
   transition: border-color 0.3s;
-}
-
-@keyframes scan-sweep {
-  0% {
-    background-size: 0% 3px;
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    background-size: 100% 3px;
-    opacity: 1;
-  }
-}
-
-.row-scan-complete {
-  border-left: 4px solid var(--green) !important;
-  background-image: linear-gradient(90deg, color-mix(in srgb, var(--green) 8%, transparent), transparent 40%) !important;
-  animation: scan-sweep 1.2s ease-out forwards;
 }
