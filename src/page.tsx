@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjects } from "@/hooks/use-projects";
 import { useConfig } from "@/hooks/use-config";
@@ -6,148 +5,37 @@ import { useRefresh } from "@/hooks/use-refresh";
 import { useRefreshDeltas } from "@/hooks/use-refresh-deltas";
 import { useFocusGoals, useShipped, useVisit, dismissAlert, aggregateActions } from "@/hooks/use-whatnow-data";
 import type { Project, WorkflowView, SortKey, PriorityAction } from "@/lib/types";
-import { StatsBar } from "@/components/overview-strip";
-import { ProjectList } from "@/components/project-list";
-import { STATUS_COLORS } from "@/lib/status-colors";
+import {
+  SORT_OPTIONS,
+  sortProjects,
+  filterByView,
+  filterBySearch,
+  filterBySignal,
+  SIGNAL_LABELS,
+  loadSortKey,
+  saveSortKey,
+  getLastRefreshed,
+} from "@/lib/dashboard-filters";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { STATUS_COLORS } from "@/lib/status-colors";
+import type { StatsBarSignalFilter as SignalFilter } from "@/components/overview-strip";
+import { StatsBar } from "@/components/overview-strip";
+import { OverviewStrip } from "@/components/overview-strip";
+import { ProjectList } from "@/components/project-list";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
 import { ActionFeed } from "@/components/action-card";
-import { OverviewStrip } from "@/components/overview-strip";
 import { FocusSection } from "@/components/focus-section";
 import { ShippedSection } from "@/components/shipped-section";
 import { LifecycleActions } from "@/components/lifecycle-actions";
-
-import type { StatsBarSignalFilter as SignalFilter } from "@/components/overview-strip";
 import { SettingsModal } from "@/components/settings-modal";
 import { ActivityLogPanel } from "@/components/activity-log-panel";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Settings, X, Moon, Sun, Zap, Sparkles, TriangleAlert, Info, Target } from "lucide-react";
-import { formatRelativeTime } from "@/lib/project-helpers";
-
+import { Target, TriangleAlert, Info, X, Settings } from "lucide-react";
 import { toast } from "sonner";
-
-
-/* ── Sort ───────────────────────────────────────────────── */
-
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "lastCommit", label: "Last Commit" },
-  { key: "name", label: "Name" },
-  { key: "health", label: "Health" },
-  { key: "status", label: "Status" },
-  { key: "daysInactive", label: "Days Inactive" },
-];
-
-function sortProjects(projects: Project[], sortKey: SortKey): Project[] {
-  const sorted = [...projects];
-  switch (sortKey) {
-    case "lastCommit":
-      return sorted.sort((a, b) => {
-        const da = a.scan?.lastCommitDate ?? "";
-        const db = b.scan?.lastCommitDate ?? "";
-        return db.localeCompare(da); // desc
-      });
-    case "name":
-      return sorted.sort((a, b) => a.name.localeCompare(b.name)); // asc
-    case "health":
-      return sorted.sort((a, b) => a.healthScore - b.healthScore); // asc (worst first)
-    case "status": {
-      const order: Record<string, number> = { active: 0, paused: 1, stale: 2, archived: 3 };
-      return sorted.sort(
-        (a, b) => (order[a.status] ?? 99) - (order[b.status] ?? 99)
-      );
-    }
-    case "daysInactive":
-      return sorted.sort((a, b) => {
-        const da = a.scan?.daysInactive ?? Infinity;
-        const db = b.scan?.daysInactive ?? Infinity;
-        return da - db; // asc (least inactive first)
-      });
-    default:
-      return sorted;
-  }
-}
-
-/* ── Filter ─────────────────────────────────────────────── */
-
-function filterByView(projects: Project[], view: WorkflowView): Project[] {
-  switch (view) {
-    case "active":
-      return projects.filter((p) => p.status === "active");
-    case "completed":
-      return projects.filter((p) => p.status === "completed");
-    case "paused":
-      return projects.filter((p) => p.status === "paused");
-    case "archived":
-      return projects.filter((p) => p.status === "archived");
-    default:
-      return projects;
-  }
-}
-
-function filterBySearch(projects: Project[], query: string): Project[] {
-  if (!query) return projects;
-  const q = query.toLowerCase();
-  return projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(q) ||
-      p.status.toLowerCase().includes(q) ||
-      p.tags.some((t) => t.toLowerCase().includes(q)) ||
-      p.summary?.toLowerCase().includes(q) ||
-      p.scan?.languages?.primary?.toLowerCase().includes(q)
-  );
-}
-
-function filterBySignal(projects: Project[], signal: SignalFilter): Project[] {
-  if (!signal) return projects;
-  switch (signal) {
-    case "uncommitted":
-      return projects.filter((p) => p.isDirty);
-    case "open-issues":
-      return projects.filter((p) => p.openIssues > 0);
-    case "ci-failing":
-      return projects.filter((p) => p.ciStatus === "failure");
-    case "not-on-github":
-      return projects.filter((p) => p.repoVisibility === "not-on-github");
-    default:
-      return projects;
-  }
-}
-
-const SIGNAL_LABELS: Record<string, string> = {
-  uncommitted: "Uncommitted",
-  "open-issues": "Open Issues",
-  "ci-failing": "CI Failing",
-  "not-on-github": "Not on GitHub",
-};
-
-/* ── LocalStorage helpers ───────────────────────────────── */
-
-function loadSortKey(): SortKey {
-  if (typeof window === "undefined") return "lastCommit";
-  return (localStorage.getItem("dashboard-sort") as SortKey) ?? "lastCommit";
-}
-
-function saveSortKey(key: SortKey) {
-  localStorage.setItem("dashboard-sort", key);
-}
-
-/* ── Last Refreshed ─────────────────────────────────────── */
-
-function getLastRefreshed(projects: Project[]): string | null {
-  let latest: string | null = null;
-  for (const p of projects) {
-    if (p.lastScanned && (!latest || p.lastScanned > latest)) {
-      latest = p.lastScanned;
-    }
-  }
-  return latest;
-}
-
-/* ── Page ───────────────────────────────────────────────── */
 
 export function DashboardPage() {
   const { projects, loading, error, fetchProjects, updateOverride, togglePin, touchProject } =
@@ -231,23 +119,23 @@ export function DashboardPage() {
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
-  // Save visit snapshot on page visibility change (beforeunload)
+  // Save visit snapshot on page unload using sendBeacon
   useEffect(() => {
+    const handleBeforeUnload = () => {
+      navigator.sendBeacon("/api/visit");
+    };
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") {
-        visitHook.saveSnapshot();
+        navigator.sendBeacon("/api/visit");
       }
     };
-    const handleBeforeUnload = () => {
-      visitHook.saveSnapshot();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [visitHook.saveSnapshot]);
+  }, []);
 
   const handleFastScan = useCallback(() => {
     deltaHook.snapshot();
@@ -304,7 +192,7 @@ export function DashboardPage() {
   const handleDismissAlert = useCallback(
     (action: PriorityAction) => {
       dismissAlert(action.projectId, action.type, () => {
-        fetchProjects(); // Refresh to remove dismissed action
+        fetchProjects();
       });
     },
     [fetchProjects]
@@ -409,111 +297,19 @@ export function DashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {refreshHook.state.active && <div className="progress-bar" />}
-      <header className="sticky top-0 z-10 border-b border-border bg-card">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-xl font-bold tracking-tight">Sidequests</h1>
-              {lastRefreshed && (
-                <span className="text-xs text-muted-foreground">
-                  Last refreshed {formatRelativeTime(lastRefreshed)}
-                </span>
-              )}
-              {versionInfo?.updateAvailable && versionInfo.latest && (
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-xs font-medium text-amber-600 dark:text-amber-400 cursor-default">
-                        v{versionInfo.latest} available
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      <p>Run: npx @eeshans/sidequests@latest</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-            <div className="flex items-center gap-2 min-w-0">
-              <TooltipProvider delayDuration={300}>
-              {refreshHook.state.active ? (
-                <>
-                  <span className="text-xs text-muted-foreground max-w-[320px] truncate text-right shrink min-w-0">
-                    {refreshHook.state.phase}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={refreshHook.cancel}
-                  >
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                  <div className="flex items-center gap-1.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleFastScan}
-                          className="gap-1.5"
-                        >
-                          <Zap className="size-3.5" />
-                          Fast Scan{selectedNames.size > 0 ? ` [${selectedNames.size}]` : ""}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                        <p className="font-semibold mb-1">Deterministic scan</p>
-                        <p>Folders, lines of code, git history, GitHub issues, PRs, CI status, visibility</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          onClick={handleAiScan}
-                          className="gap-1.5"
-                        >
-                          <Sparkles className="size-3.5" />
-                          AI Scan{selectedNames.size > 0 ? ` [${selectedNames.size}]` : ""}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[240px] text-xs">
-                        <p className="font-semibold mb-1">Fast scan + LLM analysis</p>
-                        <p>Adds: summary, status reason, next action, health score, tags</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-              )}
-              <button
-                type="button"
-                className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                onClick={() => setDark((d) => !d)}
-                aria-label="Toggle dark mode"
-              >
-                {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-              </button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                    onClick={() => setSettingsOpen(true)}
-                    aria-label="Settings"
-                  >
-                    <Settings className="size-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">
-                  <p>Dev root, LLM provider, scan options</p>
-                </TooltipContent>
-              </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader
+        lastRefreshed={lastRefreshed}
+        versionInfo={versionInfo}
+        refreshActive={refreshHook.state.active}
+        refreshPhase={refreshHook.state.phase}
+        onCancel={refreshHook.cancel}
+        dark={dark}
+        onToggleDark={() => setDark((d) => !d)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onFastScan={handleFastScan}
+        onAiScan={handleAiScan}
+        selectedNamesCount={selectedNames.size}
+      />
 
       {/* Full-width scrollable content */}
       <main className="flex-1">
@@ -559,7 +355,6 @@ export function DashboardPage() {
             {/* ── What Now Tab ── */}
             {tab === "whatnow" && (
               <div className="space-y-6">
-                {/* Overview strip: delta + shipped + focus at a glance */}
                 <OverviewStrip
                   projects={projects}
                   focusGoals={focusHook.goals}
@@ -575,7 +370,6 @@ export function DashboardPage() {
                   onClearAll={() => { setView("all"); setSearch(""); setSignalFilter(null); }}
                 />
 
-                {/* Priority actions feed */}
                 <div>
                   <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Priority Actions
@@ -587,7 +381,6 @@ export function DashboardPage() {
                   />
                 </div>
 
-                {/* Expanded goals & shipped below actions */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <FocusSection
                     goals={focusHook.goals}
@@ -829,7 +622,7 @@ export function DashboardPage() {
               Source
             </a>
             <a href="https://www.linkedin.com/in/eeshans/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
-              <svg className="size-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.06 2.06 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0z"/></svg>
+              <svg className="size-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062.06 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0z"/></svg>
               LinkedIn
             </a>
           </div>
@@ -851,7 +644,6 @@ export function DashboardPage() {
                 onTouch={handleTouch}
                 delta={selectedId ? deltaHook.deltas?.projects.get(selectedId) ?? null : null}
               />
-              {/* Lifecycle actions in the detail pane */}
               <div className="px-6 pb-6">
                 <LifecycleActions
                   project={selectedProject}

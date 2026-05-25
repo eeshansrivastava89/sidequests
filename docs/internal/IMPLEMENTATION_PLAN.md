@@ -1,7 +1,7 @@
 # Sidequests — Architecture & Implementation Plan
 
 **Updated:** 2026-05-25
-**Status:** Phase 5 complete. SSE streaming fixed. Ready for Phase 6 (menu bar) and Phase 7 (polish).
+**Status:** Phase 5 complete. SSE streaming fixed. Ready for Phase 7 (polish), then Phase 6 (menu bar) and Phase 8 (ship).
 
 ---
 
@@ -113,17 +113,15 @@ The product is a **control center for side projects**, not a dashboard. Every fe
 
 ---
 
-## Phase 7: Polish & Ship
+## Phase 7: Polish
 
-### Before shipping v1
+Code quality and UX improvements. No production/deployment concerns.
 
-- [ ] **Split `page.tsx`** — currently 877 lines, needs modularization
-- [ ] **Lifecycle actions modal** — replace `prompt()` with proper dialog
-- [ ] **`beforeunload` visit save** — use `navigator.sendBeacon()` instead of sync fetch
-- [ ] **End-to-end npx validation** — fresh install, scan, verify all features work
-- [ ] **GitHub Actions** — update from deprecated Node 20
-- [ ] **Prisma hash fragility** — investigate and fix standalone Prisma hash mismatch
-- [ ] **Pre-existing test failures** — `use-refresh-cancel.test.tsx` and `use-refresh-restart.test.tsx` need `EventSource` mock in jsdom
+- [x] **Split `page.tsx`** — extracted sort/filter helpers to `dashboard-filters.ts`, extracted header to `dashboard-header.tsx` (877 → 669 lines)
+- [x] **Lifecycle actions modal** — replaced `prompt()` with Dialog component
+- [x] **`beforeunload` visit save** — switched from sync fetch to `navigator.sendBeacon()`
+- [x] **Pre-existing test failures** — rewrote `use-refresh-cancel` and `use-refresh-restart` tests with proper EventSource mock (7 tests, all passing now)
+- [ ] Further split `page.tsx` — 669 lines still, could extract Projects tab and What Now tab into components
 
 ### Future (v2+)
 
@@ -135,6 +133,16 @@ The product is a **control center for side projects**, not a dashboard. Every fe
 
 ---
 
+## Phase 8: Ship
+
+Productionizing for release. Not code quality — packaging, CI, distribution.
+
+- [ ] **End-to-end npx validation** — fresh install, scan, verify all features work
+- [ ] **GitHub Actions** — update from deprecated Node 20
+- [ ] **Prisma hash fragility** — investigate and fix standalone Prisma hash mismatch
+
+---
+
 ## Implementation Order
 
 ```
@@ -142,7 +150,8 @@ Phases 0–4: Complete ✅
 Phase 5: Express migration + SSE fix  ✅
     │
 Phase 6: Menu bar companion           ← Next (separate Swift project)
-Phase 7: Polish & ship v1             ← After or in parallel
+Phase 7: Polish                        ← Current priority
+Phase 8: Ship                          ← After polish + menu bar
 ```
 
 ---

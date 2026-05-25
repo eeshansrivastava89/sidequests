@@ -1,10 +1,11 @@
-
 import type { Project } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { AlarmClock, Archive, RotateCcw, X } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface LifecycleActionsProps {
   project: Project;
@@ -14,6 +15,8 @@ interface LifecycleActionsProps {
 
 export function LifecycleActions({ project, onUpdateOverride, isSnoozed }: LifecycleActionsProps) {
   const [snoozeDays, setSnoozeDays] = React.useState<number | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveNote, setArchiveNote] = useState("");
 
   const isArchived = project.status === "archived";
 
@@ -48,12 +51,11 @@ export function LifecycleActions({ project, onUpdateOverride, isSnoozed }: Lifec
   }
 
   async function handleArchive() {
-    const note = prompt("What did you learn from this project?");
-    if (note === null) return; // cancelled
+    const note = archiveNote.trim() || null;
     try {
       const result = await onUpdateOverride(project.id, {
         statusOverride: "archived",
-        archivedNote: note || null,
+        archivedNote: note,
       });
       if ((result as { ok?: boolean })?.ok) {
         toast.success(`Archived ${project.name}`);
@@ -63,6 +65,8 @@ export function LifecycleActions({ project, onUpdateOverride, isSnoozed }: Lifec
     } catch {
       toast.error("Failed to archive project");
     }
+    setArchiveDialogOpen(false);
+    setArchiveNote("");
   }
 
   async function handleRevive() {
@@ -172,7 +176,7 @@ export function LifecycleActions({ project, onUpdateOverride, isSnoozed }: Lifec
                 size="sm"
                 variant="outline"
                 className="gap-1.5 text-xs"
-                onClick={handleArchive}
+                onClick={() => setArchiveDialogOpen(true)}
               >
                 <Archive className="size-3.5" />
                 Archive
@@ -193,6 +197,36 @@ export function LifecycleActions({ project, onUpdateOverride, isSnoozed }: Lifec
           )}
         </div>
       </div>
+
+      {/* Archive confirmation dialog */}
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Archive {project.name}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              This marks the project as archived. You can revive it later.
+            </p>
+            <Input
+              placeholder="What did you learn from this project? (optional)"
+              value={archiveNote}
+              onChange={(e) => setArchiveNote(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleArchive();
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleArchive}>
+              Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

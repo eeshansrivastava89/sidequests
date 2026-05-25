@@ -5,55 +5,87 @@ import { useRefresh } from "@/hooks/use-refresh";
 
 afterEach(cleanup);
 
-vi.mock("sonner", () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() } }));
 
-function createMockSSEFetch(status = 200) {
-  let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
-  const encoder = new TextEncoder();
+/**
+ * Mock EventSource for jsdom (which doesn't provide EventSource).
+ */
+class MockEventSource {
+  static instances: MockEventSource[] = [];
+  url: string;
+  onopen: ((ev: Event) => void) | null = null;
+  onmessage: ((ev: MessageEvent) => void) | null = null;
+  onerror: ((ev: Event) => void) | null = null;
+  readyState: number = 0;
+  private eventListeners: Map<string, EventListener[]> = new Map();
+  private closed = false;
 
-  const mockFetch = vi.fn().mockImplementation(() => {
-    if (status === 409) {
-      return Promise.resolve({ ok: false, status: 409, body: null });
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+
+  constructor(url: string) {
+    this.url = url;
+    this.readyState = MockEventSource.CONNECTING;
+    MockEventSource.instances.push(this);
+    setTimeout(() => {
+      if (this.closed) return;
+      this.readyState = MockEventSource.OPEN;
+      this.onopen?.(new Event("open"));
+    }, 0);
+  }
+
+  addEventListener(type: string, listener: EventListener) {
+    const existing = this.eventListeners.get(type) ?? [];
+    existing.push(listener);
+    this.eventListeners.set(type, existing);
+  }
+
+  removeEventListener(type: string, listener: EventListener) {
+    const existing = this.eventListeners.get(type) ?? [];
+    this.eventListeners.set(type, existing.filter((l) => l !== listener));
+  }
+
+  close() {
+    this.closed = true;
+    this.readyState = MockEventSource.CLOSED;
+  }
+
+  _emit(type: string, data: string) {
+    const listeners = this.eventListeners.get(type) ?? [];
+    const event = new MessageEvent(type, { data });
+    for (const listener of listeners) {
+      listener(event as MessageEvent);
     }
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        streamController = controller;
-      },
-    });
-    return Promise.resolve({ ok: true, status: 200, body: stream });
-  });
-
-  return {
-    mockFetch,
-    pushSSE(event: string, data: string) {
-      streamController?.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
-    },
-    closeStream() {
-      try { streamController?.close(); } catch { /* already closed */ }
-    },
-  };
+  }
 }
 
 describe("useRefresh — cancel→restart flow", () => {
+  let originalEventSource: typeof globalThis.EventSource;
   let originalFetch: typeof globalThis.fetch;
 
   beforeEach(() => {
+    originalEventSource = globalThis.EventSource;
     originalFetch = globalThis.fetch;
+    MockEventSource.instances = [];
+    // @ts-expect-error polyfill
+    globalThis.EventSource = MockEventSource;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch;
   });
 
   afterEach(() => {
+    globalThis.EventSource = originalEventSource;
     globalThis.fetch = originalFetch;
+    MockEventSource.instances = [];
   });
 
   it("cancel sets active to false", async () => {
-    const { mockFetch } = createMockSSEFetch();
-    globalThis.fetch = mockFetch as unknown as typeof fetch;
-
     const onComplete = vi.fn();
     const { result } = renderHook(() => useRefresh(onComplete));
 
     await act(async () => {
       result.current.start();
+      await new Promise((r) => setTimeout(r, 10));
     });
     expect(result.current.state.active).toBe(true);
 
@@ -64,33 +96,31 @@ describe("useRefresh — cancel→restart flow", () => {
   });
 
   it("can restart after cancel (no stuck state)", async () => {
-    const { mockFetch } = createMockSSEFetch();
-    globalThis.fetch = mockFetch as unknown as typeof fetch;
-
     const onComplete = vi.fn();
     const { result } = renderHook(() => useRefresh(onComplete));
 
     // Start and cancel
     await act(async () => {
       result.current.start();
+      await new Promise((r) => setTimeout(r, 10));
     });
     act(() => {
       result.current.cancel();
     });
     expect(result.current.state.active).toBe(false);
 
-    // Restart with fresh mock
-    const { mockFetch: mockFetch2, pushSSE: pushSSE2 } = createMockSSEFetch();
-    globalThis.fetch = mockFetch2 as unknown as typeof fetch;
-
+    // Restart
+    MockEventSource.instances = [];
     await act(async () => {
       result.current.start();
+      await new Promise((r) => setTimeout(r, 10));
     });
     expect(result.current.state.active).toBe(true);
 
     // Verify stream works
+    const es = MockEventSource.instances[MockEventSource.instances.length - 1];
     await act(async () => {
-      pushSSE2("enumerate_complete", '{"projectCount":3,"names":["a","b","c"]}');
+      es._emit("enumerate_complete", JSON.stringify({ projectCount: 3, names: ["a", "b", "c"] }));
       await new Promise((r) => setTimeout(r, 10));
     });
     expect(result.current.state.phase).toBe("Found 3 projects. Scanning...");
@@ -100,22 +130,24 @@ describe("useRefresh — cancel→restart flow", () => {
     });
   });
 
-  it("409 on restart shows toast and resets state", async () => {
-    // Mock 409 response directly — no prior cancel, so hook should immediately
-    // toast and reset to INITIAL_STATE
-    const { mockFetch: mockFetch409 } = createMockSSEFetch(409);
-    globalThis.fetch = mockFetch409 as unknown as typeof fetch;
-
+  it("handles EventSource error by resetting state", async () => {
     const onComplete = vi.fn();
     const { result } = renderHook(() => useRefresh(onComplete));
 
     await act(async () => {
       result.current.start();
-      // Allow the async IIFE in start() to process the 409 response
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(result.current.state.active).toBe(true);
+
+    // Simulate EventSource error
+    const es = MockEventSource.instances[MockEventSource.instances.length - 1];
+    act(() => {
+      es.onerror?.(new Event("error"));
     });
 
-    // Should have reset to inactive (409 without recent cancel → toast + reset)
+    // Should reset to inactive with error phase
     expect(result.current.state.active).toBe(false);
+    expect(result.current.state.phase).toBe("Error");
   });
 });
