@@ -37,4 +37,23 @@ export const ollamaProvider: LlmProvider = {
 
     return parseEnrichment(content);
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const baseUrl = config.ollamaUrl;
+    const res = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: config.ollamaModel,
+        stream: false,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout * 2),
+    });
+    if (!res.ok) throw new Error(`Ollama API error: ${res.status}`);
+    const data = await res.json();
+    const content = data.message?.content;
+    if (!content) throw new Error("Empty response from Ollama");
+    return content;
+  },
 };

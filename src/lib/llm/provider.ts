@@ -48,4 +48,6 @@ export interface LlmInput {
 export interface LlmProvider {
   name: string;
   enrich(input: LlmInput, signal?: AbortSignal): Promise<LlmEnrichment>;
+  /** Run a raw text prompt and return the text response. Used for portfolio-level analysis. */
+  analyze(prompt: string, signal?: AbortSignal): Promise<string>;
 }

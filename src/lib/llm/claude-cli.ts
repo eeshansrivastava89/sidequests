@@ -37,4 +37,19 @@ export const claudeCliProvider: LlmProvider = {
 
     return parseEnrichment(stdout);
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const { stdout } = await runCli({
+      command: "claude",
+      args: [
+        "-p",
+        "--output-format", "text",
+        ...(config.claudeCliModel ? ["--model", config.claudeCliModel] : []),
+      ],
+      stdinData: prompt,
+      timeoutMs: config.llmTimeout * 2, // Portfolio analysis takes longer
+      signal,
+    });
+    return stdout;
+  },
 };

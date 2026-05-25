@@ -70,4 +70,15 @@ export const qwenCliProvider: LlmProvider = {
 
     return parseEnrichment(text);
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const { stdout } = await runCli({
+      command: "qwen-cli",
+      args: [],
+      stdinData: prompt,
+      timeoutMs: config.llmTimeout * 2,
+      signal,
+    });
+    return stdout;
+  },
 };

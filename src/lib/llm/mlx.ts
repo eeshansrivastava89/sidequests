@@ -37,4 +37,22 @@ export const mlxProvider: LlmProvider = {
 
     return parseEnrichment(content);
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const res = await fetch(`${config.mlxUrl}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: config.mlxModel,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+      }),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout * 2),
+    });
+    if (!res.ok) throw new Error(`MLX server error: ${res.status}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from MLX server");
+    return content;
+  },
 };

@@ -79,4 +79,15 @@ export const codexCliProvider: LlmProvider = {
       try { unlinkSync(outputFile); } catch { /* temp file cleanup */ }
     }
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const { stdout } = await runCli({
+      command: "codex",
+      args: ["-q", "--full-auto", ...(config.codexCliModel ? ["--model", config.codexCliModel] : [])],
+      stdinData: prompt,
+      timeoutMs: config.llmTimeout * 2,
+      signal,
+    });
+    return stdout;
+  },
 };

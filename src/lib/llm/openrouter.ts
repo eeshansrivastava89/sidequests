@@ -43,4 +43,24 @@ export const openrouterProvider: LlmProvider = {
 
     return parseEnrichment(content);
   },
+
+  async analyze(prompt: string, signal?: AbortSignal): Promise<string> {
+    const apiKey = config.openrouterApiKey;
+    if (!apiKey) throw new Error("openrouterApiKey is required");
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: config.openrouterModel,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+      }),
+      signal: signal ?? AbortSignal.timeout(config.llmTimeout * 2),
+    });
+    if (!res.ok) throw new Error(`OpenRouter API error: ${res.status}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from OpenRouter");
+    return content;
+  },
 };

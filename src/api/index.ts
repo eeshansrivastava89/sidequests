@@ -11,6 +11,7 @@ import { versionRoute } from "./routes/version";
 import { focusRoute } from "./routes/focus";
 import { visitRoute } from "./routes/visit";
 import { shippedRoute } from "./routes/shipped";
+import { portfolioRoute } from "./routes/portfolio";
 
 // ── API router (mountable on any Express app) ────────────────
 export const apiRouter = Router();
@@ -32,6 +33,7 @@ apiRouter.use("/version", versionRoute);
 apiRouter.use("/focus", focusRoute);
 apiRouter.use("/visit", visitRoute);
 apiRouter.use("/shipped", shippedRoute);
+apiRouter.use("/portfolio", portfolioRoute);
 
 // ── 404 fallback ────────────────────────────────────────
 apiRouter.use((_req, res) => {

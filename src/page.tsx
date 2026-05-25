@@ -380,10 +380,6 @@ export function DashboardPage() {
                 shippedLoading={shippedHook.loading}
                 visit={visitHook.visit}
                 visitLoading={visitHook.loading}
-                focusGoals={focusHook.goals}
-                focusLoading={focusHook.loading}
-                onToggleFocusGoal={(id, completed) => focusHook.updateGoal(id, { completed })}
-                onAddFocusGoal={() => setTab("whatnow")}
                 onSelectProject={(id) => setSelectedId(id)}
               />
             )}
