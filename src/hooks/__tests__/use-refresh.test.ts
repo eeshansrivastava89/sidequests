@@ -4,7 +4,7 @@ import { parseSSE, reduceRefreshEvent, type RefreshState } from "@/hooks/use-ref
 function makeActiveState(overrides: Partial<RefreshState> = {}): RefreshState {
   return {
     active: true,
-    phase: "Scanning...",
+    phase: "Fast scanning...",
     deterministicReady: false,
     skipLlm: false,
     projects: new Map(),
@@ -58,7 +58,7 @@ describe("reduceRefreshEvent — state transitions", () => {
   it("enumerate_complete shows project count and pre-populates projects", () => {
     const state = makeActiveState();
     const next = reduceRefreshEvent(state, "enumerate_complete", '{"projectCount":3,"names":["a","b","c"]}');
-    expect(next.phase).toBe("Found 3 projects. Scanning...");
+    expect(next.phase).toBe("Found 3 projects. Fast scanning...");
     expect(next.projects.size).toBe(3);
     expect(next.projects.get("a")?.storeStatus).toBe("pending");
   });
@@ -92,12 +92,12 @@ describe("reduceRefreshEvent — state transitions", () => {
     expect(next.phase).toBe("qwen-cli: 1 running | 0/1");
   });
 
-  it("project_start with step=store shows Scanning phase", () => {
+  it("project_start with step=store shows Fast scanning phase", () => {
     const state = makeActiveState();
     const raw = JSON.stringify({ name: "my-app", step: "store", index: 0, total: 5 });
 
     const next = reduceRefreshEvent(state, "project_start", raw);
-    expect(next.phase).toBe("Scanning my-app (1/5)");
+    expect(next.phase).toBe("Fast scanning my-app (1/5)");
   });
 
   it("done event finalizes state: active=false, deterministicReady=true, summary set", () => {
@@ -126,12 +126,12 @@ describe("reduceRefreshEvent — state transitions", () => {
     let state = makeActiveState();
 
     state = reduceRefreshEvent(state, "enumerate_complete", '{"projectCount":3,"names":["app-a","app-b","app-c"]}');
-    expect(state.phase).toBe("Found 3 projects. Scanning...");
+    expect(state.phase).toBe("Found 3 projects. Fast scanning...");
 
     state = reduceRefreshEvent(state, "project_start", JSON.stringify({
       name: "app-a", step: "store", index: 0, total: 3,
     }));
-    expect(state.phase).toBe("Scanning app-a (1/3)");
+    expect(state.phase).toBe("Fast scanning app-a (1/3)");
   });
 
   it("project_complete updates project status correctly", () => {

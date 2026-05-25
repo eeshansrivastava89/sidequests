@@ -26,7 +26,7 @@ function StatusIcon({ status }: { status: string }) {
 function statusLabel(status: string): string {
   switch (status) {
     case "pending": return "Waiting";
-    case "scanning": return "Scanning";
+    case "scanning": return "Fast scanning";
     case "ai-scanning": return "AI scanning";
     case "done": return "Done";
     case "error": return "Failed";

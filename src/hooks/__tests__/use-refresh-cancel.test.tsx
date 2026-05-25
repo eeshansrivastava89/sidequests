@@ -110,7 +110,7 @@ describe("useRefresh — hook-level cancel path", () => {
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    expect(result.current.state.phase).toBe("Found 5 projects. Scanning...");
+    expect(result.current.state.phase).toBe("Found 5 projects. Fast scanning...");
 
     // Cancel
     act(() => {
@@ -187,7 +187,7 @@ describe("useRefresh — hook-level cancel path", () => {
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    expect(result.current.state.phase).toBe("Found 3 projects. Scanning...");
+    expect(result.current.state.phase).toBe("Found 3 projects. Fast scanning...");
 
     // Cleanup
     act(() => {

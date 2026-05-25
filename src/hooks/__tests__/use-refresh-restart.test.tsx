@@ -123,7 +123,7 @@ describe("useRefresh — cancel→restart flow", () => {
       es._emit("enumerate_complete", JSON.stringify({ projectCount: 3, names: ["a", "b", "c"] }));
       await new Promise((r) => setTimeout(r, 10));
     });
-    expect(result.current.state.phase).toBe("Found 3 projects. Scanning...");
+    expect(result.current.state.phase).toBe("Found 3 projects. Fast scanning...");
 
     act(() => {
       result.current.cancel();

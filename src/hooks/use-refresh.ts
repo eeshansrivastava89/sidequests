@@ -140,7 +140,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
           projects.set(key, { name: names[i], storeStatus: "pending", llmStatus: "pending" });
         }
       }
-      return { ...state, projects, phase: `Found ${d.projectCount} projects. Scanning...` };
+      return { ...state, projects, phase: `Found ${d.projectCount} projects. Fast scanning...` };
     }
     case "project_start": {
       const projects = new Map(state.projects);
@@ -159,7 +159,7 @@ export function reduceRefreshEvent(state: RefreshState, type: string, raw: strin
       projects.set(key, existing);
       const phase = d.step === "llm"
         ? buildLlmPhase(projects, d.provider)
-        : `Scanning ${d.name} (${d.index! + 1}/${d.total})`;
+        : `Fast scanning ${d.name} (${d.index! + 1}/${d.total})`;
       return { ...state, projects, phase };
     }
     case "project_complete": {
