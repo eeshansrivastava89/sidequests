@@ -29,6 +29,7 @@ let db: any;
 let app: ReturnType<typeof createTestApp>;
 
 beforeAll(async () => {
+  // @ts-expect-error -- .mjs import has no type declarations
   const { bootstrapDb } = await import("../../../../bin/bootstrap-db.mjs");
   await bootstrapDb(TEST_DB_PATH);
   db = await getTestDb();

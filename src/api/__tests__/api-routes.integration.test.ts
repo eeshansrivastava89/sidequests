@@ -33,6 +33,7 @@ let app: ReturnType<typeof createTestApp>;
 
 beforeAll(async () => {
   // Ensure DB schema is current by running bootstrap migrations
+  // @ts-expect-error -- .mjs import has no type declarations
   const { bootstrapDb } = await import("../../../../bin/bootstrap-db.mjs");
   await bootstrapDb(TEST_DB_PATH);
 
@@ -227,12 +228,6 @@ describe("Express simple routes", () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
     expect(res.body.ts).toBeDefined();
-  });
-
-  it("GET /api/config returns empty object", async () => {
-    const res = await request(app).get("/api/config");
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({});
   });
 
   it("GET /api/preflight returns checks array", async () => {

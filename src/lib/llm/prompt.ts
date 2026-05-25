@@ -1,8 +1,26 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import type { LlmInput, LlmEnrichment, LlmStatus, Insight, InsightSeverity } from "./provider";
+import { config } from "../config";
 
 const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+
+/** Try to parse a JSON object from an LLM response.
+ * Handles string responses, markdown fences, and partial JSON wrapping.
+ * Returns null if parsing fails entirely. */
+export function tryParseLlmJson(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw === "object" && raw !== null) return raw as Record<string, unknown>;
+  if (typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { return null; }
+    }
+    return null;
+  }
+}
 
 export const SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "project-system.md"), "utf-8").trim();
 const USER_TEMPLATE = readFileSync(join(PROMPTS_DIR, "project-user.md"), "utf-8").trim();
@@ -35,6 +53,10 @@ export function buildPrompt(input: LlmInput): string {
     prompt = prompt.replace("{{previousSummaryBlock}}", "");
   }
 
+  if (config.llmDebug) {
+    console.log(`[llm] Prompt for ${input.name} (~${prompt.length} chars):\n${prompt.slice(0, 1200)}${prompt.length > 1200 ? "\n..." : ""}`);
+  }
+
   return prompt;
 }
 
@@ -43,24 +65,7 @@ export function buildPrompt(input: LlmInput): string {
  * applying defaults for any missing fields.
  */
 export function parseEnrichment(raw: unknown): LlmEnrichment {
-  let obj: Record<string, unknown> | null = null;
-
-  if (typeof raw === "string") {
-    try {
-      obj = JSON.parse(raw);
-    } catch {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          obj = JSON.parse(match[0]);
-        } catch {
-          // fall through to defaults
-        }
-      }
-    }
-  } else {
-    obj = raw as Record<string, unknown>;
-  }
+  const obj = tryParseLlmJson(raw);
 
   const summary = typeof obj?.summary === "string" ? obj.summary : "";
   const nextAction = typeof obj?.nextAction === "string" && obj.nextAction

@@ -62,6 +62,7 @@ export const ModelName = {
   WeeklyFocus: 'WeeklyFocus',
   DismissedAlert: 'DismissedAlert',
   UserPreference: 'UserPreference',
+  PortfolioAnalysis: 'PortfolioAnalysis',
   UserVisit: 'UserVisit'
 } as const
 
@@ -100,6 +101,7 @@ export const ScanScalarFieldEnum = {
   projectId: 'projectId',
   rawJson: 'rawJson',
   rawJsonHash: 'rawJsonHash',
+  metaJson: 'metaJson',
   scannedAt: 'scannedAt'
 } as const
 
@@ -148,11 +150,8 @@ export const LlmScalarFieldEnum = {
   framework: 'framework',
   primaryLanguage: 'primaryLanguage',
   purpose: 'purpose',
-  notableFeaturesJson: 'notableFeaturesJson',
-  pitch: 'pitch',
-  aiInsightJson: 'aiInsightJson',
-  aiInsightGeneratedAt: 'aiInsightGeneratedAt',
   llmError: 'llmError',
+  extrasJson: 'extrasJson',
   generatedAt: 'generatedAt'
 } as const
 
@@ -241,6 +240,15 @@ export const UserPreferenceScalarFieldEnum = {
 } as const
 
 export type UserPreferenceScalarFieldEnum = (typeof UserPreferenceScalarFieldEnum)[keyof typeof UserPreferenceScalarFieldEnum]
+
+
+export const PortfolioAnalysisScalarFieldEnum = {
+  id: 'id',
+  resultJson: 'resultJson',
+  generatedAt: 'generatedAt'
+} as const
+
+export type PortfolioAnalysisScalarFieldEnum = (typeof PortfolioAnalysisScalarFieldEnum)[keyof typeof PortfolioAnalysisScalarFieldEnum]
 
 
 export const UserVisitScalarFieldEnum = {

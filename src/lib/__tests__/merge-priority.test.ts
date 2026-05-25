@@ -80,11 +80,8 @@ function makeFixture(overrides: Partial<ProjectWithRelations> = {}): ProjectWith
       tagsJson: JSON.stringify(["typescript", "next", "fullstack"]),
       recommendationsJson: JSON.stringify(["Add tests"]),
       llmError: null,
-      // Legacy
+      // Legacy fallback
       purpose: "LLM purpose",
-      notableFeaturesJson: JSON.stringify(["SSR", "API routes"]),
-      pitch: "A great project",
-      aiInsightJson: null,
       generatedAt: now,
     },
     override: null,

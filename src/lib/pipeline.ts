@@ -1,10 +1,105 @@
 import { createHash } from "crypto";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { config } from "./config";
 import { db } from "./db";
 import { getLlmProvider, type LlmEnrichment } from "./llm";
+import { tryParseLlmJson } from "./llm/prompt";
 import { listProjectDirs, scanProject } from "./pipeline-native/scan";
 import { deriveProject, type ScanProject as DeriveInput } from "./pipeline-native/derive";
 import { fetchGitHubData, isGhAvailable, parseGitHubOwnerRepo } from "./pipeline-native/github";
+import { mergeAllProjects } from "./merge";
+
+// Load portfolio prompt from config file
+const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
+const PORTFOLIO_SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "portfolio-system.md"), "utf-8").trim();
+
+
+/** Build the per-project summary string for the portfolio LLM prompt.
+ *
+ *  To add a field: add a conditional line below. It will automatically
+ *  appear in the portfolio prompt next time the analysis runs.
+ *  Fields come from MergedProject — see merge.ts for the full list.
+ */
+export function buildPortfolioSummary(p: Awaited<ReturnType<typeof mergeAllProjects>>[number]): string {
+  const parts = [
+    `## ${p.name}`,
+    `Status: ${p.llmStatus ?? p.status}${p.statusReason ? ` (${p.statusReason})` : ""}`,
+    `Health: ${p.healthScore}/100`,
+    `Hygiene: ${p.hygieneScore}/100`,
+    `Momentum: ${p.momentumScore}/100`,
+    `Commits: ${p.weekCommits}/7d, ${p.monthCommits}/30d, ${p.quarterCommits}/90d`,
+  ];
+  if (p.openIssues > 0) parts.push(`Open Issues: ${p.openIssues}`);
+  if (p.ciStatus === "failure") parts.push("CI: FAILING");
+  if (p.isDirty) parts.push("Dirty: yes (uncommitted changes)");
+  if (p.nextAction) parts.push(`Next Action: ${p.nextAction}`);
+  if (p.summary) parts.push(`Summary: ${p.summary}`);
+  if (p.insights.length > 0) parts.push(`Insights: ${p.insights.map((i) => `[${i.severity}] ${i.text}`).join(";")}`);
+  if (p.goal) parts.push(`Goal: ${p.goal}`);
+  if (p.framework) parts.push(`Framework: ${p.framework}`);
+  if (p.primaryLanguage) parts.push(`Language: ${p.primaryLanguage}`);
+  // Extra fields from meta (scan/LLM extensible data)
+  if (p.meta && Object.keys(p.meta).length > 0) {
+    for (const [key, val] of Object.entries(p.meta)) {
+      if (val != null && val !== "") parts.push(`${key}: ${val}`);
+    }
+  }
+  return parts.join("\n");
+}
+
+/** Run portfolio-level LLM analysis and persist to DB. */
+export async function runPortfolioAnalysis(signal?: AbortSignal): Promise<void> {
+  const provider = getLlmProvider();
+  if (!provider) {
+    console.log("[pipeline] No LLM provider — skipping portfolio analysis");
+    return;
+  }
+
+  const projects = await mergeAllProjects();
+  const summaries = projects.map(buildPortfolioSummary);
+  const prompt = `${PORTFOLIO_SYSTEM_PROMPT}\n\nProjects (${projects.length} total):\n\n${summaries.join("\n\n")}`;
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[pipeline] [portfolio] Running portfolio analysis (${projects.length} projects, ~${prompt.length} chars)...`);
+    if (config.llmDebug) {
+      console.log(`[pipeline] [portfolio] Prompt:\n${prompt.slice(0, 1200)}${prompt.length > 1200 ? "\n..." : ""}`);
+    }
+  }
+
+  const startTime = Date.now();
+  try {
+    const result = await provider.analyze(prompt, signal);
+    const durationMs = Date.now() - startTime;
+
+    if (process.env.NODE_ENV !== "test") {
+      console.log(`[pipeline] [portfolio] LLM responded in ${(durationMs / 1000).toFixed(1)}s (${String(result).length} chars)`);
+      if (config.llmDebug) {
+        console.log(`[pipeline] [portfolio] Raw output:\n${String(result).slice(0, 800)}${String(result).length > 800 ? "\n..." : ""}`);
+      }
+    }
+
+    const parsed = tryParseLlmJson(result);
+    if (!parsed) {
+      console.error("[pipeline] [portfolio] Failed to parse LLM response as JSON");
+      return;
+    }
+
+    // Delete previous and create new
+    if (process.env.NODE_ENV !== "test") {
+      console.log("[pipeline] [portfolio] Saving analysis to DB...");
+    }
+    await db.portfolioAnalysis.deleteMany({});
+    await db.portfolioAnalysis.create({
+      data: { resultJson: JSON.stringify(parsed) },
+    });
+    console.log(`[pipeline] [portfolio] Analysis saved (${((Date.now() - startTime) / 1000).toFixed(1)}s total)`);
+  } catch (err) {
+    if (signal?.aborted) return;
+    const durationMs = Date.now() - startTime;
+    console.error(`[pipeline] [portfolio] Failed after ${(durationMs / 1000).toFixed(1)}s:`, err instanceof Error ? err.message : String(err));
+  }
+}
 
 /** Validate scan output shape. */
 export function validateScanOutput(data: unknown): { scannedAt: string; projectCount: number; projects: Array<Record<string, unknown>> } {
@@ -206,17 +301,32 @@ export async function runRefreshPipeline(
     const rawJson = JSON.stringify(scanned);
     const newHash = hashRawJson(rawJson);
 
+    // Build metaJson — extensible key-value pairs for UI/display
+    const metaJson = JSON.stringify({
+      description: scanned.description ?? null,
+      languages: scanned.languages ?? null,
+      files: scanned.files ?? null,
+      cicd: scanned.cicd ?? null,
+      deployment: scanned.deployment ?? null,
+      todoCount: scanned.todoCount ?? 0,
+      fixmeCount: scanned.fixmeCount ?? 0,
+      stashCount: scanned.stashCount ?? 0,
+      commitCount: scanned.commitCount ?? 0,
+    });
+
     await db.scan.upsert({
       where: { projectId: project.id },
       create: {
         projectId: project.id,
         rawJson,
         rawJsonHash: newHash,
+        metaJson,
         scannedAt: new Date(scannedAt),
       },
       update: {
         rawJson,
         rawJsonHash: newHash,
+        metaJson,
         scannedAt: new Date(scannedAt),
       },
     });
@@ -528,7 +638,12 @@ export async function runRefreshPipeline(
     );
   }
 
-  // 4. Log activity for each project
+  // 4. Portfolio analysis (only after AI scan with LLM)
+  if (llmProvider && llmSucceeded > 0 && !signal?.aborted) {
+    await runPortfolioAnalysis(signal);
+  }
+
+  // 5. Log activity for each project
   for (const entry of projectLog) {
     await db.activity.create({
       data: {
@@ -544,7 +659,7 @@ export async function runRefreshPipeline(
     });
   }
 
-  // 5. Emit done IMMEDIATELY — don't let notifications/cleanup delay it
+  // 6. Emit done IMMEDIATELY — don't let notifications/cleanup delay it
   //    The UI needs this event to transition out of "active" state.
   if (signal?.aborted) {
     return { projectCount: projectDirs.length };
@@ -577,7 +692,7 @@ export async function runRefreshPipeline(
     provider: providerName ?? undefined,
   });
 
-  // 6. Notifications are deprecated — in-app attention signals (What Now tab)
+  // 7. Notifications are deprecated — in-app attention signals (What Now tab)
   //    and future menu bar badges replace system notifications.
   //    Cleanup old notification Activity records:
   if (process.env.NODE_ENV !== "test") {
@@ -588,7 +703,7 @@ export async function runRefreshPipeline(
     }
   }
 
-  // 7. Cleanup: delete Activity records older than 90 days
+  // 8. Cleanup: delete Activity records older than 90 days
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   await db.activity.deleteMany({
     where: { createdAt: { lt: ninetyDaysAgo } },

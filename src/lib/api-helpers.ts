@@ -1,5 +1,3 @@
-import { db } from "@/lib/db";
-
 /* ------------------------------------------------------------------ */
 /*  PATCH field coercion (framework-agnostic)                          */
 /* ------------------------------------------------------------------ */
@@ -61,33 +59,4 @@ export function coercePatchBody(
   }
 
   return { data };
-}
-
-/* ------------------------------------------------------------------ */
-/*  Safe JSON parse                                                    */
-/* ------------------------------------------------------------------ */
-
-/** Parse a JSON string, returning `fallback` on failure or null/undefined. */
-export function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
-  if (!json) return fallback;
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Error detection (framework-agnostic)                                */
-/* ------------------------------------------------------------------ */
-
-/** Format an unknown error into a consistent message string. */
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** Detect SQLite "no such table" errors from Prisma/LibSQL. */
-export function isMissingTableError(error: unknown): boolean {
-  const msg = errorMessage(error);
-  return msg.includes("no such table") || msg.includes("SQLITE_ERROR");
 }

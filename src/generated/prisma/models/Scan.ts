@@ -29,6 +29,7 @@ export type ScanMinAggregateOutputType = {
   projectId: string | null
   rawJson: string | null
   rawJsonHash: string | null
+  metaJson: string | null
   scannedAt: Date | null
 }
 
@@ -37,6 +38,7 @@ export type ScanMaxAggregateOutputType = {
   projectId: string | null
   rawJson: string | null
   rawJsonHash: string | null
+  metaJson: string | null
   scannedAt: Date | null
 }
 
@@ -45,6 +47,7 @@ export type ScanCountAggregateOutputType = {
   projectId: number
   rawJson: number
   rawJsonHash: number
+  metaJson: number
   scannedAt: number
   _all: number
 }
@@ -55,6 +58,7 @@ export type ScanMinAggregateInputType = {
   projectId?: true
   rawJson?: true
   rawJsonHash?: true
+  metaJson?: true
   scannedAt?: true
 }
 
@@ -63,6 +67,7 @@ export type ScanMaxAggregateInputType = {
   projectId?: true
   rawJson?: true
   rawJsonHash?: true
+  metaJson?: true
   scannedAt?: true
 }
 
@@ -71,6 +76,7 @@ export type ScanCountAggregateInputType = {
   projectId?: true
   rawJson?: true
   rawJsonHash?: true
+  metaJson?: true
   scannedAt?: true
   _all?: true
 }
@@ -152,6 +158,7 @@ export type ScanGroupByOutputType = {
   projectId: string
   rawJson: string
   rawJsonHash: string | null
+  metaJson: string | null
   scannedAt: Date
   _count: ScanCountAggregateOutputType | null
   _min: ScanMinAggregateOutputType | null
@@ -181,6 +188,7 @@ export type ScanWhereInput = {
   projectId?: Prisma.StringFilter<"Scan"> | string
   rawJson?: Prisma.StringFilter<"Scan"> | string
   rawJsonHash?: Prisma.StringNullableFilter<"Scan"> | string | null
+  metaJson?: Prisma.StringNullableFilter<"Scan"> | string | null
   scannedAt?: Prisma.DateTimeFilter<"Scan"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }
@@ -190,6 +198,7 @@ export type ScanOrderByWithRelationInput = {
   projectId?: Prisma.SortOrder
   rawJson?: Prisma.SortOrder
   rawJsonHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  metaJson?: Prisma.SortOrderInput | Prisma.SortOrder
   scannedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
 }
@@ -202,6 +211,7 @@ export type ScanWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.ScanWhereInput | Prisma.ScanWhereInput[]
   rawJson?: Prisma.StringFilter<"Scan"> | string
   rawJsonHash?: Prisma.StringNullableFilter<"Scan"> | string | null
+  metaJson?: Prisma.StringNullableFilter<"Scan"> | string | null
   scannedAt?: Prisma.DateTimeFilter<"Scan"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }, "id" | "projectId">
@@ -211,6 +221,7 @@ export type ScanOrderByWithAggregationInput = {
   projectId?: Prisma.SortOrder
   rawJson?: Prisma.SortOrder
   rawJsonHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  metaJson?: Prisma.SortOrderInput | Prisma.SortOrder
   scannedAt?: Prisma.SortOrder
   _count?: Prisma.ScanCountOrderByAggregateInput
   _max?: Prisma.ScanMaxOrderByAggregateInput
@@ -225,6 +236,7 @@ export type ScanScalarWhereWithAggregatesInput = {
   projectId?: Prisma.StringWithAggregatesFilter<"Scan"> | string
   rawJson?: Prisma.StringWithAggregatesFilter<"Scan"> | string
   rawJsonHash?: Prisma.StringNullableWithAggregatesFilter<"Scan"> | string | null
+  metaJson?: Prisma.StringNullableWithAggregatesFilter<"Scan"> | string | null
   scannedAt?: Prisma.DateTimeWithAggregatesFilter<"Scan"> | Date | string
 }
 
@@ -232,6 +244,7 @@ export type ScanCreateInput = {
   id?: string
   rawJson: string
   rawJsonHash?: string | null
+  metaJson?: string | null
   scannedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutScanInput
 }
@@ -241,6 +254,7 @@ export type ScanUncheckedCreateInput = {
   projectId: string
   rawJson: string
   rawJsonHash?: string | null
+  metaJson?: string | null
   scannedAt?: Date | string
 }
 
@@ -248,6 +262,7 @@ export type ScanUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutScanNestedInput
 }
@@ -257,6 +272,7 @@ export type ScanUncheckedUpdateInput = {
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -265,6 +281,7 @@ export type ScanCreateManyInput = {
   projectId: string
   rawJson: string
   rawJsonHash?: string | null
+  metaJson?: string | null
   scannedAt?: Date | string
 }
 
@@ -272,6 +289,7 @@ export type ScanUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -280,6 +298,7 @@ export type ScanUncheckedUpdateManyInput = {
   projectId?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -293,6 +312,7 @@ export type ScanCountOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   rawJson?: Prisma.SortOrder
   rawJsonHash?: Prisma.SortOrder
+  metaJson?: Prisma.SortOrder
   scannedAt?: Prisma.SortOrder
 }
 
@@ -301,6 +321,7 @@ export type ScanMaxOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   rawJson?: Prisma.SortOrder
   rawJsonHash?: Prisma.SortOrder
+  metaJson?: Prisma.SortOrder
   scannedAt?: Prisma.SortOrder
 }
 
@@ -309,6 +330,7 @@ export type ScanMinOrderByAggregateInput = {
   projectId?: Prisma.SortOrder
   rawJson?: Prisma.SortOrder
   rawJsonHash?: Prisma.SortOrder
+  metaJson?: Prisma.SortOrder
   scannedAt?: Prisma.SortOrder
 }
 
@@ -348,6 +370,7 @@ export type ScanCreateWithoutProjectInput = {
   id?: string
   rawJson: string
   rawJsonHash?: string | null
+  metaJson?: string | null
   scannedAt?: Date | string
 }
 
@@ -355,6 +378,7 @@ export type ScanUncheckedCreateWithoutProjectInput = {
   id?: string
   rawJson: string
   rawJsonHash?: string | null
+  metaJson?: string | null
   scannedAt?: Date | string
 }
 
@@ -378,6 +402,7 @@ export type ScanUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -385,6 +410,7 @@ export type ScanUncheckedUpdateWithoutProjectInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   rawJson?: Prisma.StringFieldUpdateOperationsInput | string
   rawJsonHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metaJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scannedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -395,6 +421,7 @@ export type ScanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   projectId?: boolean
   rawJson?: boolean
   rawJsonHash?: boolean
+  metaJson?: boolean
   scannedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["scan"]>
@@ -404,6 +431,7 @@ export type ScanSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   projectId?: boolean
   rawJson?: boolean
   rawJsonHash?: boolean
+  metaJson?: boolean
   scannedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["scan"]>
@@ -413,6 +441,7 @@ export type ScanSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   projectId?: boolean
   rawJson?: boolean
   rawJsonHash?: boolean
+  metaJson?: boolean
   scannedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["scan"]>
@@ -422,10 +451,11 @@ export type ScanSelectScalar = {
   projectId?: boolean
   rawJson?: boolean
   rawJsonHash?: boolean
+  metaJson?: boolean
   scannedAt?: boolean
 }
 
-export type ScanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "rawJson" | "rawJsonHash" | "scannedAt", ExtArgs["result"]["scan"]>
+export type ScanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "rawJson" | "rawJsonHash" | "metaJson" | "scannedAt", ExtArgs["result"]["scan"]>
 export type ScanInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }
@@ -446,6 +476,7 @@ export type $ScanPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     projectId: string
     rawJson: string
     rawJsonHash: string | null
+    metaJson: string | null
     scannedAt: Date
   }, ExtArgs["result"]["scan"]>
   composites: {}
@@ -875,6 +906,7 @@ export interface ScanFieldRefs {
   readonly projectId: Prisma.FieldRef<"Scan", 'String'>
   readonly rawJson: Prisma.FieldRef<"Scan", 'String'>
   readonly rawJsonHash: Prisma.FieldRef<"Scan", 'String'>
+  readonly metaJson: Prisma.FieldRef<"Scan", 'String'>
   readonly scannedAt: Prisma.FieldRef<"Scan", 'DateTime'>
 }
     

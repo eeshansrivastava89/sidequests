@@ -73,6 +73,11 @@ export type DismissedAlert = Prisma.DismissedAlertModel
  */
 export type UserPreference = Prisma.UserPreferenceModel
 /**
+ * Model PortfolioAnalysis
+ * 
+ */
+export type PortfolioAnalysis = Prisma.PortfolioAnalysisModel
+/**
  * Model UserVisit
  * 
  */

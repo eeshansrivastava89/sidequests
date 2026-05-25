@@ -31,6 +31,7 @@ const SCHEMA_SQL = [
     "projectId"   TEXT NOT NULL,
     "rawJson"     TEXT NOT NULL,
     "rawJsonHash" TEXT,
+    "metaJson"    TEXT,
     "scannedAt"   TEXT NOT NULL DEFAULT (datetime('now')),
     CONSTRAINT "Scan_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
@@ -79,10 +80,8 @@ const SCHEMA_SQL = [
     "framework"              TEXT,
     "primaryLanguage"        TEXT,
     "purpose"                TEXT,
-    "notableFeaturesJson"    TEXT,
-    "pitch"                  TEXT,
-    "aiInsightJson"          TEXT,
-    "aiInsightGeneratedAt"   TEXT,
+    "llmError"               TEXT,
+    "extrasJson"             TEXT,
     "generatedAt"            TEXT NOT NULL DEFAULT (datetime('now')),
     CONSTRAINT "Llm_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
@@ -179,6 +178,13 @@ const SCHEMA_SQL = [
     "updatedAt"    TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "UserVisit_key_key" ON "UserVisit"("key")`,
+
+  // 13. PortfolioAnalysis
+  `CREATE TABLE IF NOT EXISTS "PortfolioAnalysis" (
+    "id"           TEXT NOT NULL PRIMARY KEY,
+    "resultJson"   TEXT NOT NULL,
+    "generatedAt"  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 
 /**
@@ -199,6 +205,10 @@ const MIGRATIONS = [
   `ALTER TABLE "Llm" ADD COLUMN "insightsJson" TEXT`,
   // Observability: per-project LLM error tracking
   `ALTER TABLE "Llm" ADD COLUMN "llmError" TEXT`,
+  // Extensible LLM output fields
+  `ALTER TABLE "Llm" ADD COLUMN "extrasJson" TEXT`,
+  // Extensible scan metadata fields
+  `ALTER TABLE "Scan" ADD COLUMN "metaJson" TEXT`,
   // Dirty file count for uncommitted badge
   `ALTER TABLE "Derived" ADD COLUMN "dirtyFileCount" INTEGER NOT NULL DEFAULT 0`,
   // v0.3.13: LOC breakdown (locCode/locDocs/locGenerated)

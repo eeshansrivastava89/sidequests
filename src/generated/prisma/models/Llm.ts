@@ -38,11 +38,8 @@ export type LlmMinAggregateOutputType = {
   framework: string | null
   primaryLanguage: string | null
   purpose: string | null
-  notableFeaturesJson: string | null
-  pitch: string | null
-  aiInsightJson: string | null
-  aiInsightGeneratedAt: Date | null
   llmError: string | null
+  extrasJson: string | null
   generatedAt: Date | null
 }
 
@@ -60,11 +57,8 @@ export type LlmMaxAggregateOutputType = {
   framework: string | null
   primaryLanguage: string | null
   purpose: string | null
-  notableFeaturesJson: string | null
-  pitch: string | null
-  aiInsightJson: string | null
-  aiInsightGeneratedAt: Date | null
   llmError: string | null
+  extrasJson: string | null
   generatedAt: Date | null
 }
 
@@ -82,11 +76,8 @@ export type LlmCountAggregateOutputType = {
   framework: number
   primaryLanguage: number
   purpose: number
-  notableFeaturesJson: number
-  pitch: number
-  aiInsightJson: number
-  aiInsightGeneratedAt: number
   llmError: number
+  extrasJson: number
   generatedAt: number
   _all: number
 }
@@ -106,11 +97,8 @@ export type LlmMinAggregateInputType = {
   framework?: true
   primaryLanguage?: true
   purpose?: true
-  notableFeaturesJson?: true
-  pitch?: true
-  aiInsightJson?: true
-  aiInsightGeneratedAt?: true
   llmError?: true
+  extrasJson?: true
   generatedAt?: true
 }
 
@@ -128,11 +116,8 @@ export type LlmMaxAggregateInputType = {
   framework?: true
   primaryLanguage?: true
   purpose?: true
-  notableFeaturesJson?: true
-  pitch?: true
-  aiInsightJson?: true
-  aiInsightGeneratedAt?: true
   llmError?: true
+  extrasJson?: true
   generatedAt?: true
 }
 
@@ -150,11 +135,8 @@ export type LlmCountAggregateInputType = {
   framework?: true
   primaryLanguage?: true
   purpose?: true
-  notableFeaturesJson?: true
-  pitch?: true
-  aiInsightJson?: true
-  aiInsightGeneratedAt?: true
   llmError?: true
+  extrasJson?: true
   generatedAt?: true
   _all?: true
 }
@@ -245,11 +227,8 @@ export type LlmGroupByOutputType = {
   framework: string | null
   primaryLanguage: string | null
   purpose: string | null
-  notableFeaturesJson: string | null
-  pitch: string | null
-  aiInsightJson: string | null
-  aiInsightGeneratedAt: Date | null
   llmError: string | null
+  extrasJson: string | null
   generatedAt: Date
   _count: LlmCountAggregateOutputType | null
   _min: LlmMinAggregateOutputType | null
@@ -288,11 +267,8 @@ export type LlmWhereInput = {
   framework?: Prisma.StringNullableFilter<"Llm"> | string | null
   primaryLanguage?: Prisma.StringNullableFilter<"Llm"> | string | null
   purpose?: Prisma.StringNullableFilter<"Llm"> | string | null
-  notableFeaturesJson?: Prisma.StringNullableFilter<"Llm"> | string | null
-  pitch?: Prisma.StringNullableFilter<"Llm"> | string | null
-  aiInsightJson?: Prisma.StringNullableFilter<"Llm"> | string | null
-  aiInsightGeneratedAt?: Prisma.DateTimeNullableFilter<"Llm"> | Date | string | null
   llmError?: Prisma.StringNullableFilter<"Llm"> | string | null
+  extrasJson?: Prisma.StringNullableFilter<"Llm"> | string | null
   generatedAt?: Prisma.DateTimeFilter<"Llm"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }
@@ -311,11 +287,8 @@ export type LlmOrderByWithRelationInput = {
   framework?: Prisma.SortOrderInput | Prisma.SortOrder
   primaryLanguage?: Prisma.SortOrderInput | Prisma.SortOrder
   purpose?: Prisma.SortOrderInput | Prisma.SortOrder
-  notableFeaturesJson?: Prisma.SortOrderInput | Prisma.SortOrder
-  pitch?: Prisma.SortOrderInput | Prisma.SortOrder
-  aiInsightJson?: Prisma.SortOrderInput | Prisma.SortOrder
-  aiInsightGeneratedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   llmError?: Prisma.SortOrderInput | Prisma.SortOrder
+  extrasJson?: Prisma.SortOrderInput | Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   project?: Prisma.ProjectOrderByWithRelationInput
 }
@@ -337,11 +310,8 @@ export type LlmWhereUniqueInput = Prisma.AtLeast<{
   framework?: Prisma.StringNullableFilter<"Llm"> | string | null
   primaryLanguage?: Prisma.StringNullableFilter<"Llm"> | string | null
   purpose?: Prisma.StringNullableFilter<"Llm"> | string | null
-  notableFeaturesJson?: Prisma.StringNullableFilter<"Llm"> | string | null
-  pitch?: Prisma.StringNullableFilter<"Llm"> | string | null
-  aiInsightJson?: Prisma.StringNullableFilter<"Llm"> | string | null
-  aiInsightGeneratedAt?: Prisma.DateTimeNullableFilter<"Llm"> | Date | string | null
   llmError?: Prisma.StringNullableFilter<"Llm"> | string | null
+  extrasJson?: Prisma.StringNullableFilter<"Llm"> | string | null
   generatedAt?: Prisma.DateTimeFilter<"Llm"> | Date | string
   project?: Prisma.XOR<Prisma.ProjectScalarRelationFilter, Prisma.ProjectWhereInput>
 }, "id" | "projectId">
@@ -360,11 +330,8 @@ export type LlmOrderByWithAggregationInput = {
   framework?: Prisma.SortOrderInput | Prisma.SortOrder
   primaryLanguage?: Prisma.SortOrderInput | Prisma.SortOrder
   purpose?: Prisma.SortOrderInput | Prisma.SortOrder
-  notableFeaturesJson?: Prisma.SortOrderInput | Prisma.SortOrder
-  pitch?: Prisma.SortOrderInput | Prisma.SortOrder
-  aiInsightJson?: Prisma.SortOrderInput | Prisma.SortOrder
-  aiInsightGeneratedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   llmError?: Prisma.SortOrderInput | Prisma.SortOrder
+  extrasJson?: Prisma.SortOrderInput | Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
   _count?: Prisma.LlmCountOrderByAggregateInput
   _max?: Prisma.LlmMaxOrderByAggregateInput
@@ -388,11 +355,8 @@ export type LlmScalarWhereWithAggregatesInput = {
   framework?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
   primaryLanguage?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
   purpose?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
-  notableFeaturesJson?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
-  pitch?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
-  aiInsightJson?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
-  aiInsightGeneratedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Llm"> | Date | string | null
   llmError?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
+  extrasJson?: Prisma.StringNullableWithAggregatesFilter<"Llm"> | string | null
   generatedAt?: Prisma.DateTimeWithAggregatesFilter<"Llm"> | Date | string
 }
 
@@ -409,11 +373,8 @@ export type LlmCreateInput = {
   framework?: string | null
   primaryLanguage?: string | null
   purpose?: string | null
-  notableFeaturesJson?: string | null
-  pitch?: string | null
-  aiInsightJson?: string | null
-  aiInsightGeneratedAt?: Date | string | null
   llmError?: string | null
+  extrasJson?: string | null
   generatedAt?: Date | string
   project: Prisma.ProjectCreateNestedOneWithoutLlmInput
 }
@@ -432,11 +393,8 @@ export type LlmUncheckedCreateInput = {
   framework?: string | null
   primaryLanguage?: string | null
   purpose?: string | null
-  notableFeaturesJson?: string | null
-  pitch?: string | null
-  aiInsightJson?: string | null
-  aiInsightGeneratedAt?: Date | string | null
   llmError?: string | null
+  extrasJson?: string | null
   generatedAt?: Date | string
 }
 
@@ -453,11 +411,8 @@ export type LlmUpdateInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   project?: Prisma.ProjectUpdateOneRequiredWithoutLlmNestedInput
 }
@@ -476,11 +431,8 @@ export type LlmUncheckedUpdateInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -498,11 +450,8 @@ export type LlmCreateManyInput = {
   framework?: string | null
   primaryLanguage?: string | null
   purpose?: string | null
-  notableFeaturesJson?: string | null
-  pitch?: string | null
-  aiInsightJson?: string | null
-  aiInsightGeneratedAt?: Date | string | null
   llmError?: string | null
+  extrasJson?: string | null
   generatedAt?: Date | string
 }
 
@@ -519,11 +468,8 @@ export type LlmUpdateManyMutationInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -541,11 +487,8 @@ export type LlmUncheckedUpdateManyInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -568,11 +511,8 @@ export type LlmCountOrderByAggregateInput = {
   framework?: Prisma.SortOrder
   primaryLanguage?: Prisma.SortOrder
   purpose?: Prisma.SortOrder
-  notableFeaturesJson?: Prisma.SortOrder
-  pitch?: Prisma.SortOrder
-  aiInsightJson?: Prisma.SortOrder
-  aiInsightGeneratedAt?: Prisma.SortOrder
   llmError?: Prisma.SortOrder
+  extrasJson?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
 }
 
@@ -590,11 +530,8 @@ export type LlmMaxOrderByAggregateInput = {
   framework?: Prisma.SortOrder
   primaryLanguage?: Prisma.SortOrder
   purpose?: Prisma.SortOrder
-  notableFeaturesJson?: Prisma.SortOrder
-  pitch?: Prisma.SortOrder
-  aiInsightJson?: Prisma.SortOrder
-  aiInsightGeneratedAt?: Prisma.SortOrder
   llmError?: Prisma.SortOrder
+  extrasJson?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
 }
 
@@ -612,11 +549,8 @@ export type LlmMinOrderByAggregateInput = {
   framework?: Prisma.SortOrder
   primaryLanguage?: Prisma.SortOrder
   purpose?: Prisma.SortOrder
-  notableFeaturesJson?: Prisma.SortOrder
-  pitch?: Prisma.SortOrder
-  aiInsightJson?: Prisma.SortOrder
-  aiInsightGeneratedAt?: Prisma.SortOrder
   llmError?: Prisma.SortOrder
+  extrasJson?: Prisma.SortOrder
   generatedAt?: Prisma.SortOrder
 }
 
@@ -665,11 +599,8 @@ export type LlmCreateWithoutProjectInput = {
   framework?: string | null
   primaryLanguage?: string | null
   purpose?: string | null
-  notableFeaturesJson?: string | null
-  pitch?: string | null
-  aiInsightJson?: string | null
-  aiInsightGeneratedAt?: Date | string | null
   llmError?: string | null
+  extrasJson?: string | null
   generatedAt?: Date | string
 }
 
@@ -686,11 +617,8 @@ export type LlmUncheckedCreateWithoutProjectInput = {
   framework?: string | null
   primaryLanguage?: string | null
   purpose?: string | null
-  notableFeaturesJson?: string | null
-  pitch?: string | null
-  aiInsightJson?: string | null
-  aiInsightGeneratedAt?: Date | string | null
   llmError?: string | null
+  extrasJson?: string | null
   generatedAt?: Date | string
 }
 
@@ -723,11 +651,8 @@ export type LlmUpdateWithoutProjectInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -744,11 +669,8 @@ export type LlmUncheckedUpdateWithoutProjectInput = {
   framework?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   primaryLanguage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   purpose?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  notableFeaturesJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  pitch?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  aiInsightGeneratedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   llmError?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  extrasJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   generatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -768,11 +690,8 @@ export type LlmSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = ru
   framework?: boolean
   primaryLanguage?: boolean
   purpose?: boolean
-  notableFeaturesJson?: boolean
-  pitch?: boolean
-  aiInsightJson?: boolean
-  aiInsightGeneratedAt?: boolean
   llmError?: boolean
+  extrasJson?: boolean
   generatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["llm"]>
@@ -791,11 +710,8 @@ export type LlmSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extension
   framework?: boolean
   primaryLanguage?: boolean
   purpose?: boolean
-  notableFeaturesJson?: boolean
-  pitch?: boolean
-  aiInsightJson?: boolean
-  aiInsightGeneratedAt?: boolean
   llmError?: boolean
+  extrasJson?: boolean
   generatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["llm"]>
@@ -814,11 +730,8 @@ export type LlmSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extension
   framework?: boolean
   primaryLanguage?: boolean
   purpose?: boolean
-  notableFeaturesJson?: boolean
-  pitch?: boolean
-  aiInsightJson?: boolean
-  aiInsightGeneratedAt?: boolean
   llmError?: boolean
+  extrasJson?: boolean
   generatedAt?: boolean
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["llm"]>
@@ -837,15 +750,12 @@ export type LlmSelectScalar = {
   framework?: boolean
   primaryLanguage?: boolean
   purpose?: boolean
-  notableFeaturesJson?: boolean
-  pitch?: boolean
-  aiInsightJson?: boolean
-  aiInsightGeneratedAt?: boolean
   llmError?: boolean
+  extrasJson?: boolean
   generatedAt?: boolean
 }
 
-export type LlmOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "summary" | "nextAction" | "llmStatus" | "statusReason" | "risksJson" | "tagsJson" | "recommendationsJson" | "insightsJson" | "framework" | "primaryLanguage" | "purpose" | "notableFeaturesJson" | "pitch" | "aiInsightJson" | "aiInsightGeneratedAt" | "llmError" | "generatedAt", ExtArgs["result"]["llm"]>
+export type LlmOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "projectId" | "summary" | "nextAction" | "llmStatus" | "statusReason" | "risksJson" | "tagsJson" | "recommendationsJson" | "insightsJson" | "framework" | "primaryLanguage" | "purpose" | "llmError" | "extrasJson" | "generatedAt", ExtArgs["result"]["llm"]>
 export type LlmInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   project?: boolean | Prisma.ProjectDefaultArgs<ExtArgs>
 }
@@ -875,11 +785,8 @@ export type $LlmPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
     framework: string | null
     primaryLanguage: string | null
     purpose: string | null
-    notableFeaturesJson: string | null
-    pitch: string | null
-    aiInsightJson: string | null
-    aiInsightGeneratedAt: Date | null
     llmError: string | null
+    extrasJson: string | null
     generatedAt: Date
   }, ExtArgs["result"]["llm"]>
   composites: {}
@@ -1318,11 +1225,8 @@ export interface LlmFieldRefs {
   readonly framework: Prisma.FieldRef<"Llm", 'String'>
   readonly primaryLanguage: Prisma.FieldRef<"Llm", 'String'>
   readonly purpose: Prisma.FieldRef<"Llm", 'String'>
-  readonly notableFeaturesJson: Prisma.FieldRef<"Llm", 'String'>
-  readonly pitch: Prisma.FieldRef<"Llm", 'String'>
-  readonly aiInsightJson: Prisma.FieldRef<"Llm", 'String'>
-  readonly aiInsightGeneratedAt: Prisma.FieldRef<"Llm", 'DateTime'>
   readonly llmError: Prisma.FieldRef<"Llm", 'String'>
+  readonly extrasJson: Prisma.FieldRef<"Llm", 'String'>
   readonly generatedAt: Prisma.FieldRef<"Llm", 'DateTime'>
 }
     

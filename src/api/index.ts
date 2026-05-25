@@ -5,7 +5,6 @@ import { projectByIdRoute } from "./routes/projects/[id]";
 import { dismissAlertRoute } from "./routes/dismiss-alert";
 import { refreshRoute } from "./routes/refresh";
 import { settingsRoute } from "./routes/settings";
-import { configRoute } from "./routes/config";
 import { preflightRoute } from "./routes/preflight";
 import { versionRoute } from "./routes/version";
 import { focusRoute } from "./routes/focus";
@@ -27,7 +26,6 @@ apiRouter.use("/projects", projectByIdRoute);     // /:id, /:id/override, etc.
 apiRouter.use("/projects", dismissAlertRoute);    // /:id/dismiss-alert
 apiRouter.use("/refresh", refreshRoute);
 apiRouter.use("/settings", settingsRoute);
-apiRouter.use("/config", configRoute);
 apiRouter.use("/preflight", preflightRoute);
 apiRouter.use("/version", versionRoute);
 apiRouter.use("/focus", focusRoute);

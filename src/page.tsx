@@ -24,6 +24,7 @@ import { OverviewStrip } from "@/components/overview-strip";
 import { ProjectList } from "@/components/project-list";
 import { ProjectDetailPane } from "@/components/project-detail-pane";
 import { WhatNowTab } from "@/components/whatnow-tab";
+import { usePortfolioAnalysis } from "@/hooks/use-portfolio-analysis";
 import { AnalyticsTab } from "@/components/analytics-tab";
 import { LifecycleActions } from "@/components/lifecycle-actions";
 import { SettingsModal } from "@/components/settings-modal";
@@ -33,7 +34,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Target, TriangleAlert, Info, BarChart3, X, Settings } from "lucide-react";
+import { Target, TriangleAlert, Info, BarChart3, X, Settings, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export function DashboardPage() {
@@ -61,6 +62,10 @@ export function DashboardPage() {
       } else {
         toast.success(`Scanned ${count} projects`);
       }
+      // Refresh portfolio analysis after AI scan (pipeline saves to DB)
+      if (llmOk > 0) {
+        portfolioHook.fetchAnalysis();
+      }
     },
     onError: (message) => {
       toast.error(message);
@@ -80,6 +85,8 @@ export function DashboardPage() {
   const [signalFilter, setSignalFilter] = useState<SignalFilter>(null);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
   const filteredRef = useRef<Project[]>([]);
+
+  const portfolioHook = usePortfolioAnalysis();
 
   const [dark, setDark] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -333,33 +340,49 @@ export function DashboardPage() {
               </div>
             )}
 
-            {/* ── Tab switcher: What Now / Projects ── */}
-            <Tabs value={tab} onValueChange={(v) => setTab(v as "whatnow" | "projects")}>
-              <TabsList>
-                <TabsTrigger value="whatnow" className="gap-1.5">
-                  <Target className="size-3.5" />
-                  What Now
-                  {visibleActions.length > 0 && (
-                    <span className="ml-1 inline-flex items-center justify-center size-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
-                      {visibleActions.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="projects">
-                  Projects ({projects.length})
-                </TabsTrigger>
-                <TabsTrigger value="analytics">
-                  <BarChart3 className="size-3.5" />
-                  Analytics
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* ── Tab switcher: What Now / Projects / Analytics ── */}
+            <div className="flex items-center justify-between gap-4">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as "whatnow" | "projects")}>
+                <TabsList>
+                  <TabsTrigger value="whatnow" className="gap-1.5">
+                    <Target className="size-3.5" />
+                    What Now
+                    {visibleActions.length > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center size-5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold">
+                        {visibleActions.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="projects">
+                    Projects ({projects.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="analytics">
+                    <BarChart3 className="size-3.5" />
+                    Analytics
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {tab === "whatnow" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs shrink-0"
+                  onClick={() => portfolioHook.refreshAnalysis()}
+                  disabled={portfolioHook.loading}
+                >
+                  <Sparkles className="size-3.5" />
+                  {portfolioHook.loading ? "Analyzing..." : "Refresh analysis"}
+                </Button>
+              )}
+            </div>
 
             {/* ── What Now Tab ── */}
             {tab === "whatnow" && (
               <WhatNowTab
                 projects={projects}
-                onDismiss={handleDismissAlert}
+                analysis={portfolioHook.analysis}
+                analysisLoading={portfolioHook.loading}
+                analysisError={portfolioHook.error}
                 onSelectProject={(id) => setSelectedId(id)}
               />
             )}

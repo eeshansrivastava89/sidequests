@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@/lib/db";
 import { mergeProjectView } from "@/lib/merge";
-import { coercePatchBody, safeJsonParse } from "@/lib/api-helpers";
+import { coercePatchBody } from "@/lib/api-helpers";
 
 export const projectByIdRoute = Router();
 
@@ -106,10 +106,11 @@ projectByIdRoute.patch("/:id/metadata", async (req, res) => {
     return;
   }
 
+  const patchData = result.data as Partial<Record<"goal" | "audience" | "successMetrics" | "nextAction" | "publishTarget", string | null>>;
   const metadata = await db.metadata.upsert({
     where: { projectId: id },
-    create: { projectId: id, ...result.data },
-    update: result.data,
+    create: { projectId: id, ...patchData },
+    update: patchData,
   });
 
   await db.activity.create({
@@ -182,7 +183,7 @@ projectByIdRoute.get("/:id/activity", async (req, res) => {
     activities: activities.map((a) => ({
       id: a.id,
       type: a.type,
-      payload: safeJsonParse(a.payloadJson, null),
+      payload: a.payloadJson ? JSON.parse(a.payloadJson) : null,
       createdAt: a.createdAt.toISOString(),
     })),
   });

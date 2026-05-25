@@ -19,6 +19,7 @@ const EXPECTED_TABLES = [
   "DismissedAlert",
   "UserPreference",
   "UserVisit",
+  "PortfolioAnalysis",
   "_DataFix",
 ];
 
@@ -42,6 +43,7 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     projectId: "TEXT",
     rawJson: "TEXT",
     rawJsonHash: "TEXT",
+    metaJson: "TEXT",
     scannedAt: "TEXT",
   },
   Derived: {
@@ -82,12 +84,9 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     framework: "TEXT",
     primaryLanguage: "TEXT",
     purpose: "TEXT",
-    notableFeaturesJson: "TEXT",
-    pitch: "TEXT",
-    aiInsightJson: "TEXT",
-    aiInsightGeneratedAt: "TEXT",
     generatedAt: "TEXT",
     llmError: "TEXT",
+    extrasJson: "TEXT",
   },
   Override: {
     id: "TEXT",
@@ -155,6 +154,11 @@ const EXPECTED_COLUMNS: Record<string, Record<string, string>> = {
     snapshotJson: "TEXT",
     updatedAt: "TEXT",
   },
+  PortfolioAnalysis: {
+    id: "TEXT",
+    resultJson: "TEXT",
+    generatedAt: "TEXT",
+  },
 };
 
 /** Expected unique indexes (index name → table) */
@@ -190,7 +194,7 @@ function makeTmpDb(): string {
 }
 
 describe("bootstrapDb — schema parity", () => {
-  it("creates all 8 tables", async () => {
+  it("creates all expected tables", async () => {
     const dbPath = makeTmpDb();
     await bootstrapDb(dbPath);
 

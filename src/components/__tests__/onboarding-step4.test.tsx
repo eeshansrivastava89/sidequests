@@ -13,6 +13,7 @@ function makeState(overrides: Partial<RefreshState> = {}): RefreshState {
     active: false,
     phase: "",
     deterministicReady: false,
+    skipLlm: false,
     projects: new Map(),
     summary: null,
     error: null,

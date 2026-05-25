@@ -395,6 +395,7 @@ export const ModelName = {
   WeeklyFocus: 'WeeklyFocus',
   DismissedAlert: 'DismissedAlert',
   UserPreference: 'UserPreference',
+  PortfolioAnalysis: 'PortfolioAnalysis',
   UserVisit: 'UserVisit'
 } as const
 
@@ -411,7 +412,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "project" | "scan" | "derived" | "llm" | "override" | "metadata" | "gitHub" | "activity" | "weeklyFocus" | "dismissedAlert" | "userPreference" | "userVisit"
+    modelProps: "project" | "scan" | "derived" | "llm" | "override" | "metadata" | "gitHub" | "activity" | "weeklyFocus" | "dismissedAlert" | "userPreference" | "portfolioAnalysis" | "userVisit"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1229,6 +1230,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PortfolioAnalysis: {
+      payload: Prisma.$PortfolioAnalysisPayload<ExtArgs>
+      fields: Prisma.PortfolioAnalysisFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PortfolioAnalysisFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PortfolioAnalysisFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        findFirst: {
+          args: Prisma.PortfolioAnalysisFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PortfolioAnalysisFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        findMany: {
+          args: Prisma.PortfolioAnalysisFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>[]
+        }
+        create: {
+          args: Prisma.PortfolioAnalysisCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        createMany: {
+          args: Prisma.PortfolioAnalysisCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PortfolioAnalysisCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>[]
+        }
+        delete: {
+          args: Prisma.PortfolioAnalysisDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        update: {
+          args: Prisma.PortfolioAnalysisUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        deleteMany: {
+          args: Prisma.PortfolioAnalysisDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PortfolioAnalysisUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PortfolioAnalysisUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>[]
+        }
+        upsert: {
+          args: Prisma.PortfolioAnalysisUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PortfolioAnalysisPayload>
+        }
+        aggregate: {
+          args: Prisma.PortfolioAnalysisAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePortfolioAnalysis>
+        }
+        groupBy: {
+          args: Prisma.PortfolioAnalysisGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PortfolioAnalysisGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PortfolioAnalysisCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PortfolioAnalysisCountAggregateOutputType> | number
+        }
+      }
+    }
     UserVisit: {
       payload: Prisma.$UserVisitPayload<ExtArgs>
       fields: Prisma.UserVisitFieldRefs
@@ -1361,6 +1436,7 @@ export const ScanScalarFieldEnum = {
   projectId: 'projectId',
   rawJson: 'rawJson',
   rawJsonHash: 'rawJsonHash',
+  metaJson: 'metaJson',
   scannedAt: 'scannedAt'
 } as const
 
@@ -1409,11 +1485,8 @@ export const LlmScalarFieldEnum = {
   framework: 'framework',
   primaryLanguage: 'primaryLanguage',
   purpose: 'purpose',
-  notableFeaturesJson: 'notableFeaturesJson',
-  pitch: 'pitch',
-  aiInsightJson: 'aiInsightJson',
-  aiInsightGeneratedAt: 'aiInsightGeneratedAt',
   llmError: 'llmError',
+  extrasJson: 'extrasJson',
   generatedAt: 'generatedAt'
 } as const
 
@@ -1502,6 +1575,15 @@ export const UserPreferenceScalarFieldEnum = {
 } as const
 
 export type UserPreferenceScalarFieldEnum = (typeof UserPreferenceScalarFieldEnum)[keyof typeof UserPreferenceScalarFieldEnum]
+
+
+export const PortfolioAnalysisScalarFieldEnum = {
+  id: 'id',
+  resultJson: 'resultJson',
+  generatedAt: 'generatedAt'
+} as const
+
+export type PortfolioAnalysisScalarFieldEnum = (typeof PortfolioAnalysisScalarFieldEnum)[keyof typeof PortfolioAnalysisScalarFieldEnum]
 
 
 export const UserVisitScalarFieldEnum = {
@@ -1676,6 +1758,7 @@ export type GlobalOmitConfig = {
   weeklyFocus?: Prisma.WeeklyFocusOmit
   dismissedAlert?: Prisma.DismissedAlertOmit
   userPreference?: Prisma.UserPreferenceOmit
+  portfolioAnalysis?: Prisma.PortfolioAnalysisOmit
   userVisit?: Prisma.UserVisitOmit
 }
 

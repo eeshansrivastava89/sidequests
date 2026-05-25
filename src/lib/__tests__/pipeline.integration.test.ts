@@ -92,7 +92,7 @@ beforeEach(async () => {
 describe("pipeline integration — store phase", () => {
   it("full pipeline happy path (LLM disabled): creates Project, Scan, Derived", async () => {
     const events: PipelineEvent[] = [];
-    const result = await runRefreshPipeline((e) => events.push(e), undefined, { skipLlm: true });
+    const result = await runRefreshPipeline((e) => { events.push(e); }, undefined, { skipLlm: true });
 
     expect(result.projectCount).toBe(3);
 
@@ -240,7 +240,7 @@ describe("pipeline integration — LLM enrichment", () => {
     });
 
     const events: PipelineEvent[] = [];
-    await runRefreshPipeline((e) => events.push(e));
+    await runRefreshPipeline((e) => { events.push(e); });
 
     const doneEvent = events.find((e) => e.type === "done") as Extract<PipelineEvent, { type: "done" }>;
     expect(doneEvent.llmFailed).toBe(1);
@@ -286,7 +286,7 @@ describe("pipeline integration — LLM enrichment", () => {
     });
 
     const events: PipelineEvent[] = [];
-    await runRefreshPipeline((e) => events.push(e));
+    await runRefreshPipeline((e) => { events.push(e); });
 
     const doneEvent = events.find((e) => e.type === "done") as Extract<PipelineEvent, { type: "done" }>;
     expect(doneEvent.llmFailedNames).toHaveLength(1);
@@ -468,7 +468,7 @@ describe("pipeline integration — activity & cleanup", () => {
 describe("pipeline integration — events", () => {
   it("emits correct sequence of events", async () => {
     const events: PipelineEvent[] = [];
-    await runRefreshPipeline((e) => events.push(e), undefined, { skipLlm: true });
+    await runRefreshPipeline((e) => { events.push(e); }, undefined, { skipLlm: true });
 
     const types = events.map((e) => e.type);
     expect(types[0]).toBe("enumerate_complete");
@@ -483,7 +483,7 @@ describe("pipeline integration — events", () => {
 
   it("done event has correct counts and positive durationMs", async () => {
     const events: PipelineEvent[] = [];
-    await runRefreshPipeline((e) => events.push(e), undefined, { skipLlm: true });
+    await runRefreshPipeline((e) => { events.push(e); }, undefined, { skipLlm: true });
 
     const done = events.find((e) => e.type === "done") as Extract<PipelineEvent, { type: "done" }>;
     expect(done.projectCount).toBe(3);

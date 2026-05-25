@@ -37,6 +37,7 @@ model Scan {
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   rawJson     String   // Full scan output as JSON
   rawJsonHash String?  // SHA-256 hash of rawJson for change detection
+  metaJson    String?  // Key-value pairs surfaced to UI (extensible, no migration needed)
   scannedAt   DateTime @default(now())
 }
 
@@ -75,19 +76,16 @@ model Llm {
   nextAction             String?
   llmStatus              String?   // LlmStatus: building|shipping|maintaining|blocked|stale|idea
   statusReason           String?
-  risksJson              String?   // deprecated — use insightsJson
+  risksJson              String?   // deprecated — use insightsJson (kept as fallback)
   tagsJson               String?   // JSON array
-  recommendationsJson    String?   // deprecated — use insightsJson
+  recommendationsJson    String?   // deprecated — use insightsJson (kept as fallback)
   insightsJson           String?   // JSON array — consolidated insights
   framework              String?
   primaryLanguage        String?
-  // Deprecated (kept for rollback safety)
+  // Deprecated (kept for rollback safety — summary supersedes purpose)
   purpose                String?
-  notableFeaturesJson    String?   // JSON array
-  pitch                  String?
-  aiInsightJson          String?   // JSON: { score, confidence, reasons, risks, nextBestAction }
-  aiInsightGeneratedAt   DateTime?
   llmError               String?   // Last enrichment error message, null on success
+  extrasJson             String?   // Extra LLM output fields (extensible, no migration needed)
   generatedAt            DateTime  @default(now())
 }
 
@@ -164,6 +162,12 @@ model UserPreference {
   key       String   @unique // e.g. "notification.quietHours", "staleness.threshold"
   value     String   // JSON string
   updatedAt DateTime @updatedAt
+}
+
+model PortfolioAnalysis {
+  id          String   @id @default(cuid())
+  resultJson  String   // Full portfolio analysis as JSON
+  generatedAt DateTime @default(now())
 }
 
 model UserVisit {

@@ -56,23 +56,23 @@ describe("pipeline parity — fixture integrity", () => {
   });
 
   it("derive expected output contains correct scores for synthetic projects", () => {
-    const data = JSON.parse(fs.readFileSync(DERIVE_EXPECTED, "utf-8"));
-    const byHash = new Map(data.projects.map((p: { pathHash: string }) => [p.pathHash, p]));
+    const data = JSON.parse(fs.readFileSync(DERIVE_EXPECTED, "utf-8")) as { projects: Array<Record<string, unknown> & { pathHash: string }> };
+    const byHash = new Map(data.projects.map((p) => [p.pathHash, p]));
 
     // Active TS project — perfect scores
-    const active = byHash.get("aaaa111122223333");
+    const active = byHash.get("aaaa111122223333")!;
     expect(active.statusAuto).toBe("active");
     expect(active.healthScoreAuto).toBe(100);
     expect(active.hygieneScoreAuto).toBe(100);
     expect(active.momentumScoreAuto).toBe(100);
 
     // Paused Python project (168 days inactive) — low momentum
-    const paused = byHash.get("bbbb444455556666");
+    const paused = byHash.get("bbbb444455556666")!;
     expect(paused.statusAuto).toBe("paused");
     expect(paused.momentumScoreAuto).toBe(0);
 
     // Archived non-git project
-    const archived = byHash.get("cccc777788889999");
+    const archived = byHash.get("cccc777788889999")!;
     expect(archived.statusAuto).toBe("archived");
   });
 });

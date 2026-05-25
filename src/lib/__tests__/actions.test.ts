@@ -63,6 +63,7 @@ function makeProject(overrides: Partial<MergedProject> = {}): MergedProject {
     githubFetchedAt: null,
     lastScanned: null,
     updatedAt: new Date().toISOString(),
+    meta: {},
     scan: null,
     ...overrides,
   };

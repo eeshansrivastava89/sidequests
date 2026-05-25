@@ -74,3 +74,5 @@ __pycache__/
 
 # archive of internal review logs
 /docs/internal/archive/
+# Python venv
+pipeline/.venv/

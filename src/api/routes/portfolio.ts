@@ -1,40 +1,46 @@
 import { Router } from "express";
-import { readFileSync } from "fs";
-import { join } from "path";
+import { db } from "@/lib/db";
 import { mergeAllProjects } from "@/lib/merge";
 import { getLlmProvider } from "@/lib/llm";
+import { runPortfolioAnalysis } from "@/lib/pipeline";
 
 export const portfolioRoute = Router();
 
-// Load portfolio prompt from config file
-const PROMPTS_DIR = join(process.cwd(), "src", "config", "prompts");
-const PORTFOLIO_SYSTEM_PROMPT = readFileSync(join(PROMPTS_DIR, "portfolio-system.md"), "utf-8").trim();
-
-// Simple in-memory cache: { result, timestamp }
-let analysisCache: { result: Record<string, unknown>; timestamp: number } | null = null;
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
-
-
-interface ProjectSummary {
-  name: string;
-  status: string;
-  statusReason: string | null;
-  nextAction: string | null;
-  healthScore: number;
-  weekCommits: number;
-  monthCommits: number;
-  quarterCommits: number;
-  openIssues: number;
-  ciStatus: string;
-  isDirty: boolean;
-  summary: string | null;
-  insights: Array<{ text: string; severity: string }>;
-  goal: string | null;
-}
-
-// GET /api/portfolio/analysis — run portfolio-level LLM analysis
+// GET /api/portfolio/analysis — return persisted portfolio analysis from DB
 portfolioRoute.get("/analysis", async (_req, res) => {
+  try {
+    const row = await db.portfolioAnalysis.findFirst({
+      orderBy: { generatedAt: "desc" },
+    });
+
+    if (!row) {
+      res.json({ ok: true, recommendation: null, secondary: [], portfolioInsights: [] });
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(row.resultJson);
+    } catch {
+      res.json({ ok: false, error: "Failed to parse stored analysis" });
+      return;
+    }
+
+    res.json({ ok: true, ...parsed, cached: true, generatedAt: row.generatedAt.toISOString() });
+  } catch (error) {
+    // Gracefully handle missing table (e.g. before first migration)
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes("no such table")) {
+      res.json({ ok: true, recommendation: null, secondary: [], portfolioInsights: [] });
+      return;
+    }
+    console.error("[portfolio/analysis GET]", error);
+    res.json({ ok: false, error: String(error) });
+  }
+});
+
+// POST /api/portfolio/analysis — re-run portfolio LLM analysis and save to DB
+portfolioRoute.post("/analysis", async (_req, res) => {
   try {
     const provider = getLlmProvider();
     if (!provider) {
@@ -42,76 +48,37 @@ portfolioRoute.get("/analysis", async (_req, res) => {
       return;
     }
 
-    // Check in-memory cache
-    if (analysisCache && Date.now() - analysisCache.timestamp < CACHE_TTL) {
-      res.json({ ok: true, ...analysisCache.result, cached: true });
+    // Check that at least some projects have LLM data
+    const projects = await mergeAllProjects();
+    const hasLlm = projects.some((p) => p.nextAction || p.summary);
+    if (!hasLlm) {
+      res.json({ ok: false, error: "No LLM data yet. Run an AI scan first." });
       return;
     }
 
-    // Gather project summaries
-    const projects = await mergeAllProjects();
+    await runPortfolioAnalysis();
 
-    const summaries: ProjectSummary[] = projects.map((p) => ({
-      name: p.name,
-      status: p.llmStatus ?? p.status,
-      statusReason: p.statusReason ?? null,
-      nextAction: p.nextAction ?? null,
-      healthScore: p.healthScore,
-      weekCommits: p.weekCommits,
-      monthCommits: p.monthCommits,
-      quarterCommits: p.quarterCommits,
-      openIssues: p.openIssues,
-      ciStatus: p.ciStatus,
-      isDirty: p.isDirty,
-      summary: p.summary ?? null,
-      insights: p.insights ?? [],
-      goal: p.goal ?? null,
-    }));
+    // Fetch the newly saved analysis
+    const row = await db.portfolioAnalysis.findFirst({
+      orderBy: { generatedAt: "desc" },
+    });
 
-    const prompt = `${PORTFOLIO_SYSTEM_PROMPT}
-
-Projects (${summaries.length} total):
-
-${summaries
-  .map((p) => {
-    const parts = [
-      `## ${p.name}`,
-      `Status: ${p.status}${p.statusReason ? ` (${p.statusReason})` : ""}`,
-      `Health: ${p.healthScore}/100`,
-      `Commits: ${p.weekCommits}/7d, ${p.monthCommits}/30d, ${p.quarterCommits}/90d`,
-    ];
-    if (p.openIssues > 0) parts.push(`Open Issues: ${p.openIssues}`);
-    if (p.ciStatus === "failure") parts.push("CI: FAILING");
-    if (p.isDirty) parts.push("Dirty: yes (uncommitted changes)");
-    if (p.nextAction) parts.push(`Next Action: ${p.nextAction}`);
-    if (p.summary) parts.push(`Summary: ${p.summary}`);
-    if (p.insights.length > 0) parts.push(`Insights: ${p.insights.map((i) => `[${i.severity}] ${i.text}`).join("; ")}`);
-    if (p.goal) parts.push(`Goal: ${p.goal}`);
-    return parts.join("\n");
-  })
-  .join("\n\n")}`;
-
-    const result = await provider.analyze(prompt);
-
-    // Parse the result
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = typeof result === "string" ? JSON.parse(result) : result;
-    } catch {
-      const match = String(result).match(/\{[\s\S]*\}/);
-      if (match) {
-        try { parsed = JSON.parse(match[0]); } catch { parsed = { error: "Failed to parse LLM response" }; }
-      } else {
-        parsed = { error: "Failed to parse LLM response" };
-      }
+    if (!row) {
+      res.json({ ok: false, error: "Analysis failed to save" });
+      return;
     }
 
-    // Cache the result in memory
-    analysisCache = { result: parsed, timestamp: Date.now() };
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(row.resultJson);
+    } catch {
+      res.json({ ok: false, error: "Failed to parse analysis result" });
+      return;
+    }
 
-    res.json({ ok: true, ...parsed, cached: false });
+    res.json({ ok: true, ...parsed, cached: false, generatedAt: row.generatedAt.toISOString() });
   } catch (error) {
-    console.error("[portfolio/analysis]", error);
+    console.error("[portfolio/analysis POST]", error);
     res.json({ ok: false, error: String(error) });
   }
 });

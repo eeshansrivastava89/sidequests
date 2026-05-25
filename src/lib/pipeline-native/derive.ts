@@ -2,25 +2,10 @@
  * TypeScript-native derive — deterministic derivation of status, health score, and tags.
  *
  * Port of pipeline/derive.py. Must produce byte-identical output for the same input.
- *
- * Status rules (by daysInactive):
- *   active:   <= 14 days
- *   paused:   15-60 days
- *   stale:    61-180 days
- *   archived: > 180 days or no commits
- *
- * Hygiene score (0-95 raw -> 0-100):
- *   README: +15, Tests: +20, CI/CD: +15, Remote: +10
- *   Low TODOs (<10): +10, Deployment: +10, Linter: +5, License: +5, Lockfile: +5
- *
- * Momentum score (0-70 raw -> 0-100):
- *   Commit recency: +25 (<=7d), +20 (<=14d), +15 (<=30d), +5 (<=60d)
- *   Clean working tree (!isDirty): +20
- *   Pushed up (ahead==0): +15
- *   Low stale branches (<=3): +10
- *
- * Health score: round(0.65 * hygiene + 0.35 * momentum)
+ * All thresholds and weights are loaded from derive-config.ts for tunability.
  */
+
+import { deriveConfig, hygieneRawMax, momentumRawMax } from "@/config/derive-config";
 
 export interface ScanProject {
   pathHash: string;
@@ -67,50 +52,53 @@ export interface DeriveOutput {
 
 export function deriveStatus(daysInactive: number | null): DeriveProject["statusAuto"] {
   if (daysInactive === null) return "archived";
-  if (daysInactive <= 14) return "active";
-  if (daysInactive <= 60) return "completed";
-  if (daysInactive <= 180) return "paused";
+  const { active, completed, paused } = deriveConfig.status;
+  if (daysInactive <= active) return "active";
+  if (daysInactive <= completed) return "completed";
+  if (daysInactive <= paused) return "paused";
   return "archived";
 }
 
 export function deriveHygieneScore(project: ScanProject): [number, Record<string, number>] {
   const breakdown: Record<string, number> = {};
+  const { hygiene } = deriveConfig;
   const files = project.files ?? {};
   const cicd = project.cicd ?? {};
   const deployment = project.deployment ?? {};
 
-  if (files.readme) breakdown.readme = 15;
-  if (files.tests) breakdown.tests = 20;
-  if (Object.values(cicd).some(Boolean)) breakdown.cicd = 15;
-  if (project.remoteUrl) breakdown.remote = 10;
-  if ((project.todoCount ?? 0) < 10) breakdown.lowTodos = 10;
-  if (Object.values(deployment).some(Boolean)) breakdown.deployment = 10;
-  if (files.linterConfig) breakdown.linter = 5;
-  if (files.license) breakdown.license = 5;
-  if (files.lockfile) breakdown.lockfile = 5;
+  if (files.readme) breakdown.readme = hygiene.readme;
+  if (files.tests) breakdown.tests = hygiene.tests;
+  if (Object.values(cicd).some(Boolean)) breakdown.cicd = hygiene.cicd;
+  if (project.remoteUrl) breakdown.remote = hygiene.remote;
+  if ((project.todoCount ?? 0) < deriveConfig.lowTodosThreshold) breakdown.lowTodos = hygiene.lowTodos;
+  if (Object.values(deployment).some(Boolean)) breakdown.deployment = hygiene.deployment;
+  if (files.linterConfig) breakdown.linter = hygiene.linter;
+  if (files.license) breakdown.license = hygiene.license;
+  if (files.lockfile) breakdown.lockfile = hygiene.lockfile;
 
   const raw = Object.values(breakdown).reduce((a, b) => a + b, 0);
-  const normalized = Math.min(Math.round((raw * 100) / 95), 100);
+  const normalized = Math.min(Math.round((raw * 100) / hygieneRawMax), 100);
   return [normalized, breakdown];
 }
 
 export function deriveMomentumScore(project: ScanProject): [number, Record<string, number>] {
   const breakdown: Record<string, number> = {};
+  const { momentum } = deriveConfig;
 
   const days = project.daysInactive;
   if (days !== null) {
-    if (days <= 7) breakdown.recency = 25;
-    else if (days <= 14) breakdown.recency = 20;
-    else if (days <= 30) breakdown.recency = 15;
-    else if (days <= 60) breakdown.recency = 5;
+    if (days <= 7) breakdown.recency = momentum.recency7d;
+    else if (days <= 14) breakdown.recency = momentum.recency14d;
+    else if (days <= 30) breakdown.recency = momentum.recency30d;
+    else if (days <= 60) breakdown.recency = momentum.recency60d;
   }
 
-  if (!project.isDirty) breakdown.cleanTree = 20;
-  if ((project.ahead ?? 0) === 0) breakdown.pushedUp = 15;
-  if ((project.branchCount ?? 0) <= 3) breakdown.lowBranches = 10;
+  if (!project.isDirty) breakdown.cleanTree = momentum.cleanTree;
+  if ((project.ahead ?? 0) === 0) breakdown.pushedUp = momentum.pushedUp;
+  if ((project.branchCount ?? 0) <= deriveConfig.lowBranchesThreshold) breakdown.lowBranches = momentum.lowBranches;
 
   const raw = Object.values(breakdown).reduce((a, b) => a + b, 0);
-  const normalized = Math.min(Math.round((raw * 100) / 70), 100);
+  const normalized = Math.min(Math.round((raw * 100) / momentumRawMax), 100);
   return [normalized, breakdown];
 }
 
@@ -142,7 +130,8 @@ export function deriveTags(project: ScanProject): string[] {
 export function deriveProject(project: ScanProject): DeriveProject {
   const [hygiene, hygieneBreakdown] = deriveHygieneScore(project);
   const [momentum, momentumBreakdown] = deriveMomentumScore(project);
-  const health = Math.round(0.65 * hygiene + 0.35 * momentum);
+  const { hygiene: hW, momentum: mW } = deriveConfig.healthWeights;
+  const health = Math.round(hW * hygiene + mW * momentum);
 
   return {
     pathHash: project.pathHash,

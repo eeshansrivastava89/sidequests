@@ -93,6 +93,10 @@ export interface MergedProject {
   repoVisibility: string;
   githubFetchedAt: string | null;
 
+  // Extensible key-value data from Scan.metaJson + Llm.extrasJson
+  // New scan/LLM fields automatically appear here without schema migration.
+  meta: Record<string, unknown>;
+
   // Timestamps
   lastScanned: string | null;
   updatedAt: string;
@@ -129,7 +133,7 @@ export async function mergeAllProjects(): Promise<MergedProject[]> {
 }
 
 export type ProjectWithRelations = Project & {
-  scan: { rawJson: string; scannedAt: Date } | null;
+  scan: { rawJson: string; metaJson: string | null; scannedAt: Date } | null;
   derived: {
     statusAuto: string;
     healthScoreAuto: number;
@@ -153,7 +157,6 @@ export type ProjectWithRelations = Project & {
     quarterCommits: number;
   } | null;
   llm: {
-    // New fields
     summary: string | null;
     nextAction: string | null;
     llmStatus: string | null;
@@ -165,10 +168,9 @@ export type ProjectWithRelations = Project & {
     framework: string | null;
     primaryLanguage: string | null;
     llmError: string | null;
-    // Legacy fields
+    extrasJson: string | null;
+    // Legacy fallback (summary supersedes purpose)
     purpose: string | null;
-    pitch: string | null;
-    aiInsightJson: string | null;
     generatedAt: Date;
   } | null;
   override: {
@@ -327,6 +329,12 @@ export function buildMergedView(project: ProjectWithRelations): MergedProject {
     prsTopJson: github?.prsJson ?? null,
     repoVisibility: github?.repoVisibility ?? "not-on-github",
     githubFetchedAt: github?.fetchedAt?.toISOString() ?? null,
+
+    // Extensible metadata: merge scan meta + LLM extras
+    meta: {
+      ...parseJson(scan?.metaJson, {} as Record<string, unknown>),
+      ...parseJson(llm?.extrasJson, {} as Record<string, unknown>),
+    },
 
     lastScanned: scan?.scannedAt?.toISOString() ?? null,
     updatedAt: project.updatedAt.toISOString(),

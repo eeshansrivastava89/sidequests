@@ -168,6 +168,8 @@ export const LLM_ENRICHMENT_FIXTURE: LlmEnrichment = {
     { text: "Set up CI/CD to automate builds and catch issues early", severity: "red" },
     { text: "Consider adding a second maintainer to reduce bus factor risk", severity: "amber" },
   ],
+  framework: "Next.js",
+  primaryLanguage: "TypeScript",
 };
 
 // -- DB seeding helpers --
@@ -212,11 +214,11 @@ interface SeedOverrides {
     risksJson?: string;
     tagsJson?: string;
     recommendationsJson?: string;
-    // Legacy fields
+    insightsJson?: string;
+    framework?: string;
+    primaryLanguage?: string;
+    // Legacy fallback
     purpose?: string;
-    notableFeaturesJson?: string;
-    pitch?: string | null;
-    aiInsightJson?: string | null;
   } | false;
   override?: {
     statusOverride?: string | null;
@@ -299,11 +301,8 @@ export async function seedProject(
         insightsJson: overrides.llm?.insightsJson ?? JSON.stringify(["Add tests to improve coverage"]),
         framework: overrides.llm?.framework ?? "Next.js",
         primaryLanguage: overrides.llm?.primaryLanguage ?? "TypeScript",
-        // Legacy fields
+        // Legacy fallback
         purpose: overrides.llm?.purpose ?? "Test purpose",
-        notableFeaturesJson: overrides.llm?.notableFeaturesJson ?? JSON.stringify(["SSR"]),
-        pitch: overrides.llm?.pitch ?? "A great project",
-        aiInsightJson: overrides.llm?.aiInsightJson ?? null,
       },
     });
   }

@@ -2,12 +2,6 @@ import { toast } from "sonner";
 
 /* ── Shared helpers for project UI components ──────────── */
 
-export function healthColor(score: number): string {
-  if (score >= 70) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 40) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
-}
-
 export function copyToClipboard(text: string, label: string) {
   navigator.clipboard.writeText(text).then(
     () => toast.success(`Copied ${label} command`),
@@ -48,10 +42,6 @@ export function formatRelativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-/**
- * Format "last touched" time with "Opened" prefix (e.g. "Opened 5m ago").
- * Used in project-list rows.
- */
 /**
  * Parse a GitHub remote URL (SSH or HTTPS) into owner/repo.
  */
